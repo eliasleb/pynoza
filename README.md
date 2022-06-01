@@ -1,6 +1,6 @@
 # pynoza
 
-Python files for the computation of time-domain solutions of Maxwell's equations using the cartesian multipole expansion.
+Python implementation of time-domain solutions of Maxwell's equations using the cartesian multipole expansion.
 
 ## Installation
 

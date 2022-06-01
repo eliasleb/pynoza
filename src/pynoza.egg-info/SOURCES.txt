@@ -1,0 +1,10 @@
+LICENSE
+README.md
+setup.cfg
+setup.py
+src/pynoza/__init__.py
+src/pynoza/solution.py
+src/pynoza.egg-info/PKG-INFO
+src/pynoza.egg-info/SOURCES.txt
+src/pynoza.egg-info/dependency_links.txt
+src/pynoza.egg-info/top_level.txt
