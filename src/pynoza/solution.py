@@ -102,7 +102,7 @@ class Solution:
         
     def _evaluate(self,
                   ind, t, x1, x2, x3, r, hs,
-                  **kwargs):
+                  **_):
         """Evaluate the auxiliary function.
         
         Positional arguments:
@@ -114,9 +114,7 @@ class Solution:
         R -- equal to X1**2+X2**2+X3**2. Passed to avoid computing it repeatedly.
         Hs -- dictionary of the derivatives of thetime-dependent excitation function.
               Must be in the form {order:derivative of order} for order=-1..max_order+2
-              
-        Keyword arguments:
-        delayed -- whether to evaluate the auxiliary function in t or t-r/c (default True)"""
+        """
         y = np.zeros(x1.shape)
         for signature in self._aux_func[ind]:
             if self.delayed:
@@ -165,14 +163,20 @@ class Solution:
     
         if not self.ran_recurse or not self.ran_set_moments:
             raise RuntimeError("You must first run the `recurse' and `set_moments' methods.")
-            
-        np.seterr(divide="raise",
-                  over="raise",
-                  under="warn",
-                  invalid="raise")
 
         self.verbose = kwargs.pop("verbose", False)
         self.delayed = kwargs.pop("delayed", True)
+
+        if self.verbose:
+            np.seterr(divide="raise",
+                      over="raise",
+                      under="warn",
+                      invalid="raise")
+        else:
+            np.seterr(divide="raise",
+                      over="raise",
+                      under="ignore",
+                      invalid="raise")
 
         if kwargs:
             raise ValueError(f"Unexpected keyword argument: {kwargs}")
