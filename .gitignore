@@ -4,6 +4,7 @@
 .ipynb_checkpoints
 .pytest_cache
 .tox
+.idea
 
 git_ignore/
 
