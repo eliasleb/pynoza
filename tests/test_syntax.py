@@ -3,11 +3,14 @@
 
 import pynoza
 import pytest
+import sympy
+import numpy as np
 
 
-def check_args(fun,*args,**kwargs):
+def check_args(fun, *args, **kwargs):
     with pytest.raises(ValueError):
-        fun(*args,**kwargs)
+        fun(*args, **kwargs)
+
 
 def test_inputs():
     check_args(pynoza.Solution, wave_speed="hello you")
@@ -18,12 +21,7 @@ def test_inputs():
     check_args(s.set_moments, charge_moment=lambda a1, a2, a3: "hello you")
     check_args(s.set_moments, current_moment=lambda a1, a2, a3: "hello you")
     with pytest.raises(RuntimeError):
-        s.compute_e_field(0,
-                          0,
-                          0,
-                          0,
-                          0,
-                          0)
-
-
-
+        x = np.array([0, ])
+        t_sym = sympy.Symbol("t")
+        h_sym = t_sym
+        s.compute_e_field(x, x, x, x, h_sym, t_sym)

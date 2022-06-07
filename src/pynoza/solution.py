@@ -6,7 +6,6 @@ Created on Thu Oct 14 11:16:58 2021
 @author: Elias Le Boudec, elias.leboudec@epfl.ch
 """
 import numpy as np
-from numpy.typing import ArrayLike
 import sys
 import sympy
 import numbers
@@ -115,7 +114,7 @@ class Solution:
                   x2: np.ndarray,
                   x3: np.ndarray,
                   r: np.ndarray,
-                  hs: dict[int, typing.Callable[[np.ndarray], np.ndarray]],
+                  hs: list[typing.Callable[[np.ndarray], np.ndarray]],
                   **_) -> np.ndarray:
         """Evaluate the auxiliary function.
         
@@ -154,10 +153,10 @@ class Solution:
                                                                                                                  0,
                                                                                                                  0],
                     charge_moment: typing.Callable[[int, int, int], list[numbers.Number,
-                                                                          numbers.Number,
-                                                                          numbers.Number]] = lambda a1, a2, a3: [0,
-                                                                                                                 0,
-                                                                                                                 0],)\
+                                                                         numbers.Number,
+                                                                         numbers.Number]] = lambda a1, a2, a3: [0,
+                                                                                                                0,
+                                                                                                                0],)\
             -> None:
         """Set the current and charge moment functions.
         
@@ -274,7 +273,7 @@ class Solution:
         return e_field
 
 
-def fact(a: tuple[int, int, int]) -> numbers.Number:
+def fact(a) -> numbers.Number:
     res = 1
     for i in a:
         res *= np.math.factorial(i)
