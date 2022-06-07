@@ -5,7 +5,9 @@ Summary: Computation of time-domain solutions of Maxwell's equations using the c
 Home-page: https://c4science.ch/source/pynoza
 Author: Elias Le Boudec
 Author-email: elias.leboudec@epfl.ch
+License: UNKNOWN
 Project-URL: Bug Tracker, https://c4science.ch/source/pynoza
+Platform: UNKNOWN
 Classifier: Programming Language :: Python :: 3
 Classifier: License :: OSI Approved :: MIT License
 Classifier: Operating System :: OS Independent
@@ -21,3 +23,4 @@ Python implementation of time-domain solutions of Maxwell's equations using the 
 
 - [ ] finish README
 - [ ] tests
+

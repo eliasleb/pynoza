@@ -82,7 +82,7 @@ class Solution:
                 self._aux_func[index][tuple(identity_third_term)] = \
                     -coeff / self.c
 
-    def recurse(self, verbose=True):
+    def recurse(self, verbose=False):
         """Compute the auxiliary function up to the max order.
         
         Keyword arguments:

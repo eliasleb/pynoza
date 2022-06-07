@@ -153,7 +153,6 @@ def test_solution(test_case):
         case _:
             t = np.array([0, ])
 
-
     def current_moment(a1, a2, a3):
         moment = 0
         if a3 == 0:
@@ -162,7 +161,6 @@ def test_solution(test_case):
                               hi / Llogo * L) / gamma_SI
         return [moment, 0, 0]
 
-
     def charge_moment(a1, a2, a3):
         moment = 0
         if a3 == 0:
@@ -170,7 +168,6 @@ def test_solution(test_case):
                 moment += c_r(a1, a2, a3, xi / Llogo * L - d1, yi / Llogo * L - d2, wi / Llogo * L,
                               hi / Llogo * L) / gamma_SI
         return [moment, 0, 0]
-
 
     x1 = np.array([0, ])
     x2 = np.array([0, ])
@@ -232,3 +229,7 @@ def test_solution(test_case):
             assert np.linalg.norm(e_paper1 * 1e2 - E1[0, 0, 0, :] * x3[0] / 1e6, ord=2) / t.size < 0.3 \
                    and np.linalg.norm(e_paper2 * 1e2 - E1[0, 0, 1, :] * x3[1] / 1e6, ord=2) / t.size < 0.3 \
                    and np.linalg.norm(e_paper3 * 1e2 - E1[0, 0, 2, :] * x3[2] / 1e6, ord=2) / t.size < 0.3
+
+
+if __name__ == "__main__":
+    test_solution("logo")
