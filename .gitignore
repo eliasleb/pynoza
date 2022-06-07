@@ -5,6 +5,7 @@
 .pytest_cache
 .tox
 .idea
+src/pynoza.egg-info/
 
 git_ignore/
 

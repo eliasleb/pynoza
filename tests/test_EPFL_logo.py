@@ -6,7 +6,7 @@ import pandas as pd
 import sympy.functions.special
 import itertools
 import scipy.interpolate
-import pynoza.solution
+import pynoza
 import pytest
 
 

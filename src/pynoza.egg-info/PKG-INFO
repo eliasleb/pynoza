@@ -1,17 +1,15 @@
 Metadata-Version: 2.1
 Name: pynoza
-Version: 0.0.1
+Version: 0.0a0
 Summary: Computation of time-domain solutions of Maxwell's equations using the cartesian multipole expansion
 Home-page: https://c4science.ch/source/pynoza
 Author: Elias Le Boudec
 Author-email: elias.leboudec@epfl.ch
-License: UNKNOWN
 Project-URL: Bug Tracker, https://c4science.ch/source/pynoza
-Platform: UNKNOWN
 Classifier: Programming Language :: Python :: 3
 Classifier: License :: OSI Approved :: MIT License
 Classifier: Operating System :: OS Independent
-Requires-Python: >=3.6
+Requires-Python: >=3.10
 Description-Content-Type: text/markdown
 License-File: LICENSE
 
@@ -23,4 +21,3 @@ Python implementation of time-domain solutions of Maxwell's equations using the 
 
 - [ ] finish README
 - [ ] tests
-
