@@ -35,6 +35,6 @@ The Python `>= 3.10` script `tests/test_EPFL_logo.py` shows some examples. A Jup
 
 6. Create a `pynoza.Solution` object with the given medium light speed (in natural units) and given multipole expansion order.
 
-7. Run the `recurse` method to initiate the Green’s function approximation (this gets slower for high orders), and the `set_moments` method to pass the current and charge moments that you computed above.
+7. Run the `recurse` method to initialize the Green’s function approximation (this gets slower for high orders), and the `set_moments` method to pass the current and charge moments that you computed above.
 
 8.  Run the `compute_e_field` method to compute the electric field from the Green’s functions approximation and the charge and current moments. Under the hood, this method will integrate and differentiate the time-dependent function `h_sym` to the needed order.
