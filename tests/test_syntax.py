@@ -25,3 +25,10 @@ def test_inputs():
         t_sym = sympy.Symbol("t")
         h_sym = t_sym
         s.compute_e_field(x, x, x, x, h_sym, t_sym)
+
+
+if __name__ == "__main__":
+    sol = pynoza.Solution(max_order=2)
+    print(sol)
+    sol.recurse()
+    print(sol)

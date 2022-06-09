@@ -21,6 +21,9 @@ Python implementation of time-domain solutions of Maxwell's equations using the 
 
 Currently, only the electric field computation is supported, and the current density must be time-separable, i.e., $\mathbf{J}(t,\mathbf{x})=h(t)\mathbf{j}(\mathbf{x})$
 
+## Installation
+To install, clone the repository. From the root `pynoza` folder, run `pip install -e .`.
+
 ## Tutorial
 
 The Python `>= 3.10` script `tests/test_EPFL_logo.py` shows some examples. A Jupyter notebook is also provided. The general procedure is the following:
@@ -52,9 +55,4 @@ The Python `>= 3.10` script `tests/test_EPFL_logo.py` shows some examples. A Jup
 7. Run the `recurse` method to initiate the Green’s function approximation (this gets slower for high orders), and the `set_moments` method to pass the current and charge moments that you computed above.
 
 8.  Run the `compute_e_field` method to compute the electric field from the Green’s functions approximation and the charge and current moments. Under the hood, this method will integrate and differentiate the time-dependent function `h_sym` to the needed order.
-
-## TODO
-
-- [ ] finish README
-- [ ] tests
 

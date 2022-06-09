@@ -46,6 +46,10 @@ class Solution:
         self.verbose: bool = False
         self.delayed: bool = True
 
+        self.e_field: np.ndarray = np.array([])
+
+        self.e_field_text: str = ""
+
     def _increase_order(self, known_index: tuple[int, int, int], index: tuple[int, int, int]) -> None:
         """Private method to compute the auxiliary function.
         
@@ -146,6 +150,30 @@ class Solution:
             y += dy
         return y
 
+    def _evaluate_txt(self,
+                      ind: tuple[int, int, int],
+                      h: str) -> str:
+        """Evaluate the auxiliary function as a symbolic expression
+
+            :param ind: multi-index to evaluate at
+            :param h: name of the function
+            :return: a string describing the auxiliary function
+            """
+        y: str = ""
+        for signature in self._aux_func[ind]:
+            dy = ""
+            dy += f"{self._aux_func[ind][signature]:.2e}*{h}^({signature[3]})(t-r/{self.c:.1f})"
+            if signature[0] > 0:
+                dy += f"x1^{signature[0]}"
+            if signature[1] > 0:
+                dy += f"x2^{signature[1]}"
+            if signature[2] > 0:
+                dy += f"x3^{signature[2]}"
+            if signature[-1] > 0:
+                dy += f"/r^{signature[-1]}"
+            y += dy
+        return y
+
     def set_moments(self,
                     current_moment: typing.Callable[[int, int, int], list[numbers.Number,
                                                                           numbers.Number,
@@ -214,7 +242,8 @@ class Solution:
         if kwargs:
             raise ValueError(f"Unexpected keyword arguments: {kwargs}")
 
-        e_field = np.zeros((3, x1.size, x2.size, x3.size, t.size))
+        self.e_field = np.zeros((3, x1.size, x2.size, x3.size, t.size))
+        self.e_field_text = ""
 
         x1, x2, x3, t = np.meshgrid(x1, x2, x3, t)
         r = np.sqrt(x1 ** 2 + x2 ** 2 + x3 ** 2)
@@ -257,20 +286,50 @@ class Solution:
                 current_moment = -self.mu * np.array(
                     self.current_moment(a1, a2, a3)).reshape((3, 1, 1, 1, 1))
                 if np.any(charge_moment) > thresh:
-                    e_field += (-1) ** np.sum(ind) / fact(ind) \
-                               * charge_moment * self._evaluate(tuple(ind),
-                                                                t, x1, x2, x3, r,
+                    self.e_field += self._single_term_multipole(ind,
+                                                                charge_moment,
                                                                 hs_integral,
-                                                                **kwargs) / 4 / np.pi
+                                                                t, x1, x2, x3, r,
+                                                                **kwargs)
+                    self.e_field_text += self._single_term_multipole_txt(ind,
+                                                                         charge_moment,
+                                                                         "int_h")
                 if np.any(current_moment) > thresh:
-                    e_field += (-1) ** np.sum(ind) / fact(ind) \
-                               * current_moment * self._evaluate(tuple(ind),
-                                                                 t, x1, x2, x3, r,
-                                                                 hs_derivative,
-                                                                 **kwargs) / 4 / np.pi
+                    self.e_field += self._single_term_multipole(ind,
+                                                                current_moment,
+                                                                hs_derivative,
+                                                                t, x1, x2, x3, r,
+                                                                **kwargs)
+                    self.e_field_text += self._single_term_multipole_txt(ind,
+                                                                         current_moment,
+                                                                         "dhdt")
+
         if self.verbose:
             print("Done.")
-        return e_field
+
+        return self.e_field
+
+    def _single_term_multipole(self,
+                               ind: np.ndarray,
+                               moment: np.ndarray,
+                               hs: np.ndarray,
+                               *args,
+                               **kwargs):
+        return (-1) ** np.sum(ind) / fact(ind) \
+               * moment * self._evaluate(tuple(ind),
+                                         *args,
+                                         hs,
+                                         **kwargs) / 4 / np.pi
+
+    def _single_term_multipole_txt(self,
+                                   ind: np.ndarray,
+                                   moment: np.ndarray,
+                                   hs: str):
+        return f"""  {(-1) ** np.sum(ind):+d}/{fact(ind)}"""\
+               f"""*{list(map('{:.2e}%'.format, moment.flatten()))}*{self._evaluate_txt(tuple(ind), hs)}/(4pi)\n"""
+
+    def __repr__(self) -> str:
+        return f"Solution: {self.max_order=}, {self.c=}, {self.ran_recurse=}"
 
 
 def fact(a) -> numbers.Number:
