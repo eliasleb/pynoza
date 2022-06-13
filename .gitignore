@@ -10,6 +10,7 @@ src/pynoza.egg-info/
 git_ignore/
 .idea/
 dist/
+src/pynoza.egg-info/
 
 __pycache__/
 .ipynb_checkpoints/
