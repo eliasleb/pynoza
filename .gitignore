@@ -8,7 +8,7 @@
 src/pynoza.egg-info/
 
 git_ignore/
-
+.idea/
 dist/
 
 __pycache__/
