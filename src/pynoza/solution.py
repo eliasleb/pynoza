@@ -333,7 +333,7 @@ class Solution:
 
 
 def fact(a) -> numbers.Number:
-    res = 1
+    res: numbers.Number = 1
     for i in a:
         res *= np.math.factorial(i)
     return res
