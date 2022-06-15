@@ -215,7 +215,10 @@ class Solution:
         Positional arguments:
         x1,x2,x3 -- arrays of the spatial coordinates to evaluate the e_field-field at (aka x,y,z)
         t -- array of the time coordinates to evaluate the e_field-field at
-        h_sym -- symbolic time-dependent (:t_sym:) function describing the shape of the current
+        h_sym -- symbolic time-dependent (t_sym) function describing the shape of the current
+                 *or* a dictionary of numpy arrays of the same shape as t, each array containing the
+                  values of the nth order derivative of the time-dependent function. The keys of the
+                  dictionary must be the integers in the range -1..max_order+2.
         t_sym -- symbolic variable representing time, used in h_sym
         
         Keyword arguments:
@@ -224,6 +227,11 @@ class Solution:
 
         if not self.ran_recurse or not self.ran_set_moments:
             raise RuntimeError("You must first run the `recurse' and `set_moments' methods.")
+
+        if isinstance(h_sym, dict):
+            if not set(h_sym.keys()).issuperset(set(range(-1, self.max_order + 3))):
+                raise ValueError("When h_sym is a dictionary, the keys must contain"\
+                                 "the indices -1..max_order + 2")
 
         self.verbose = kwargs.pop("verbose", False)
         self.delayed = kwargs.pop("delayed", True)
@@ -329,7 +337,7 @@ class Solution:
                f"""*{list(map('{:.2e}%'.format, moment.flatten()))}*{self._evaluate_txt(tuple(ind), hs)}/(4pi)\n"""
 
     def __repr__(self) -> str:
-        return f"Solution: {self.max_order=}, {self.c=}, {self.ran_recurse=}"
+        return f"Solution({self.max_order=}, {self.c=}, {self.ran_recurse=})"
 
 
 def fact(a) -> numbers.Number:
