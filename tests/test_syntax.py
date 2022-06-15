@@ -30,7 +30,8 @@ def test_inputs():
     with pytest.raises(ValueError):
         s.compute_e_field(x, x, x, x, {-1: None}, t_sym)
     h_sym = {-1: x, 0: x, 1: x, 2: x}
-#    s.compute_e_field(x, x, x, x, h_sym, t_sym)
+    s.compute_e_field(x, x, x, x, h_sym, t_sym)
+
 
 if __name__ == "__main__":
     sol = pynoza.Solution(max_order=2)

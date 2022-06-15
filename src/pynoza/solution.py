@@ -230,7 +230,7 @@ class Solution:
 
         if isinstance(h_sym, dict):
             if not set(h_sym.keys()).issuperset(set(range(-1, self.max_order + 3))):
-                raise ValueError("When h_sym is a dictionary, the keys must contain"\
+                raise ValueError("When h_sym is a dictionary, the keys must contain"
                                  "the indices -1..max_order + 2")
 
         self.verbose = kwargs.pop("verbose", False)
@@ -258,30 +258,10 @@ class Solution:
 
         thresh = 1e-14
 
-        h_0_sym = h_sym.integrate(t_sym)
-        hs_sym = {-1: h_0_sym, 0: h_sym}
-        for order in range(1, self.max_order + 3):
-            if self.verbose:
-                sys.stdout.write("\rComputing derivative of order {}...".format(order))
-            hs_sym[order] = sympy.diff(hs_sym[order - 1]).simplify()
-        if self.verbose:
-            print("Done.")
-        hs = dict()
-        for order in hs_sym:
-            hs[order] = sympy.lambdify(t_sym, hs_sym[order])
-
-        hs_integral = list()
-        hs_derivative = list()
-        for order in range(-1, self.max_order + 3):
-            if order > 0:
-                if order <= self.max_order:
-                    hs_derivative.append(hs[order])
-                    hs_integral.append(hs[order])
-                else:
-                    hs_derivative.append(lambda _: 0)
-                    hs_integral.append(lambda _: 0)
-            else:
-                hs_integral.append(hs[order])
+        if isinstance(h_sym, dict):
+            hs_derivative, hs_integral = self._handle_h_dict(h_sym)
+        else:
+            hs_derivative, hs_integral = self._handle_h_symbolic(h_sym, t_sym)
 
         for ind, _ in np.ndenumerate(np.zeros(self._shape)):
             ind = np.array(ind)
@@ -316,6 +296,43 @@ class Solution:
             print("Done.")
 
         return self.e_field
+
+    def _handle_h_symbolic(self, h_sym, t_sym):
+        h_0_sym = h_sym.integrate(t_sym)
+        hs_sym = {-1: h_0_sym, 0: h_sym}
+        for order in range(1, self.max_order + 3):
+            if self.verbose:
+                sys.stdout.write("\rComputing derivative of order {}...".format(order))
+            hs_sym[order] = sympy.diff(hs_sym[order - 1]).simplify()
+        if self.verbose:
+            print("Done.")
+        hs = dict()
+        for order in hs_sym:
+            hs[order] = sympy.lambdify(t_sym, hs_sym[order])
+
+        return self._repack_hs(hs)
+
+    def _repack_hs(self, hs):
+        hs_integral = list()
+        hs_derivative = list()
+        for order in range(-1, self.max_order + 3):
+            if order > 0:
+                if order <= self.max_order:
+                    hs_derivative.append(hs[order])
+                    hs_integral.append(hs[order])
+                else:
+                    hs_derivative.append(lambda _: 0)
+                    hs_integral.append(lambda _: 0)
+            else:
+                hs_integral.append(hs[order])
+
+        return hs_derivative, hs_integral
+
+    def _handle_h_dict(self, h_sym):
+        h_sym_callable = dict()
+        for order in h_sym:
+            h_sym_callable[order] = lambda _: h_sym[order]
+        return self._repack_hs(h_sym_callable)
 
     def _single_term_multipole(self,
                                ind: np.ndarray,
