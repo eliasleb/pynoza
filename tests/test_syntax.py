@@ -20,12 +20,17 @@ def test_inputs():
     check_args(s.set_moments, current_moment=1)
     check_args(s.set_moments, charge_moment=lambda a1, a2, a3: "hello you")
     check_args(s.set_moments, current_moment=lambda a1, a2, a3: "hello you")
+    x = np.array([0, ])
+    t_sym = sympy.Symbol("t")
+    h_sym = t_sym
     with pytest.raises(RuntimeError):
-        x = np.array([0, ])
-        t_sym = sympy.Symbol("t")
-        h_sym = t_sym
         s.compute_e_field(x, x, x, x, h_sym, t_sym)
-
+    s.recurse()
+    s.set_moments()
+    with pytest.raises(ValueError):
+        s.compute_e_field(x, x, x, x, {-1: None}, t_sym)
+    h_sym = {-1: x, 0: x, 1: x, 2: x}
+#    s.compute_e_field(x, x, x, x, h_sym, t_sym)
 
 if __name__ == "__main__":
     sol = pynoza.Solution(max_order=2)
