@@ -10,6 +10,7 @@ import sys
 import sympy
 import numbers
 import typing
+import scipy.interpolate
 
 
 class Solution:
@@ -133,21 +134,21 @@ class Solution:
               Must be in the form {order:derivative of order} for order=-1..max_order+2
         """
         y: np.ndarray = np.zeros(x1.shape)
-        dy: np.ndarray = np.zeros(x1.shape)
+
         for signature in self._aux_func[ind]:
             if self.delayed:
                 dy = hs[signature[3]](t - r / self.c) * self._aux_func[ind][signature]
             else:
                 dy = hs[signature[3]](t) * self._aux_func[ind][signature]
             if signature[0] > 0:
-                dy *= x1 ** signature[0]
+                dy = dy * x1 ** signature[0]
             if signature[1] > 0:
-                dy *= x2 ** signature[1]
+                dy = dy * x2 ** signature[1]
             if signature[2] > 0:
-                dy *= x3 ** signature[2]
+                dy = dy * x3 ** signature[2]
             if signature[-1] > 0:
-                dy /= r ** signature[-1]
-            y += dy
+                dy = dy / r ** signature[-1]
+            y = y + dy
         return y
 
     def _evaluate_txt(self,
@@ -252,14 +253,18 @@ class Solution:
 
         self.e_field = np.zeros((3, x1.size, x2.size, x3.size, t.size))
         self.e_field_text = ""
+        #x1, x2, x3, t = np.meshgrid(x1, x2, x3, t)
+        x1 = x1.reshape((x1.size, 1, 1, 1))
+        x2 = x2.reshape((1, x2.size, 1, 1))
+        x3 = x3.reshape((1, 1, x3.size, 1))
+        t = t.reshape((1, 1, 1, t.size))
 
-        x1, x2, x3, t = np.meshgrid(x1, x2, x3, t)
         r = np.sqrt(x1 ** 2 + x2 ** 2 + x3 ** 2)
 
         thresh = 1e-14
 
         if isinstance(h_sym, dict):
-            hs_derivative, hs_integral = self._handle_h_dict(h_sym)
+            hs_derivative, hs_integral = self._handle_h_dict(h_sym, t)
         else:
             hs_derivative, hs_integral = self._handle_h_symbolic(h_sym, t_sym)
 
@@ -328,10 +333,13 @@ class Solution:
 
         return hs_derivative, hs_integral
 
-    def _handle_h_dict(self, h_sym):
+    def _handle_h_dict(self, hs, t):
         h_sym_callable = dict()
-        for order in h_sym:
-            h_sym_callable[order] = lambda _: h_sym[order]
+
+        print(hs[0].shape, t.shape)
+
+        for order in hs:
+            h_sym_callable[order] = lambda t_call: scipy.interpolate.interpn(t, hs[order], t_call)
         return self._repack_hs(h_sym_callable)
 
     def _single_term_multipole(self,
