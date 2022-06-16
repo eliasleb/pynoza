@@ -231,7 +231,7 @@ class Solution:
         if isinstance(h_sym, dict):
             if not set(h_sym.keys()).issuperset(set(range(-1, self.max_order + 3))):
                 raise ValueError("When h_sym is a dictionary, the keys must contain"
-                                 "the indices -1..max_order + 2")
+                                 " the indices -1..max_order + 2")
 
         self.verbose = kwargs.pop("verbose", False)
         self.delayed = kwargs.pop("delayed", True)
