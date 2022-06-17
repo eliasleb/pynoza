@@ -12,6 +12,18 @@ import numbers
 import typing
 import scipy.interpolate
 
+class Interpolator(scipy.interpolate.interp1d):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.__doc__ = scipy.interpolate.interp1d.__doc__
+
+    def __call__(self, *args, **kwargs):
+        x = args[0]
+        x[x < self.x.min()] = self.x.min()
+        x[x > self.x.max()] = self.x.max()
+
+        return super().__call__(*args, **kwargs)
+
 
 class Solution:
     """A class to compute solutions of Maxwell's equations, based on"""
@@ -263,8 +275,8 @@ class Solution:
 
         thresh = 1e-14
 
-        if isinstance(h_sym, dict):
-            hs_derivative, hs_integral = self._handle_h_dict(h_sym, t)
+        if isinstance(h_sym, np.ndarray):
+            hs_derivative, hs_integral = self._handle_h_array(h_sym, t)
         else:
             hs_derivative, hs_integral = self._handle_h_symbolic(h_sym, t_sym)
 
@@ -333,13 +345,24 @@ class Solution:
 
         return hs_derivative, hs_integral
 
-    def _handle_h_dict(self, hs, t):
+    def _handle_h_array(self, h, t):
+
+        dt = np.max(np.diff(t))
+
+        def integrate_array(x):
+            return np.cumsum(x) * dt
+
+        def derivative(x):
+            return np.gradient(x, dt)
+
+        hs = {-1: integrate_array(h), 0: h}
+
+        for i in range(1, self.max_order + 3):
+            hs[i] = derivative(hs[i - 1])
+
         h_sym_callable = dict()
-
-        print(hs[0].shape, t.shape)
-
         for order in hs:
-            h_sym_callable[order] = lambda t_call: scipy.interpolate.interpn(t, hs[order], t_call)
+            h_sym_callable[order] = Interpolator(t.squeeze(), hs[order])
         return self._repack_hs(h_sym_callable)
 
     def _single_term_multipole(self,
@@ -370,6 +393,22 @@ def fact(a) -> numbers.Number:
     for i in a:
         res *= np.math.factorial(i)
     return res
+
+
+def set_extremities(x, ratio, dim=0, val=0):
+
+    portion = np.linspace(0, 1, x.shape[dim])
+    start = np.where(portion > ratio/2)[0][0]
+    stop = np.where(portion > 1 - ratio/2)[0][0]
+    s_start = {dim: slice(0, start)}
+    s_stop = {dim: slice(stop, None)}
+    ix_start = [s_start.get(dim, slice(None)) for dim in range(x.ndim)]
+    ix_stop = [s_stop.get(dim, slice(None)) for dim in range(x.ndim)]
+    
+    x[tuple(ix_start)] = val
+    x[tuple(ix_stop)] = val
+    
+    return x
 
 
 if __name__ == "__main__":
