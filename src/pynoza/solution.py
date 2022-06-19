@@ -270,7 +270,7 @@ class Solution:
 
         self.e_field = np.zeros((3, x1.size, x2.size, x3.size, t.size))
         self.e_field_text = ""
-        #x1, x2, x3, t = np.meshgrid(x1, x2, x3, t)
+
         x1 = x1.reshape((x1.size, 1, 1, 1))
         x2 = x2.reshape((1, x2.size, 1, 1))
         x3 = x3.reshape((1, 1, x3.size, 1))
