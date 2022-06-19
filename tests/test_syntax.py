@@ -5,6 +5,7 @@ import pynoza
 import pytest
 import sympy
 import numpy as np
+import sympy
 
 
 def check_args(fun, *args, **kwargs):
@@ -29,7 +30,8 @@ def test_inputs():
     s.set_moments()
     with pytest.raises(ValueError):
         s.compute_e_field(x, x, x, x, {-1: None}, t_sym)
-    h_sym = {-1: x, 0: x, 1: x, 2: x}
+    t_sym = sympy.Symbol("t")
+    h_sym = t_sym
     s.compute_e_field(x, x, x, x, h_sym, t_sym)
 
 
