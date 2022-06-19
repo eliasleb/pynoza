@@ -1,28 +1,17 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib as mpl
-
 import pandas as pd
-import sympy.functions.special
-import matplotlib.patches as patches
-from matplotlib.collections import PatchCollection
-import itertools
+import inverse_problem
 
-import pynoza
-import scipy.interpolate
-import scipy.optimize
-import re
-import importlib
-
-case_ = "fast"
+case_ = "full"
 
 match case_:
     case "fast":
         filename = "../../../git_ignore/GLOBALEM/hira_v1.txt"
     case "full":
-        filename = "../../../git_ignore/GLOBALEM/hira_v4.txt"
+        filename = "../../../git_ignore/GLOBALEM/hira_v6.txt"
     case _:
-        filename = "../../../git_ignore/GLOBALEM/hira_v4.txt"
+        raise NotImplementedError()
 
 data = pd.read_csv(filename,
                    delim_whitespace=True,
@@ -42,8 +31,8 @@ data.set_axis(names, axis=1, inplace=True)
 data.head()
 
 r_HIRA = 0.7
-shift = 0
-dt = 6.6666e-11
+shift = -.4
+dt = 3.333333e-11
 
 src_range_x = [-r_HIRA, r_HIRA]
 src_range_y = [shift - r_HIRA/2, shift - r_HIRA/2 + 2*r_HIRA]
@@ -55,7 +44,7 @@ src_radius = 2*r_HIRA
 if case_ == "fast":
     obs_range = [1.7*src_radius, 1.71*src_radius]
 else:
-    obs_range = [1.7 * src_radius, 2 * src_radius]
+    obs_range = [1.3 * src_radius, 20 * src_radius]
 
 Np = data.shape[0]
 Nt = 0
@@ -75,104 +64,60 @@ for i, (xi, yi, zi) in enumerate(zip(data["x"], data["y"], data["z"])):
 
 print(f"Found {len(indices_obs)} points")
 
+n_down_sample_t = 1
+n_down_sample_x = 100
+
 x1 = data["x"][indices_obs]
 x2 = data["y"][indices_obs]
 x3 = data["z"][indices_obs]
+x1 = x1 - src_center[0]
+x2 = x2 - src_center[1]
+x3 = x3 - src_center[2]
+
 ex = data.iloc[indices_obs, 3:3*Nt+3:3]
 ey = data.iloc[indices_obs, 4:3*Nt+3:3]
 ez = data.iloc[indices_obs, 5:3*Nt+3:3]
+t = t[::n_down_sample_t]
 
 assert np.all(["Ex" in name for name in ex.columns])
 assert np.all(["Ey" in name for name in ey.columns])
 assert np.all(["Ez" in name for name in ez.columns])
 
-x1 = np.array(x1)
-x2 = np.array(x2)
-x3 = np.array(x3)
+x1 = np.array(x1)[::n_down_sample_x]
+x2 = np.array(x2)[::n_down_sample_x]
+x3 = np.array(x3)[::n_down_sample_x]
 
-ex = np.array(ex)
-ey = np.array(ey)
-ez = np.array(ez)
+ex = np.array(ex)[::n_down_sample_x, ::n_down_sample_t]
+ey = np.array(ey)[::n_down_sample_x, ::n_down_sample_t]
+ez = np.array(ez)[::n_down_sample_x, ::n_down_sample_t]
 
-M = 1
-sol = pynoza.Solution(max_order=M,
-                      wave_speed=1,)
-sol.recurse()
+# Symmetry along yz axis
+x1_sym, x2_sym, x3_sym = np.zeros(x1.shape), np.zeros(x2.shape), np.zeros(x3.shape)
+ex_sym, ey_sym, ez_sym = np.zeros(ex.shape), np.zeros(ey.shape), np.zeros(ez.shape)
 
+for i, (x1i, x2i, x3i, exi, eyi, ezi) in enumerate(zip(x1, x2, x3, ex, ey, ez)):
+    ex_sym[i, :] = exi
+    ey_sym[i, :] = -eyi
+    ez_sym[i, :] = -ezi
+    x1_sym[i] = -x1i
+    x2_sym[i] = x2i
+    x3_sym[i] = x3i
 
-def integrate_array(x):
-    return np.cumsum(x)*dt
-
-
-def derivative(x):
-    return np.gradient(x, dt)
-
-
-def get_all_orders(h):
-    h_dict = {-1: integrate_array(h), 0: h}
-
-    for i in range(1, M+3):
-        h_dict[i] = derivative(h_dict[i-1])
-
-    return h_dict
-
-
-def get_fields(current_moment, charge_moment, h):
-
-    h_dict = get_all_orders(h)
-
-    c_mom = lambda a1, a2, a3: list(current_moment[a1, a2, a3])
-    r_mom = lambda a1, a2, a3: list(charge_moment[a1, a2, a3])
-
-    sol.set_moments(c_mom, r_mom)
-
-    return sol.compute_e_field(x1,
-                               x2,
-                               x3,
-                               t,
-                               h_dict,
-                               None)
-
+x1, x2, x3, ex, ey, ez = np.concatenate((x1, x1_sym)), np.concatenate((x2, x2_sym)), np.concatenate((x3, x3_sym)), \
+    np.concatenate((ex, ex_sym)), np.concatenate((ey, ey_sym)), np.concatenate((ez, ez_sym))
 
 e_true = [ex, ey, ez]
+print(f"{ex.shape=}")
 
-charge_moments = np.ones((sol.max_order+1, sol.max_order+1, sol.max_order+1, 3))
-current_moments = charge_moments.copy()
-Nmom = charge_moments.size
-shape_mom = charge_moments.shape
-
-h = np.sin(t).reshape(1, 1, 1, t.size)
-Nh = h.size
-shape_h = h.shape
+kwargs = {"tol": 1e-4,
+          "n_points": 50,
+          "error_tol": 1e-2,
+          "coeff_derivative": 0}
 
 
+current_moment, charge_moment, h = inverse_problem.inverse_problem(1, e_true, x1, x2, x3, t, **kwargs)
 
-def ravel_params(charge_moment, current_moments, h):
-    return np.concatenate((np.ravel(charge_moment), np.ravel(current_moments), np.ravel(h)))
-
-
-def unravel_params(params):
-    return params[:Nmom].reshape(shape_mom), \
-           params[Nmom:Nmom+Nmom].reshape(shape_mom), \
-           params[2*Nmom:]
-
-
-x0 = ravel_params(charge_moments, current_moments, h)
-
-
-def get_error(x):
-
-    current_moment, charge_moment, h = unravel_params(x)
-
-    e_opt = get_fields(current_moment, charge_moment, h)
-
-    error = 0
-    for c1, c2 in zip(e_true, e_opt):
-        error += np.sum((c1 - c2)**2)
-
-    return error
-
-
-get_error(x0)
-
-# scipy.optimize.minimize(get_error, x0)
+h -= h[0]
+plt.plot(t, e_true[0][:, :].T, "--")
+plt.plot(t, h / np.max(np.abs(h)))
+plt.show()
