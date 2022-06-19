@@ -12,6 +12,7 @@ import numbers
 import typing
 import scipy.interpolate
 
+
 class Interpolator(scipy.interpolate.interp1d):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -19,10 +20,14 @@ class Interpolator(scipy.interpolate.interp1d):
 
     def __call__(self, *args, **kwargs):
         x = args[0]
+        idx = (x < self.x.min()) | (x > self.x.max())
+
         x[x < self.x.min()] = self.x.min()
         x[x > self.x.max()] = self.x.max()
 
-        return super().__call__(*args, **kwargs)
+        y = super().__call__(*args, **kwargs)
+        y[idx] = 0
+        return y
 
 
 class Solution:
