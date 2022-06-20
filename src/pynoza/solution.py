@@ -56,6 +56,7 @@ class Solution:
             self._aux_func[tuple(ind)] = dict()
         self._aux_func[(0, 0, 0)] = {(0, 0, 0, 0, 1): 1.}
         self.mu: float = 4 * np.pi * 1e-7
+        self.thresh = 1e-14
 
         self.ran_recurse: bool = False
         self.ran_set_moments: bool = False
@@ -277,8 +278,7 @@ class Solution:
         t = t.reshape((1, 1, 1, t.size))
 
         r = np.sqrt(x1 ** 2 + x2 ** 2 + x3 ** 2)
-
-        thresh = 1e-14
+        r[r < self.thresh] = np.inf
 
         if isinstance(h_sym, np.ndarray):
             hs_derivative, hs_integral = self._handle_h_array(h_sym, t)
@@ -295,7 +295,7 @@ class Solution:
                     self.charge_moment(a1, a2, a3)).reshape((3, 1, 1, 1, 1))
                 current_moment = -self.mu * np.array(
                     self.current_moment(a1, a2, a3)).reshape((3, 1, 1, 1, 1))
-                if np.any(charge_moment) > thresh:
+                if np.any(charge_moment) > self.thresh:
                     self.e_field += self._single_term_multipole(ind,
                                                                 charge_moment,
                                                                 hs_integral,
@@ -304,7 +304,7 @@ class Solution:
                     self.e_field_text += self._single_term_multipole_txt(ind,
                                                                          charge_moment,
                                                                          "int_h")
-                if np.any(current_moment) > thresh:
+                if np.any(current_moment) > self.thresh:
                     self.e_field += self._single_term_multipole(ind,
                                                                 current_moment,
                                                                 hs_derivative,

@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 import matplotlib.pyplot as plt
 import inverse_problem
-import sympy
+import scipy
 
 
 @pytest.mark.skip(reason="Not done yet")
@@ -26,12 +26,23 @@ def test_inverse_problem_simple():
     f = np.linspace(0, 1/dt, t.size)
 
     e_true = direct_problem_simple(x1, x2, x3, t, h_true)
-    kwargs = {"tol": 1e-8,
-              "n_points": 20,
-              "error_tol": 0.5e-2,
-              "coeff_derivative": 0}
-    current_moment, charge_moment, h = inverse_problem.inverse_problem(1, e_true, x1, x2, x3, t, **kwargs)
 
+    def get_h_num(h, t):
+        h[-h.size//3:] = 0
+        h[0] = 0
+        return scipy.interpolate.interp1d(np.linspace(t.min(), t.max(), h.size),
+                                          h,
+                                          kind="cubic")(t)
+
+    kwargs = {"tol": 1e-10,
+              "n_points": 20,
+              "error_tol": 1e-3,
+              "coeff_derivative": 0,
+              "verbose_every": 1000,
+              "plot": True,
+              "h_num": get_h_num}
+    current_moment, charge_moment, h, center = inverse_problem.inverse_problem(1, e_true, x1, x2, x3, t, **kwargs)
+    print(f"{center=}")
     h -= h[0]
     plt.plot(t, h/np.max(np.abs(h)))
     h_max = np.max(np.abs(h_true))
