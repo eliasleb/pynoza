@@ -30,12 +30,12 @@ src_radius = 3*r_HIRA
 c0 = 3e8
 t = np.array(data["Time"])*c0
 d_obs = 0.15#4*r_HIRA
-# x1 = np.array([-d_obs, 0, ]).reshape((2, 1, 1))
-# x2 = np.array([-d_obs, 0, d_obs, ]).reshape((1, 3, 1))
-# x3 = np.array([-d_obs, 0, d_obs, ]).reshape((1, 1, 3))
-x1 = np.array([0, ]).reshape((1, 1, 1))
-x2 = np.array([0, ]).reshape((1, 1, 1))
-x3 = np.array([-d_obs, d_obs, ]).reshape((1, 1, 2))
+x1 = np.array([-d_obs, 0, ]).reshape((2, 1, 1))
+x2 = np.array([-d_obs, 0, d_obs, ]).reshape((1, 3, 1))
+x3 = np.array([-d_obs, 0, d_obs, ]).reshape((1, 1, 3))
+#x1 = np.array([0, ]).reshape((1, 1, 1))
+#x2 = np.array([0, ]).reshape((1, 1, 1))
+#x3 = np.array([-d_obs, d_obs, ]).reshape((1, 1, 2))
 
 x2 = x2 + 0.5
 
@@ -50,6 +50,7 @@ def get_str_descr(x, name="2*r_HIRA"):
         return "-" + name
     else:
         return "0"
+
 
 num_col = 0
 for i, j, k in itertools.product(range(x1.size), range(x2.size), range(x3.size)):
@@ -79,51 +80,65 @@ for i, j, k in itertools.product(range(x1.size), range(x2.size), range(x3.size))
 e_true = [ex, ey, ez]
 print(f"{ex.shape=}")
 
+c0 = 3e8
+wavelength = 0.3
+f = 1 / wavelength
+gamma = np.sqrt(12 / 7) / f
+t0 = 3 * gamma
+
+
 
 def get_h_num(h, t):
+   # h_num = np.exp(-((t - t0) / gamma) ** 2) * (4 * ((t - t0) / gamma) ** 2 - 2)
+   # return h_num
     h[-h.size // 3:] = 0
     h[0] = 0
     return scipy.interpolate.interp1d(np.linspace(t.min(), t.max(), h.size),
                                       h,
                                       kind="cubic")(t) * np.exp(-1/((t/0.1)**2 + 1e-16))
 
-kwargs = {"tol": 1e-6,
-          "n_points": 40,
+
+kwargs = {"tol": 1e-4,
+          "n_points": 20,
           "error_tol": 1e-3,
           "coeff_derivative": 0,
           "verbose_every": 100,
           "plot": True,
           "scale": 1e6,
           "h_num": get_h_num,
-          "find_center": False}
+          "find_center": True,
+          "max_global_tries": 10}
 
-order = 1
-args = (order, e_true, x1, x2, x3, t,)
-current_moment, charge_moment, h, center = inverse_problem.inverse_problem(*args, **kwargs)
+order = 2
 
-print(f"{current_moment=}")
-print(f"{charge_moment=}")
-print(f"{center=}")
+shape_mom = (order + 1, order + 1, order + 1, 3)
+dim_mom = 3
 
-if order >= 1:
-    def plot_moment(moment):
-        plt.figure()
-        m = np.max(np.abs(moment))
-        kwargs = {"cmap": "RdBu", "vmin": -m, "vmax": m}
-        for comp, iz in itertools.product(range(3), range(order+1)):
-            plt.subplot(3, order+1, 2*comp + iz + 1)
-            plt.imshow(current_moment[:, :, iz, comp].T, **kwargs)
-            plt.xlabel("x")
-            plt.ylabel("y")
-            plt.title(f"{comp=}")
 
-        plt.tight_layout()
+def get_current_moment(moment):
+    current_moment = np.zeros(shape_mom)
+    current_moment[0, 0, 0, :] = moment
+    return current_moment
 
-    plot_moment(current_moment)
-    plot_moment(charge_moment)
 
-plt.pause(0.001)
-input("Press [enter] to exit.")
-plt.close("all")
+args = (order, e_true, x1, x2, x3, t, get_current_moment, dim_mom)
+current_moment, h, center = inverse_problem.inverse_problem(*args, **kwargs)
+
+if __name__ == "__main__":
+    plt.ion()
+    print(f"{center=}")
+
+    inverse_problem.plot_moment(current_moment)
+    inverse_problem.plot_moment(inverse_problem.get_charge_moment(current_moment))
+
+    plt.figure()
+    h -= h[0]
+    plt.plot(t, h / np.max(np.abs(h)))
+    plt.xlabel("Time (relative)")
+    plt.ylabel("Amplitude (normalized)")
+    plt.title("Current vs time")
+    plt.pause(0.1)
+    plt.show()
+    input("Press Enter to continue...")
 
 

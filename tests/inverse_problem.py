@@ -7,10 +7,78 @@ import matplotlib.pyplot as plt
 import itertools
 import sys
 import os
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
 
 
-def inverse_problem(order, e_true, x1, x2, x3, t, **kwargs):
+def complement(*args):
+    if len(args) == 1:
+        i = args[0]
+        if i == 0:
+            return 1, 2
+        elif i == 1:
+            return 0, 2
+        else:
+            return 0, 1
+    elif len(args) == 2:
+        i, j = args
+        if i == j:
+            raise ValueError('i and j must be different')
+        if {i, j} == {0, 1}:
+            return 2
+        elif {i, j} == {0, 2}:
+            return 1
+        else:
+            return 0
 
+
+def get_charge_moment(current_moment):
+    charge_moment = np.zeros(current_moment.shape)
+    b = [0, 0, 0]
+    for ind, _ in np.ndenumerate(charge_moment):
+        a1, a2, a3, i = ind
+        a = (a1, a2, a3)
+        for j in range(3):
+            b = list(a)
+            if i == j:
+                if a[j] >= 2:
+                    b[j] = a[j] - 2
+                    charge_moment[a1, a2, a3, i] += a[j] * (a[j] - 1) \
+                        * current_moment[b[0], b[1], b[2], j]
+            else:
+                b[i] -= 1
+                b[j] -= 1
+                if a[j] >= 1 and a[i] >= 1:
+                    charge_moment[a1, a2, a3, i] += a[j] * a[i] \
+                        * current_moment[b[0], b[1], b[2], j]
+    return charge_moment
+
+
+def plot_moment(moment):
+    fig = plt.figure()
+    ax1 = fig.add_subplot(131, projection='3d')
+    ax2 = fig.add_subplot(132, projection='3d')
+    ax3 = fig.add_subplot(133, projection='3d')
+    axes = [ax1, ax2, ax3]
+
+    order = moment.shape[0]
+    x1 = np.arange(order)
+    x2 = np.arange(order)
+    x3 = np.arange(order)
+    x1, x2, x3 = np.meshgrid(x1, x2, x3, indexing='ij')
+    cmap = cm.get_cmap('RdBu')
+
+    m_max = np.abs(moment).max()
+
+    if m_max < 1e-10:
+        m_max = 1
+
+    for i, m in np.ndenumerate(moment):
+        plt.subplot(1, 3, i[-1] + 1)
+        axes[i[-1]].scatter(i[0], i[1], i[2], color=cmap(m/m_max/2+0.5))
+
+
+def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_moment, **kwargs):
 
     tol = kwargs.pop("tol", 1e-1)
     n_points = kwargs.pop("n_points", 3)
@@ -21,6 +89,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, **kwargs):
     scale = kwargs.pop("scale", 1)
     get_h_num = kwargs.pop("h_num", lambda h, t: h)
     find_center = kwargs.pop("find_center", True)
+    max_global_tries = kwargs.pop("max_global_tries", 10)
 
     if kwargs:
         raise ValueError(f"Unknown keyword arguments: {kwargs}")
@@ -35,8 +104,10 @@ def inverse_problem(order, e_true, x1, x2, x3, t, **kwargs):
                           wave_speed=1, )
     sol.recurse()
 
-    def get_fields(current_moment, charge_moment, h_sym, t_sym, center):
+    def get_fields(current_moment, h_sym, t_sym, center):
+
         c_mom = lambda a1, a2, a3: list(current_moment[a1, a2, a3])
+        charge_moment = get_charge_moment(current_moment)
         r_mom = lambda a1, a2, a3: list(charge_moment[a1, a2, a3])
 
         sol.set_moments(c_mom, r_mom)
@@ -50,47 +121,51 @@ def inverse_problem(order, e_true, x1, x2, x3, t, **kwargs):
         else:
             return sol.compute_e_field(x1, x2, x3, t, h_sym, t_sym)
 
-    charge_moments = np.zeros((sol.max_order + 1, sol.max_order + 1, sol.max_order + 1, 3))
-    current_moments = charge_moments.copy()
-    Nmom = charge_moments.size
-    shape_mom = charge_moments.shape
-
-    h = np.zeros((n_points, ))
-    Nh = h.size
-    shape_h = h.shape
     center = np.zeros((3, ))
+    current_moment = np.zeros((dim_moment, ))
+    h = np.zeros((n_points, ))
 
+    if find_center:
+        def ravel_params(current_moments, h, center):
+            return np.concatenate((np.ravel(current_moments), np.ravel(h), np.ravel(center)))
 
-    def ravel_params(charge_moments, current_moments, h, center):
-        return np.concatenate((np.ravel(charge_moments), np.ravel(current_moments), np.ravel(h), np.ravel(center)))
+        def unravel_params(params):
+            return params[:dim_moment], params[dim_moment:-3], params[-3:]
+    else:
+        def ravel_params(current_moments, h, *args):
+            return np.concatenate((np.ravel(current_moments), np.ravel(h)))
 
-    def unravel_params(params):
-        return params[:Nmom].reshape(shape_mom), \
-               params[Nmom:Nmom + Nmom].reshape(shape_mom), \
-               params[2 * Nmom:-3], params[-3:]
+        def unravel_params(params):
+            return params[:dim_moment], params[dim_moment:], None
 
-    x0 = ravel_params(charge_moments, current_moments, h, center)
+    x0 = ravel_params(current_moment, h, center)
     t_sym = sympy.Symbol("t", real=True)
 
     n_calls = 0
+    old_error = 0
 
     def get_error(x):
-        nonlocal n_calls
+        nonlocal n_calls, old_error
+
         n_calls += 1
-        current_moment, charge_moment, h, center = unravel_params(x)
+
+        current_moment, h, center = unravel_params(x)
         h = get_h_num(h, t)
-        e_opt = get_fields(current_moment, charge_moment, h, None, center)
+        current_moment = current_moment_callable(current_moment)
+        e_opt = get_fields(current_moment, h, None, center)
 
         error = 0
         normal = 0
 
         for c1, c2 in zip(e_true, e_opt):
-            error += np.sum((c1 - c2 * scale)**2)
-            normal += np.sum(c1 ** 2)
+            error += np.sum(np.abs(c1 - c2 * scale))
+            normal += np.sum(np.abs(c1))
         error = error / normal
 
         if coeff_derivative > 0:
             error += coeff_derivative*np.sum(np.diff(h)**2)/np.sum(h**2)*dt
+
+        error = np.clip(error, error_tol, 10)
 
         if n_calls % verbose_every == 0:
             if plot:
@@ -103,7 +178,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, **kwargs):
                 for i in range(3):
                     plt.plot(t, e_true[i].reshape(-1, t.size).T, f"{colors[i]}--")
                     plt.plot(t, e_true[i].reshape(-1, t.size).T, f"{colors[i]}--")
-                    plt.plot(t, e_true[i].reshape(-1, t.size).T/max_true, f"{colors[i]}--")
+                    plt.plot(t, e_true[i].reshape(-1, t.size).T, f"{colors[i]}--")
 
                     plt.plot(t, e_opt[i].reshape(-1, t.size).T*scale, f"{colors[i]}-")
                     plt.plot(t, e_opt[i].reshape(-1, t.size).T*scale, f"{colors[i]}-")
@@ -115,22 +190,42 @@ def inverse_problem(order, e_true, x1, x2, x3, t, **kwargs):
                 plt.pause(0.001)
 
             os.system("clear")
-            print(f"{'#'*int(error*50)}{error:.3f}, {n_calls=}", end='\r')#f"\r{error=}, {n_calls=}")
-        if error < error_tol:
-            return 0
-        else:
-            return error
+            print(f"{'#'*int(error*50)}{error:.3f}, {n_calls=}", end='\r')
+
+        return error
 
     options = {'maxiter': 1e3,
-               'disp': True,
+               'disp': False,
+               'seed': 0
                }
 
     np.random.seed(0)
-    x0 = np.random.random(x0.shape) * 2 - 1
-    x0[-3:] = np.array([0, 0, 0])
 
     # res = scipy.optimize.basinhopping(get_error, x0, niter=0, stepwise_factor=0.1)
-    res = scipy.optimize.minimize(get_error, x0, options=options, tol=tol, )
-    current_moment, charge_moment, h, center = unravel_params(res.x)
+    methods = ["Nelder-Mead",
+               "Powell",
+               "CG",
+               "BFGS",
+               "Newton-CG",
+               "L-BFGS-B",
+               "TNC",
+               "COBYLA",
+               "SLSQP",
+               "trust-constr",
+               "dogleg",
+               "trust-ncg",
+               "trust-exact",
+               "trust-krylov"]
+    for i_try in range(max_global_tries):
+        print("Try", i_try)
+        x0 = np.random.random(x0.shape) * 2 - 1
+        x0[-3:] = np.array([0, 0, 0])
+        n_calls = 0
+        res = scipy.optimize.minimize(get_error, x0,
+                                      method=None,
+                                      options=options, tol=tol, )
+        if res.fun < error_tol:
+            break
+    current_moment, h, center = unravel_params(res.x)
 
-    return current_moment, charge_moment, get_h_num(h, t), center
+    return current_moment_callable(current_moment), get_h_num(h, t), center
