@@ -90,6 +90,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_m
     get_h_num = kwargs.pop("h_num", lambda h, t: h)
     find_center = kwargs.pop("find_center", True)
     max_global_tries = kwargs.pop("max_global_tries", 10)
+    compute_grid = kwargs.pop("compute_grid", True)
 
     if kwargs:
         raise ValueError(f"Unknown keyword arguments: {kwargs}")
@@ -115,11 +116,9 @@ def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_m
             return sol.compute_e_field(x1 - center[0],
                                        x2 - center[1],
                                        x3 - center[2],
-                                       t,
-                                       h_sym,
-                                       t_sym)
+                                       t,  h_sym, t_sym, compute_grid=compute_grid)
         else:
-            return sol.compute_e_field(x1, x2, x3, t, h_sym, t_sym)
+            return sol.compute_e_field(x1, x2, x3, t, h_sym, t_sym, compute_grid=compute_grid)
 
     center = np.zeros((3, ))
     current_moment = np.zeros((dim_moment, ))
@@ -143,9 +142,10 @@ def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_m
 
     n_calls = 0
     old_error = 0
+    e_opt = None
 
     def get_error(x):
-        nonlocal n_calls, old_error
+        nonlocal n_calls, old_error, e_opt
 
         n_calls += 1
 
@@ -157,10 +157,12 @@ def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_m
         error = 0
         normal = 0
 
+        errors_comp = []
+
         for c1, c2 in zip(e_true, e_opt):
-            error += np.sum(np.abs(c1 - c2 * scale))
+            errors_comp.append(np.sum(np.abs(c1 - c2 * scale)))
             normal += np.sum(np.abs(c1))
-        error = error / normal
+        error = np.sum(errors_comp) / normal
 
         if coeff_derivative > 0:
             error += coeff_derivative*np.sum(np.diff(h)**2)/np.sum(h**2)*dt
@@ -190,7 +192,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_m
                 plt.pause(0.001)
 
             os.system("clear")
-            print(f"{'#'*int(error*50)}{error:.3f}, {n_calls=}", end='\r')
+            print(f"{'#'*int(error*50)}{error:.3f}, {n_calls=}, {errors_comp/normal=}", end='\r')
 
         return error
 
@@ -224,8 +226,9 @@ def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_m
         res = scipy.optimize.minimize(get_error, x0,
                                       method=None,
                                       options=options, tol=tol, )
-        if res.fun < error_tol:
+
+        if res.fun <= error_tol:
             break
     current_moment, h, center = unravel_params(res.x)
 
-    return current_moment_callable(current_moment), get_h_num(h, t), center
+    return current_moment_callable(current_moment), get_h_num(h, t), center, e_opt.squeeze()

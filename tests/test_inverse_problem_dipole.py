@@ -65,14 +65,15 @@ def test_inverse_problem_simple():
                                           kind="cubic")(t)
 
     kwargs = {"tol": 1e-10,
-              "n_points": 20,
+              "n_points": 30,
               "error_tol": 5e-2,
               "coeff_derivative": 0,
-              "verbose_every": 2,
+              "verbose_every": 100,
               "plot": __name__ == "__main__",
               "h_num": get_h_num,
               "find_center": True,
-              "scale": 1}
+              "scale": 1,
+              "max_global_tries": 10}
 
     order = 2
 
@@ -85,8 +86,8 @@ def test_inverse_problem_simple():
         return current_moment
 
     e_true = direct_problem_simple(x1, x2, x3, t, h_true, order=order)
-    current_moment, h, center = inverse_problem.inverse_problem(order, e_true, x1, x2, x3, t,
-                                                                get_current_moment, dim_mom, **kwargs)
+    current_moment, h, center, e_opt = inverse_problem.inverse_problem(order, e_true, x1, x2, x3, t,
+                                                                       get_current_moment, dim_mom, **kwargs)
 
     if __name__ == "__main__":
 

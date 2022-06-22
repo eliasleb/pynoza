@@ -152,7 +152,6 @@ class Solution:
               Must be in the form {order:derivative of order} for order=-1..max_order+2
         """
         y: np.ndarray = np.zeros(x1.shape)
-
         for signature in self._aux_func[ind]:
             if self.delayed:
                 dy = hs[signature[3]](t - r / self.c) * self._aux_func[ind][signature]
@@ -254,6 +253,7 @@ class Solution:
 
         self.verbose = kwargs.pop("verbose", False)
         self.delayed = kwargs.pop("delayed", True)
+        self.compute_grid = kwargs.pop("compute_grid", True)
 
         if self.verbose:
             np.seterr(divide="raise",
@@ -269,16 +269,24 @@ class Solution:
         if kwargs:
             raise ValueError(f"Unexpected keyword arguments: {kwargs}")
 
-        self.e_field = np.zeros((3, x1.size, x2.size, x3.size, t.size))
         self.e_field_text = ""
 
-        x1 = x1.reshape((x1.size, 1, 1, 1))
-        x2 = x2.reshape((1, x2.size, 1, 1))
-        x3 = x3.reshape((1, 1, x3.size, 1))
-        t = t.reshape((1, 1, 1, t.size))
+        if self.compute_grid:
+            x1 = x1.reshape((x1.size, 1, 1, 1))
+            x2 = x2.reshape((1, x2.size, 1, 1))
+            x3 = x3.reshape((1, 1, x3.size, 1))
+            t = t.reshape((1, 1, 1, t.size))
+            moment_shape = (3, 1, 1, 1, 1)
+            self.e_field = np.zeros((3, x1.size, x2.size, x3.size, t.size))
+        else:
+            x1 = x1.reshape((x1.size, 1))
+            x2 = x2.reshape((x2.size, 1))
+            x3 = x3.reshape((x3.size, 1))
+            t = t.reshape((1, t.size))
+            moment_shape = (3, 1, 1)
+            self.e_field = np.zeros((3, x1.size, t.size))
 
         r = np.sqrt(x1 ** 2 + x2 ** 2 + x3 ** 2)
-        r[r < self.thresh] = np.inf
 
         if isinstance(h_sym, np.ndarray):
             hs_derivative, hs_integral = self._handle_h_array(h_sym, t)
@@ -292,9 +300,9 @@ class Solution:
                 if self.verbose:
                     sys.stdout.write("\rComputing index {}...".format(ind))
                 charge_moment = -self.mu * self.c ** 2 * np.array(
-                    self.charge_moment(a1, a2, a3)).reshape((3, 1, 1, 1, 1))
+                    self.charge_moment(a1, a2, a3)).reshape(moment_shape)
                 current_moment = -self.mu * np.array(
-                    self.current_moment(a1, a2, a3)).reshape((3, 1, 1, 1, 1))
+                    self.current_moment(a1, a2, a3)).reshape(moment_shape)
                 if np.any(charge_moment) > self.thresh:
                     self.e_field += self._single_term_multipole(ind,
                                                                 charge_moment,
@@ -377,10 +385,7 @@ class Solution:
                                *args,
                                **kwargs):
         return (-1) ** np.sum(ind) / fact(ind) \
-               * moment * self._evaluate(tuple(ind),
-                                         *args,
-                                         hs,
-                                         **kwargs) / 4 / np.pi
+               * moment * self._evaluate(tuple(ind), *args, hs, **kwargs) / 4 / np.pi
 
     def _single_term_multipole_txt(self,
                                    ind: np.ndarray,
