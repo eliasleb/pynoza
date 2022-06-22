@@ -7,63 +7,18 @@ import scipy.interpolate
 from matplotlib import cm
 import time
 
-filename = "../../../git_ignore/GLOBALEM/dipole_v6.txt"
+filename = "../../../git_ignore/GLOBALEM/meep-dipole_v1.csv"
 data = pd.read_csv(filename,
-                   delim_whitespace=True,
-                   header=8)
-
-names = ["x", "y", "z"]
-t = 0
-while len(names) < len(data.columns):
-    names.append(f"Ex@{t=}")
-    names.append(f"Ey@{t=}")
-    names.append(f"Ez@{t=}")
-    t += 1
-
-names = names[:len(data.columns)]
-data.set_axis(names, axis=1, inplace=True)
+                   delimiter=",",
+                   header=1)
 
 c0 = 3e8
 f = 1e9/c0
 gamma = np.sqrt(12 / 7) / f
 t0 = 3 * gamma
-dt = 3.3333E-11
-down_sample_points = 120
-obs_range = [.5, np.inf]
-src_center = (0, 0, 0)
+dt = 0.0149896229
 
-Np = data.shape[0]
-Nt = 1
-while not np.isnan(data.iloc[0, 3 + 3 * Nt]):
-    Nt += 1
-dt *= c0
-t = np.arange(0, Nt * dt, dt)
 
-indices_obs = list()
-for i, (xi, yi, zi) in enumerate(zip(data["x"], data["y"], data["z"])):
-    dist = np.sqrt((xi - src_center[0]) ** 2 + (yi - src_center[1]) ** 2 + (zi - src_center[2]) ** 2)
-    if obs_range[0] <= dist <= obs_range[1]:
-        indices_obs.append(i)
-
-indices_obs = indices_obs[::down_sample_points]
-
-print(f"Found {len(indices_obs)} points")
-
-x1 = data["x"][indices_obs]
-x2 = data["y"][indices_obs]
-x3 = data["z"][indices_obs]
-ex = data.iloc[indices_obs, 3:3 * Nt + 3:3]
-ey = data.iloc[indices_obs, 4:3 * Nt + 3:3]
-ez = data.iloc[indices_obs, 5:3 * Nt + 3:3]
-assert np.all(["Ex" in name for name in ex.columns])
-assert np.all(["Ey" in name for name in ey.columns])
-assert np.all(["Ez" in name for name in ez.columns])
-x1 = np.array(x1)
-x2 = np.array(x2)
-x3 = np.array(x3)
-ex = np.array(ex)
-ey = np.array(ey)
-ez = np.array(ez)
 times_added = 7
 x1_symmetry = np.zeros((x1.size * times_added))
 x2_symmetry = np.zeros((x1.size * times_added))
@@ -138,11 +93,11 @@ kwargs = {"tol": 1e-4,
           "n_points": 0,
           "error_tol": 1e-3,
           "coeff_derivative": 0,
-          "verbose_every": 50,
+          "verbose_every": 100,
           "plot": True,
           "scale": 1e7,
           "h_num": get_h_num,
-          "find_center": True,
+          "find_center": False,
           "max_global_tries": 1,
           "compute_grid": False}
 
@@ -176,7 +131,7 @@ if __name__ == "__main__":
     plt.title("Current vs time")
     plt.pause(0.1)
     plt.show()
-    match input("Save? [y/n]"):
+    match input("Save? [y/n] "):
         case ("y" | "Y"):
             res = pd.DataFrame(data={"t": x1, "x2": x2, "x3": x3}
                                | {f"ex_opt@t={t[i]}": e_opt[0, :, i] for i in range(ex.shape[1])}
@@ -185,7 +140,9 @@ if __name__ == "__main__":
                                | {f"ex_true@t={t[i]}": ex[:, i] for i in range(ex.shape[1])}
                                | {f"ey_true@t={t[i]}": ey[:, i] for i in range(ey.shape[1])}
                                | {f"ez_true@t={t[i]}": ez[:, i] for i in range(ez.shape[1])})
-            res.to_csv(path_or_buf=f"../../../git_ignore/GLOBALEM/opt-result-{time.asctime()}.csv")
+            filename = f"../../../git_ignore/GLOBALEM/opt-result-{time.asctime()}.csv"
+            res.to_csv(path_or_buf=filename)
+            print(f"Saved as '{filename}'.")
         case _:
             pass
 

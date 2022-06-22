@@ -172,8 +172,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_m
         if n_calls % verbose_every == 0:
             if plot:
                 plt.clf()
-                #  e_opt = pynoza.set_extremities(e_opt, 0.1, dim=3)
-                #       plt.plot(t, e_true[0][:, 0, 0, :].T, "--")
+                #plt.subplot(2,1,1)
                 max_true = np.max(np.abs(e_true))
                 max_opt = np.max(np.abs(e_opt))
                 colors = ["r", "b", "g"]
@@ -188,6 +187,14 @@ def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_m
 
                 #       print(np.max(np.abs(e_opt)), np.max(np.abs(current_moment)), np.max(np.abs(charge_moment)))
                 plt.plot(t, h/np.max(np.abs(h)) * max_true, "k-.")
+
+                #plt.subplot(2, 1, 2)
+                #directivity = np.sum(e_opt**2, axis=(0, 2))
+                #max_directivity = directivity.max()
+                #if max_directivity > 0:
+                #    for xi, yi, zi, direc in zip(x1, x2, x3, directivity):
+                #        if abs(zi):
+                #            plt.plot(xi, yi, 'o', mfc=(direc/max_directivity, direc/max_directivity, direc/max_directivity), mec=(0,0,0))
                 plt.draw()
                 plt.pause(0.001)
 
