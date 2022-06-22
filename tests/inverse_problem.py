@@ -51,7 +51,7 @@ def get_charge_moment(current_moment):
                 if a[j] >= 1 and a[i] >= 1:
                     charge_moment[a1, a2, a3, i] += a[j] * a[i] \
                         * current_moment[b[0], b[1], b[2], j]
-    return charge_moment
+    return -charge_moment
 
 
 def plot_moment(moment):
@@ -91,6 +91,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_m
     find_center = kwargs.pop("find_center", True)
     max_global_tries = kwargs.pop("max_global_tries", 10)
     compute_grid = kwargs.pop("compute_grid", True)
+    estimate = kwargs.pop("estimate", None)
 
     if kwargs:
         raise ValueError(f"Unknown keyword arguments: {kwargs}")
@@ -180,7 +181,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_m
                     plt.plot(t, e_true[i].reshape(-1, t.size).T, f"{colors[i]}--")
                     plt.plot(t, e_true[i].reshape(-1, t.size).T, f"{colors[i]}--")
                     plt.plot(t, e_true[i].reshape(-1, t.size).T, f"{colors[i]}--")
-
+#
                     plt.plot(t, e_opt[i].reshape(-1, t.size).T*scale, f"{colors[i]}-")
                     plt.plot(t, e_opt[i].reshape(-1, t.size).T*scale, f"{colors[i]}-")
                     plt.plot(t, e_opt[i].reshape(-1, t.size).T*scale, f"{colors[i]}-")
@@ -210,25 +211,13 @@ def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_m
 
     np.random.seed(0)
 
-    # res = scipy.optimize.basinhopping(get_error, x0, niter=0, stepwise_factor=0.1)
-    methods = ["Nelder-Mead",
-               "Powell",
-               "CG",
-               "BFGS",
-               "Newton-CG",
-               "L-BFGS-B",
-               "TNC",
-               "COBYLA",
-               "SLSQP",
-               "trust-constr",
-               "dogleg",
-               "trust-ncg",
-               "trust-exact",
-               "trust-krylov"]
     for i_try in range(max_global_tries):
         print("Try", i_try)
-        x0 = np.random.random(x0.shape) * 2 - 1
-        x0[-3:] = np.array([0, 0, 0])
+        if estimate is None:
+            x0 = np.random.random(x0.shape) * 2 - 1
+            x0[-3:] = np.array([0, 0, 0])
+        else:
+            x0 = ravel_params(*estimate)
         n_calls = 0
         res = scipy.optimize.minimize(get_error, x0,
                                       method=None,

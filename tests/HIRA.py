@@ -7,63 +7,33 @@ import scipy.interpolate
 from matplotlib import cm
 import time
 
-filename = "../../../git_ignore/GLOBALEM/meep-dipole_v1.csv"
+filename = "../../../git_ignore/GLOBALEM/meep-dipole_v4.csv"
 data = pd.read_csv(filename,
                    delimiter=",",
-                   header=1)
+                   header=0)
 
 c0 = 3e8
 f = 1e9/c0
 gamma = np.sqrt(12 / 7) / f
 t0 = 3 * gamma
 dt = 0.0149896229
+Nt = int((data.shape[1] - 4) / 3)
 
-
-times_added = 7
-x1_symmetry = np.zeros((x1.size * times_added))
-x2_symmetry = np.zeros((x1.size * times_added))
-x3_symmetry = np.zeros((x1.size * times_added))
-ex_symmetry = np.zeros((x1.size * times_added, ex.shape[1]))
-ey_symmetry = np.zeros((x1.size * times_added, ex.shape[1]))
-ez_symmetry = np.zeros((x1.size * times_added, ex.shape[1]))
-i_sym = 0
-for i, args in enumerate(zip(x1, x2, x3, ex, ey, ez)):
-
-    def apply_symmetry(*signature):
-        global x1_symmetry, x2_symmetry, x3_symmetry, ex_symmetry, ey_symmetry, ez_symmetry, i_sym
-        x1_symmetry[i_sym], x2_symmetry[i_sym], x3_symmetry[i_sym], \
-            ex_symmetry[i_sym, :], ey_symmetry[i_sym, :], ez_symmetry[i_sym, :] \
-            = (arg*s for arg, s in zip(args, signature))
-        i_sym += 1
-
-    apply_symmetry(-1, 1, 1, -1, 1, 1)
-    apply_symmetry(1, -1, 1, 1, -1, 1)
-    apply_symmetry(-1, -1, 1, -1, -1, 1)
-
-    apply_symmetry(1, 1, -1, -1, -1, 1)
-    apply_symmetry(-1, 1, -1, 1, -1, 1)
-    apply_symmetry(1, -1, -1, -1, 1, 1)
-    apply_symmetry(-1, -1, -1, 1, 1, 1)
-
-x1 = np.concatenate((x1, x1_symmetry))
-x2 = np.concatenate((x2, x2_symmetry))
-x3 = np.concatenate((x3, x3_symmetry))
-ex = np.concatenate((ex, ex_symmetry), axis=0)
-ey = np.concatenate((ey, ey_symmetry), axis=0)
-ez = np.concatenate((ez, ez_symmetry), axis=0)
-
-assert np.any((x1 > 0) & (x2 > 0) & (x3 > 0)) and \
-      np.any((x1 > 0) & (x2 > 0) & (x3 < 0)) and \
-      np.any((x1 > 0) & (x2 < 0) & (x3 > 0)) and \
-      np.any((x1 > 0) & (x2 < 0) & (x3 < 0)) and \
-      np.any((x1 < 0) & (x2 > 0) & (x3 > 0)) and \
-      np.any((x1 < 0) & (x2 > 0) & (x3 < 0)) and \
-      np.any((x1 < 0) & (x2 < 0) & (x3 > 0)) and \
-      np.any((x1 < 0) & (x2 < 0) & (x3 < 0))
+x1 = np.array(data["x"])
+x2 = np.array(data["y"])
+x3 = np.array(data["z"])
+ex = np.array(data.iloc[:, 4:4 + Nt])
+ey = np.array(data.iloc[:, 4 + Nt:4 + 2*Nt])
+ez = np.array(data.iloc[:, 4 + 2*Nt:])
+t = np.arange(0, Nt*dt, dt)
 
 energy = np.sum(ex**2 + ey**2 + ez**2, axis=1)
 energy_max = energy.max()
 r = np.sqrt(x1**2 + x2**2 + x3**2)
+
+e_true = [ex, ey, ez]
+print(f"{ex.shape=}")
+
 plt.ion()
 fig = plt.figure()
 plt.plot(r, energy / energy_max, '.')
@@ -77,8 +47,6 @@ plt.legend(("data", "1/r", "1/r^2", "1/r^3"))
 plt.show()
 input("[Enter] to continue...")
 
-e_true = [ex, ey, ez]
-print(f"{ex.shape=}")
 
 
 def get_h_num(h, t):
@@ -89,19 +57,22 @@ def get_h_num(h, t):
                                       kind="cubic")(t) * np.exp(-1/((t/0.1)**2 + 1e-16))
 
 
+estimate = None
+
+order = 1
 kwargs = {"tol": 1e-4,
           "n_points": 0,
           "error_tol": 1e-3,
           "coeff_derivative": 0,
           "verbose_every": 100,
           "plot": True,
-          "scale": 1e7,
+          "scale": 1e4,
           "h_num": get_h_num,
-          "find_center": False,
+          "find_center": True,
           "max_global_tries": 1,
-          "compute_grid": False}
+          "compute_grid": False,
+          "estimate": estimate}
 
-order = 1
 shape_mom = (order + 2, order + 2, order + 2, 3)
 dim_mom = 3 * order**3
 
@@ -114,6 +85,7 @@ def get_current_moment(moment):
 
 args = (order + 1, e_true, x1, x2, x3, t, get_current_moment, dim_mom)
 current_moment, h, center, e_opt = inverse_problem.inverse_problem(*args, **kwargs)
+estimate = (current_moment, h, center)
 
 if __name__ == "__main__":
     plt.ion()
