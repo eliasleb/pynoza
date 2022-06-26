@@ -22,7 +22,7 @@ def test_charge_moment_computation():
     print(f"{charge_moment_analytical=}")
     print(np.any(charge_moment != 0), np.any(charge_moment_analytical != 0))
 
-    assert np.all(charge_moment == charge_moment_analytical)
+    assert np.all(charge_moment == -charge_moment_analytical)
 
     if __name__ == "__main__":
         plt.ion()
