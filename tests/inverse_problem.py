@@ -72,10 +72,20 @@ def plot_moment(moment):
 
     if m_max < 1e-10:
         m_max = 1
+    x1s, x2s, x3s, colors = [[], [], []], [[], [], []], [[], [], []], [[], [], []]
 
     for i, m in np.ndenumerate(moment):
-        plt.subplot(1, 3, i[-1] + 1)
-        axes[i[-1]].scatter(i[0], i[1], i[2], color=cmap(m/m_max/2+0.5))
+        x1s[i[-1]].append(i[0])
+        x2s[i[-1]].append(i[1])
+        x3s[i[-1]].append(i[2])
+        colors[i[-1]].append(cmap(m / m_max / 2 + 0.5))
+
+    for i in range(3):
+        plt.subplot(1, 3, i + 1)
+        axes[i].scatter(x1s[i], x2s[i], x3s[i], color=colors[i])
+        axes[i].set_xlabel("x")
+        axes[i].set_ylabel("y")
+        axes[i].set_zlabel("z")
 
 
 def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_moment, **kwargs):
@@ -181,13 +191,15 @@ def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_m
                     plt.plot(t, e_true[i].reshape(-1, t.size).T, f"{colors[i]}--")
                     plt.plot(t, e_true[i].reshape(-1, t.size).T, f"{colors[i]}--")
                     plt.plot(t, e_true[i].reshape(-1, t.size).T, f"{colors[i]}--")
-#
+
                     plt.plot(t, e_opt[i].reshape(-1, t.size).T*scale, f"{colors[i]}-")
                     plt.plot(t, e_opt[i].reshape(-1, t.size).T*scale, f"{colors[i]}-")
                     plt.plot(t, e_opt[i].reshape(-1, t.size).T*scale, f"{colors[i]}-")
 
                 #       print(np.max(np.abs(e_opt)), np.max(np.abs(current_moment)), np.max(np.abs(charge_moment)))
-                plt.plot(t, h/np.max(np.abs(h)) * max_true, "k-.")
+                max_h = np.max(np.abs(h))
+                if max_h > 0:
+                    plt.plot(t, h / max_h * max_true, "k-.")
 
                 #plt.subplot(2, 1, 2)
                 #directivity = np.sum(e_opt**2, axis=(0, 2))
@@ -196,7 +208,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_m
                 #    for xi, yi, zi, direc in zip(x1, x2, x3, directivity):
                 #        if abs(zi):
                 #            plt.plot(xi, yi, 'o', mfc=(direc/max_directivity, direc/max_directivity, direc/max_directivity), mec=(0,0,0))
-                plt.draw()
+                #plt.draw#()
                 plt.pause(0.001)
 
             os.system("clear")
@@ -219,6 +231,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_m
         else:
             x0 = ravel_params(*estimate)
         n_calls = 0
+
         res = scipy.optimize.minimize(get_error, x0,
                                       method=None,
                                       options=options, tol=tol, )
