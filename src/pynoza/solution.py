@@ -6,6 +6,9 @@ Created on Thu Oct 14 11:16:58 2021
 @author: Elias Le Boudec, elias.leboudec@epfl.ch
 """
 import numpy as np
+from numpy import zeros
+from numpy import ndarray
+from numpy import sum as npsum
 import sys
 import sympy
 import numbers
@@ -52,7 +55,7 @@ class Solution:
         self.c = wave_speed
         self._shape: tuple[int, int, int] = (max_order + 1, max_order + 1, max_order + 1)
         self._aux_func: dict[tuple[int, int, int], dict[tuple[int, int, int, int, int], float]] = dict()
-        for ind, _ in np.ndenumerate(np.zeros(self._shape)):
+        for ind, _ in np.ndenumerate(zeros(self._shape)):
             self._aux_func[tuple(ind)] = dict()
         self._aux_func[(0, 0, 0)] = {(0, 0, 0, 0, 1): 1.}
         self.mu: float = 4 * np.pi * 1e-7
@@ -65,7 +68,7 @@ class Solution:
         self.verbose: bool = False
         self.delayed: bool = True
 
-        self.e_field: np.ndarray = np.array([])
+        self.e_field: ndarray = np.array([])
 
         self.e_field_text: str = ""
 
@@ -119,9 +122,9 @@ class Solution:
         verbose -- whether to print the computed multi-index (default True)"""
         self.ran_recurse = True
         for order in range(1, self.max_order + 1):
-            for ind, _ in np.ndenumerate(np.zeros(self._shape)):
-                ind: np.ndarray = np.array(ind)
-                if np.sum(ind) == order:
+            for ind, _ in np.ndenumerate(zeros(self._shape)):
+                ind: ndarray = np.array(ind)
+                if npsum(ind) == order:
                     known_ind: np.array = ind.copy()
                     known_ind[np.where(ind > 0)[0][0]] -= 1
                     if verbose:
@@ -132,13 +135,13 @@ class Solution:
 
     def _evaluate(self,
                   ind: tuple[int, int, int],
-                  t: np.ndarray,
-                  x1: np.ndarray,
-                  x2: np.ndarray,
-                  x3: np.ndarray,
-                  r: np.ndarray,
-                  hs: list[typing.Callable[[np.ndarray], np.ndarray]],
-                  **_) -> np.ndarray:
+                  t: ndarray,
+                  x1: ndarray,
+                  x2: ndarray,
+                  x3: ndarray,
+                  r: ndarray,
+                  hs: list[typing.Callable[[ndarray], ndarray]],
+                  **_) -> ndarray:
         """Evaluate the auxiliary function.
         
         Positional arguments:
@@ -151,7 +154,7 @@ class Solution:
         Hs -- dictionary of the derivatives of the time-dependent excitation function.
               Must be in the form {order:derivative of order} for order=-1..max_order+2
         """
-        y: np.ndarray = np.zeros(x1.shape)
+        y: ndarray = zeros(x1.shape)
         for signature in self._aux_func[ind]:
             if self.delayed:
                 dy = hs[signature[3]](t - r / self.c) * self._aux_func[ind][signature]
@@ -221,13 +224,13 @@ class Solution:
         self.charge_moment = charge_moment
 
     def compute_e_field(self,
-                        x1: np.ndarray,
-                        x2: np.ndarray,
-                        x3: np.ndarray,
-                        t: np.ndarray,
+                        x1: ndarray,
+                        x2: ndarray,
+                        x3: ndarray,
+                        t: ndarray,
                         h_sym,
                         t_sym,
-                        **kwargs) -> np.ndarray:
+                        **kwargs) -> ndarray:
         """Compute the electric field from the moments.
         
         Positional arguments:
@@ -277,25 +280,25 @@ class Solution:
             x3 = x3.reshape((1, 1, x3.size, 1))
             t = t.reshape((1, 1, 1, t.size))
             moment_shape = (3, 1, 1, 1, 1)
-            self.e_field = np.zeros((3, x1.size, x2.size, x3.size, t.size))
+            self.e_field = zeros((3, x1.size, x2.size, x3.size, t.size))
         else:
             x1 = x1.reshape((x1.size, 1))
             x2 = x2.reshape((x2.size, 1))
             x3 = x3.reshape((x3.size, 1))
             t = t.reshape((1, t.size))
             moment_shape = (3, 1, 1)
-            self.e_field = np.zeros((3, x1.size, t.size))
+            self.e_field = zeros((3, x1.size, t.size))
 
         r = np.sqrt(x1 ** 2 + x2 ** 2 + x3 ** 2)
 
-        if isinstance(h_sym, np.ndarray):
+        if isinstance(h_sym, ndarray):
             hs_derivative, hs_integral = self._handle_h_array(h_sym, t)
         else:
             hs_derivative, hs_integral = self._handle_h_symbolic(h_sym, t_sym)
 
-        for ind, _ in np.ndenumerate(np.zeros(self._shape)):
+        for ind, _ in np.ndenumerate(zeros(self._shape)):
             ind = np.array(ind)
-            if np.sum(ind) <= self.max_order:
+            if npsum(ind) <= self.max_order:
                 a1, a2, a3 = ind
                 if self.verbose:
                     sys.stdout.write("\rComputing index {}...".format(ind))
@@ -379,19 +382,19 @@ class Solution:
         return self._repack_hs(h_sym_callable)
 
     def _single_term_multipole(self,
-                               ind: np.ndarray,
-                               moment: np.ndarray,
-                               hs: np.ndarray,
+                               ind: ndarray,
+                               moment: ndarray,
+                               hs: ndarray,
                                *args,
                                **kwargs):
-        return (-1) ** np.sum(ind) / fact(ind) \
+        return (-1) ** npsum(ind) / fact(ind) \
                * moment * self._evaluate(tuple(ind), *args, hs, **kwargs) / 4 / np.pi
 
     def _single_term_multipole_txt(self,
-                                   ind: np.ndarray,
-                                   moment: np.ndarray,
+                                   ind: ndarray,
+                                   moment: ndarray,
                                    hs: str):
-        return f"""  {(-1) ** np.sum(ind):+d}/{fact(ind)}"""\
+        return f"""  {(-1) ** npsum(ind):+d}/{fact(ind)}"""\
                f"""*{list(map('{:.2e}%'.format, moment.flatten()))}*{self._evaluate_txt(tuple(ind), hs)}/(4pi)\n"""
 
     def __repr__(self) -> str:
