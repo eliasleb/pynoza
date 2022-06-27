@@ -11,32 +11,33 @@ from numpy import ndarray
 from numpy import sum as npsum
 import sys
 import sympy
-import numbers
-import typing
 import scipy.interpolate
+import numbers
+import cython
 
 
 class Interpolator(scipy.interpolate.interp1d):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.__doc__ = scipy.interpolate.interp1d.__doc__
 
-    def __call__(self, *args, **kwargs):
-        x = args[0]
-        idx = (x < self.x.min()) | (x > self.x.max())
+    def __call__(self, *args, **kwargs) -> ndarray:
+        x: ndarray = args[0]
+        idx: ndarray = (x < self.x.min()) | (x > self.x.max())
 
         x[x < self.x.min()] = self.x.min()
         x[x > self.x.max()] = self.x.max()
 
-        y = super().__call__(*args, **kwargs)
+        y: ndarray = super().__call__(*args, **kwargs)
         y[idx] = 0
         return y
 
 
+@cython.cclass
 class Solution:
     """A class to compute solutions of Maxwell's equations, based on"""
     """time-domain multipole moments."""
-
+    cdef cython.int max_order
     def __init__(self,
                  max_order: int = 0,
                  wave_speed: int = 1) -> None:
@@ -44,35 +45,39 @@ class Solution:
         
         Keyword arguments:
         max_order -- the maximum order to which multipole moments will be computed (default 0)
-        wave_speed -- Wave speed `c` used to compute the retarded time t-r/c, in natural units (default 1)
+        wave_speed -- Wave speed `c` used to compute the retarded time t-_r/c, in natural units (default 1)
         """""
         if not isinstance(max_order, int):
             raise ValueError(":max_order: must be of integer type")
         if not isinstance(wave_speed, numbers.Number):
             raise ValueError(":wave_speed: must be a number")
 
-        self.max_order = max_order
-        self.c = wave_speed
-        self._shape: tuple[int, int, int] = (max_order + 1, max_order + 1, max_order + 1)
-        self._aux_func: dict[tuple[int, int, int], dict[tuple[int, int, int, int, int], float]] = dict()
+        self.max_order: cython.int = max_order
+        self.c: float = wave_speed
+        self._shape = (max_order + 1, max_order + 1, max_order + 1)
+        self._aux_func = dict()
         for ind, _ in np.ndenumerate(zeros(self._shape)):
             self._aux_func[tuple(ind)] = dict()
         self._aux_func[(0, 0, 0)] = {(0, 0, 0, 0, 1): 1.}
-        self.mu: float = 4 * np.pi * 1e-7
+        self.mu = 4 * np.pi * 1e-7
         self.thresh = 1e-14
 
-        self.ran_recurse: bool = False
-        self.ran_set_moments: bool = False
-        self.current_moment: typing.Callable[[int, int, int], numbers.Number] = lambda a1, a2, a3: 0
-        self.charge_moment: typing.Callable[[int, int, int], numbers.Number] = lambda a1, a2, a3: 0
-        self.verbose: bool = False
-        self.delayed: bool = True
+        self.ran_recurse = False
+        self.ran_set_moments = False
+        self.current_moment = lambda a1, a2, a3: [0, 0, 0]
+        self.charge_moment = lambda a1, a2, a3: [0, 0, 0]
+        self.verbose = False
+        self.delayed = True
+        self.compute_grid = True
 
         self.e_field: ndarray = np.array([])
 
-        self.e_field_text: str = ""
+        self.e_field_text = ""
+        self._r = np.array([0, ])
+        self.y = 0
+        self.dy = 0
 
-    def _increase_order(self, known_index: tuple[int, int, int], index: tuple[int, int, int]) -> None:
+    def _increase_order(self, known_index, index) -> None:
         """Private method to compute the auxiliary function.
         
         Positional arguments:
@@ -85,7 +90,7 @@ class Solution:
             # This adds three new terms; two for the space-derivative, and one for the time-derivative
             exponent_x_i: int = signature[known_dim]
             if exponent_x_i > 0:
-                identity_first_term: list[int, int, int, int, int] = list(signature)
+                identity_first_term = list(signature)
                 identity_first_term[known_dim] -= 1  # differentiate
                 try:
                     self._aux_func[index][tuple(identity_first_term)] \
@@ -94,7 +99,7 @@ class Solution:
                     self._aux_func[index][tuple(identity_first_term)] \
                         = coefficient * exponent_x_i
             exponent_r: int = signature[-1]
-            identity_second_term: list[int, int, int, int, int] = list(signature)
+            identity_second_term = list(signature)
             identity_second_term[known_dim] += 1  # numerator
             identity_second_term[-1] += 2  # denominator
             try:
@@ -104,7 +109,7 @@ class Solution:
                 self._aux_func[index][tuple(identity_second_term)] = \
                     -coefficient * exponent_r
             # Time-derivative term
-            identity_third_term: list[int, int, int, int, int] = list(signature)
+            identity_third_term = list(signature)
             identity_third_term[known_dim] += 1
             identity_third_term[3] += 1  # time-derivative
             identity_third_term[-1] += 1  # denominator
@@ -134,13 +139,13 @@ class Solution:
             print("Done.")
 
     def _evaluate(self,
-                  ind: tuple[int, int, int],
+                  ind,
                   t: ndarray,
                   x1: ndarray,
                   x2: ndarray,
                   x3: ndarray,
                   r: ndarray,
-                  hs: list[typing.Callable[[ndarray], ndarray]],
+                  hs,
                   **_) -> ndarray:
         """Evaluate the auxiliary function.
         
@@ -154,25 +159,22 @@ class Solution:
         Hs -- dictionary of the derivatives of the time-dependent excitation function.
               Must be in the form {order:derivative of order} for order=-1..max_order+2
         """
-        y: ndarray = zeros(x1.shape)
+        self.y: ndarray = zeros(x1.shape)
         for signature in self._aux_func[ind]:
-            if self.delayed:
-                dy = hs[signature[3]](t - r / self.c) * self._aux_func[ind][signature]
-            else:
-                dy = hs[signature[3]](t) * self._aux_func[ind][signature]
+            self.dy = hs[signature[3]] * self._aux_func[ind][signature]
             if signature[0] > 0:
-                dy = dy * x1 ** signature[0]
+                self.dy = self.dy * x1 ** signature[0]
             if signature[1] > 0:
-                dy = dy * x2 ** signature[1]
+                self.dy = self.dy * x2 ** signature[1]
             if signature[2] > 0:
-                dy = dy * x3 ** signature[2]
+                self.dy = self.dy * x3 ** signature[2]
             if signature[-1] > 0:
-                dy = dy / r ** signature[-1]
-            y = y + dy
-        return y
+                self.dy = self.dy / r ** signature[-1]
+            self.y = self.y + self.dy
+        return self.y
 
     def _evaluate_txt(self,
-                      ind: tuple[int, int, int],
+                      ind,
                       h: str) -> str:
         """Evaluate the auxiliary function as a symbolic expression
 
@@ -183,7 +185,7 @@ class Solution:
         y: str = ""
         for signature in self._aux_func[ind]:
             dy = ""
-            dy += f"{self._aux_func[ind][signature]:.2e}*{h}^({signature[3]})(t-r/{self.c:.1f})"
+            dy += f"{self._aux_func[ind][signature]:.2e}*{h}^({signature[3]})(t-_r/{self.c:.1f})"
             if signature[0] > 0:
                 dy += f"x1^{signature[0]}"
             if signature[1] > 0:
@@ -191,22 +193,13 @@ class Solution:
             if signature[2] > 0:
                 dy += f"x3^{signature[2]}"
             if signature[-1] > 0:
-                dy += f"/r^{signature[-1]}"
+                dy += f"/_r^{signature[-1]}"
             y += dy
         return y
 
     def set_moments(self,
-                    current_moment: typing.Callable[[int, int, int], list[numbers.Number,
-                                                                          numbers.Number,
-                                                                          numbers.Number]] = lambda a1, a2, a3: [0,
-                                                                                                                 0,
-                                                                                                                 0],
-                    charge_moment: typing.Callable[[int, int, int], list[numbers.Number,
-                                                                         numbers.Number,
-                                                                         numbers.Number]] = lambda a1, a2, a3: [0,
-                                                                                                                0,
-                                                                                                                0],)\
-            -> None:
+                    current_moment = lambda a1, a2, a3: [0, 0, 0],
+                    charge_moment = lambda a1, a2, a3: [0, 0, 0],) -> None:
         """Set the current and charge moment functions.
         
         Keyword arguments:
@@ -244,7 +237,7 @@ class Solution:
         
         Keyword arguments:
         verbose -- whether to display the progress (default False)
-        delayed -- whether to evaluate the field at the retarded time t-r/c (default True)"""
+        delayed -- whether to evaluate the field at the retarded time t-_r/c (default True)"""
 
         if not self.ran_recurse or not self.ran_set_moments:
             raise RuntimeError("You must first run the `recurse' and `set_moments' methods.")
@@ -257,6 +250,8 @@ class Solution:
         self.verbose = kwargs.pop("verbose", False)
         self.delayed = kwargs.pop("delayed", True)
         self.compute_grid = kwargs.pop("compute_grid", True)
+
+        compute_txt = kwargs.pop("compute_txt", False)
 
         if self.verbose:
             np.seterr(divide="raise",
@@ -289,12 +284,12 @@ class Solution:
             moment_shape = (3, 1, 1)
             self.e_field = zeros((3, x1.size, t.size))
 
-        r = np.sqrt(x1 ** 2 + x2 ** 2 + x3 ** 2)
+        self._r = np.sqrt(x1 ** 2 + x2 ** 2 + x3 ** 2)
 
         if isinstance(h_sym, ndarray):
             hs_derivative, hs_integral = self._handle_h_array(h_sym, t)
         else:
-            hs_derivative, hs_integral = self._handle_h_symbolic(h_sym, t_sym)
+            hs_derivative, hs_integral = self._handle_h_symbolic(h_sym, t_sym, t)
 
         for ind, _ in np.ndenumerate(zeros(self._shape)):
             ind = np.array(ind)
@@ -310,27 +305,29 @@ class Solution:
                     self.e_field += self._single_term_multipole(ind,
                                                                 charge_moment,
                                                                 hs_integral,
-                                                                t, x1, x2, x3, r,
+                                                                t, x1, x2, x3, self._r,
                                                                 **kwargs)
-                    self.e_field_text += self._single_term_multipole_txt(ind,
-                                                                         charge_moment,
-                                                                         "int_h")
+                    if compute_txt:
+                        self.e_field_text += self._single_term_multipole_txt(ind,
+                                                                             charge_moment,
+                                                                             "int_h")
                 if np.any(current_moment) > self.thresh:
                     self.e_field += self._single_term_multipole(ind,
                                                                 current_moment,
                                                                 hs_derivative,
-                                                                t, x1, x2, x3, r,
+                                                                t, x1, x2, x3, self._r,
                                                                 **kwargs)
-                    self.e_field_text += self._single_term_multipole_txt(ind,
-                                                                         current_moment,
-                                                                         "dhdt")
+                    if compute_txt:
+                        self.e_field_text += self._single_term_multipole_txt(ind,
+                                                                             current_moment,
+                                                                             "dhdt")
 
         if self.verbose:
             print("Done.")
 
         return self.e_field
 
-    def _handle_h_symbolic(self, h_sym, t_sym):
+    def _handle_h_symbolic(self, h_sym, t_sym, t):
         h_0_sym = h_sym.integrate(t_sym)
         hs_sym = {-1: h_0_sym, 0: h_sym}
         for order in range(1, self.max_order + 3):
@@ -341,7 +338,10 @@ class Solution:
             print("Done.")
         hs = dict()
         for order in hs_sym:
-            hs[order] = sympy.lambdify(t_sym, hs_sym[order])
+            if self.delayed:
+                hs[order] = sympy.lambdify(t_sym, hs_sym[order])(t - self._r / self.c)
+            else:
+                hs[order] = sympy.lambdify(t_sym, hs_sym[order])(t)
 
         return self._repack_hs(hs)
 
@@ -354,8 +354,8 @@ class Solution:
                     hs_derivative.append(hs[order])
                     hs_integral.append(hs[order])
                 else:
-                    hs_derivative.append(lambda _: 0)
-                    hs_integral.append(lambda _: 0)
+                    hs_derivative.append(0)
+                    hs_integral.append(0)
             else:
                 hs_integral.append(hs[order])
 
@@ -378,7 +378,11 @@ class Solution:
 
         h_sym_callable = dict()
         for order in hs:
-            h_sym_callable[order] = Interpolator(t.squeeze(), hs[order])
+            if self.delayed:
+                h_sym_callable[order] = Interpolator(t.squeeze(), hs[order])(t - self._r / self.c)
+            else:
+                h_sym_callable[order] = Interpolator(t.squeeze(), hs[order])(t)
+
         return self._repack_hs(h_sym_callable)
 
     def _single_term_multipole(self,
@@ -398,7 +402,8 @@ class Solution:
                f"""*{list(map('{:.2e}%'.format, moment.flatten()))}*{self._evaluate_txt(tuple(ind), hs)}/(4pi)\n"""
 
     def __repr__(self) -> str:
-        return f"Solution({self.max_order=}, {self.c=}, {self.ran_recurse=})"
+        return ""
+   #     return f"Solution({self.max_order=}, {self.c=}, {self.ran_recurse=})"
 
 
 def fact(a) -> numbers.Number:
