@@ -80,12 +80,13 @@ def plot_moment(moment):
         x3s[i[-1]].append(i[2])
         colors[i[-1]].append(cmap(m / m_max / 2 + 0.5))
 
-    for i in range(3):
+    for i, text in zip(range(3), ("x", "y", "z")):
         plt.subplot(1, 3, i + 1)
         axes[i].scatter(x1s[i], x2s[i], x3s[i], color=colors[i])
         axes[i].set_xlabel("x")
         axes[i].set_ylabel("y")
         axes[i].set_zlabel("z")
+        plt.title(text + " component")
 
 
 def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_moment, **kwargs):
@@ -186,7 +187,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_m
                 #plt.subplot(2,1,1)
                 max_true = np.max(np.abs(e_true))
                 max_opt = np.max(np.abs(e_opt))
-                colors = ["r", "b", "g"]
+                colors = ["_r", "b", "g"]
                 for i in range(3):
                     plt.plot(t, e_true[i].reshape(-1, t.size).T, f"{colors[i]}--")
                     plt.plot(t, e_true[i].reshape(-1, t.size).T, f"{colors[i]}--")

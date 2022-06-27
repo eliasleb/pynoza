@@ -37,7 +37,6 @@ class Interpolator(scipy.interpolate.interp1d):
 class Solution:
     """A class to compute solutions of Maxwell's equations, based on"""
     """time-domain multipole moments."""
-    cdef cython.int max_order
     def __init__(self,
                  max_order: int = 0,
                  wave_speed: int = 1) -> None:

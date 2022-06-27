@@ -1,6 +1,8 @@
 *~
 .DS_Store
 
+build/
+
 .ipynb_checkpoints
 .pytest_cache
 .tox

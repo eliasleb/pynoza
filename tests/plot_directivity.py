@@ -17,7 +17,7 @@ def plot_directivity(alpha, fig, subplot, axis):
     wavelength = 1 / f
     r = 10 * wavelength
     t_max = 6 * gamma + r
-    t = np.linspace(0, t_max, 50)
+    t = np.linspace(0, t_max, 150)
     t0 = 3 * gamma
     h = np.exp(-((t - t0) / gamma)**2) * (4 * ((t - t0)/gamma)**2 - 2)
 
@@ -42,6 +42,7 @@ def plot_directivity(alpha, fig, subplot, axis):
 
     sol.set_moments(current_moment=current_moment, charge_moment=charge_moment)
     field = sol.compute_e_field(x1, x2, x3, t, h, None, compute_grid=False)
+
     energy = np.sum(field**2, axis=(0, 2))
 
     ax = fig.add_subplot(*subplot, projection='3d')

@@ -12,7 +12,7 @@ def inverse_problem_hira(**kwargs):
     filename = kwargs.get("filename",
                           "../../../git_ignore/GLOBALEM/hira_v12.txt")
     data = pd.read_csv(filename,
-                       delim_whitespace=True, header = 8)
+                       delim_whitespace=True, header=8)
     names = ["x", "y", "z"]
     t = 0
 
@@ -136,29 +136,17 @@ def inverse_problem_hira(**kwargs):
     assert np.all(r > 0)
 
     plt.ion()
-    fig = plt.figure()
+    plt.figure()
     plt.plot(r, energy / energy_max, '.')
     r_min = r.min()
     plt.plot(r, 1 / (r/r_min)**1, '.')
     plt.plot(r, 1 / (r/r_min)**2, '.')
     plt.plot(r, 1 / (r/r_min)**3, '.')
 
-    plt.legend(("data", "1/r", "1/r^2", "1/r^3"))
+    plt.legend(("data", "1/_r", "1/_r^2", "1/_r^3"))
 
     plt.show()
     input("[Enter] to continue...")
-
-    for x, y, z in zip(x1, x2, x3):
-        print(x, y, z)
-
- #   assert np.any((x1 > 0) & (x2 > 0) & (x3 > 0)) and \
- #          np.any((x1 > 0) & (x2 > 0) & (x3 < 0)) and \
- #          np.any((x1 > 0) & (x2 < 0) & (x3 > 0)) and \
- #          np.any((x1 > 0) & (x2 < 0) & (x3 < 0)) and \
- #          np.any((x1 < 0) & (x2 > 0) & (x3 > 0)) and \
- #          np.any((x1 < 0) & (x2 > 0) & (x3 < 0)) and \
- #          np.any((x1 < 0) & (x2 < 0) & (x3 > 0)) and \
- #          np.any((x1 < 0) & (x2 < 0) & (x3 < 0))
 
     def get_h_num(h, t):
         if h.size == 0:
@@ -185,7 +173,6 @@ def inverse_problem_hira(**kwargs):
               "max_global_tries": int(kwargs.get("max_global_tries", 1)),
               "compute_grid": False,
               "estimate": estimate}
-
     shape_mom = (order + 2, order + 2, order + 2, 3)
     dim_mom = 3 * sum([1 for i, j, k in
                        itertools.product(range(order + 1), range(order + 1), range(order + 1)) if i + j + k <= order])
@@ -198,7 +185,6 @@ def inverse_problem_hira(**kwargs):
                 current_moment_[a1, a2, a3, :] = moment[ind:ind + 3]
                 ind += 3
         assert ind == moment.size
-       # current_moment_[:order, :order, :order, :] = moment.reshape((order, order, order, 3))
         return current_moment_
 
     args = (order + 1, e_true, x1, x2, x3, t, get_current_moment, dim_mom)
@@ -262,5 +248,5 @@ if __name__ == "__main__":
     parser.add_argument("--max_global_tries")
     parser.add_argument("--filename")
 
-    args = parser.parse_args()
-    inverse_problem_hira(**vars(args))
+    kwargs = parser.parse_args()
+    inverse_problem_hira(**vars(kwargs))
