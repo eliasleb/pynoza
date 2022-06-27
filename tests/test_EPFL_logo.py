@@ -246,7 +246,7 @@ def test_solution(test_case):
                    and np.linalg.norm(e_paper3 * 1e2 - E1[0, 0, 2, :] * x3[2] / 1e6, ord=2) / t.size < 0.3
 
     with open(f"tests/data/field-{case_}.txt", "w+") as fd:
-        fd.write(sol.e_field_text)
+        fd.write(sol.get_e_field_text())
 
 
 if __name__ == "__main__":

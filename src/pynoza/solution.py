@@ -8,7 +8,7 @@ Created on Thu Oct 14 11:16:58 2021
 import numpy as np
 from numpy import zeros
 from numpy import ndarray
-from numpy import sum as npsum
+from numpy import sum as np_sum
 import sys
 import sympy
 import scipy.interpolate
@@ -37,6 +37,25 @@ class Interpolator(scipy.interpolate.interp1d):
 class Solution:
     """A class to compute solutions of Maxwell's equations, based on"""
     """time-domain multipole moments."""
+    max_order: int
+    c: float
+    _shape: tuple
+    _aux_func: dict
+    mu: float
+    thresh: float
+    ran_recurse: bool
+    ran_set_moments: bool
+    current_moment: cython.ccall
+    charge_moment: cython.ccall
+    verbose: bool
+    delayed: bool
+    compute_grid: bool
+    e_field: ndarray
+    _r: ndarray
+    y: ndarray
+    dy: ndarray
+    e_field_text: str
+
     def __init__(self,
                  max_order: int = 0,
                  wave_speed: int = 1) -> None:
@@ -51,8 +70,8 @@ class Solution:
         if not isinstance(wave_speed, numbers.Number):
             raise ValueError(":wave_speed: must be a number")
 
-        self.max_order: cython.int = max_order
-        self.c: float = wave_speed
+        self.max_order = max_order
+        self.c = wave_speed
         self._shape = (max_order + 1, max_order + 1, max_order + 1)
         self._aux_func = dict()
         for ind, _ in np.ndenumerate(zeros(self._shape)):
@@ -73,8 +92,8 @@ class Solution:
 
         self.e_field_text = ""
         self._r = np.array([0, ])
-        self.y = 0
-        self.dy = 0
+        self.y = np.array([0, ])
+        self.dy = np.array([0, ])
 
     def _increase_order(self, known_index, index) -> None:
         """Private method to compute the auxiliary function.
@@ -128,7 +147,7 @@ class Solution:
         for order in range(1, self.max_order + 1):
             for ind, _ in np.ndenumerate(zeros(self._shape)):
                 ind: ndarray = np.array(ind)
-                if npsum(ind) == order:
+                if np_sum(ind) == order:
                     known_ind: np.array = ind.copy()
                     known_ind[np.where(ind > 0)[0][0]] -= 1
                     if verbose:
@@ -137,20 +156,18 @@ class Solution:
         if verbose:
             print("Done.")
 
+    @cython.ccall
     def _evaluate(self,
                   ind,
-                  t: ndarray,
                   x1: ndarray,
                   x2: ndarray,
                   x3: ndarray,
                   r: ndarray,
-                  hs,
-                  **_) -> ndarray:
+                  hs):
         """Evaluate the auxiliary function.
         
         Positional arguments:
         ind -- multi-index of the auxiliary function
-        T -- evaluated time
         X1 -- evaluated first coordinate (aka x)
         X2 -- evaluated second coordinate (aka y)
         X3 -- evaluated third coordinate (aka z)
@@ -177,9 +194,9 @@ class Solution:
                       h: str) -> str:
         """Evaluate the auxiliary function as a symbolic expression
 
-            :param ind: multi-index to evaluate at
-            :param h: name of the function
-            :return: a string describing the auxiliary function
+            param ind: multi-index to evaluate at
+            param h: name of the function
+            return: a string describing the auxiliary function
             """
         y: str = ""
         for signature in self._aux_func[ind]:
@@ -197,8 +214,8 @@ class Solution:
         return y
 
     def set_moments(self,
-                    current_moment = lambda a1, a2, a3: [0, 0, 0],
-                    charge_moment = lambda a1, a2, a3: [0, 0, 0],) -> None:
+                    current_moment=lambda a1, a2, a3: [0, 0, 0],
+                    charge_moment=lambda a1, a2, a3: [0, 0, 0],) -> None:
         """Set the current and charge moment functions.
         
         Keyword arguments:
@@ -215,6 +232,7 @@ class Solution:
         self.current_moment = current_moment
         self.charge_moment = charge_moment
 
+    @cython.ccall
     def compute_e_field(self,
                         x1: ndarray,
                         x2: ndarray,
@@ -222,7 +240,10 @@ class Solution:
                         t: ndarray,
                         h_sym,
                         t_sym,
-                        **kwargs) -> ndarray:
+                        verbose=False,
+                        delayed=True,
+                        compute_grid=True,
+                        compute_txt=False):
         """Compute the electric field from the moments.
         
         Positional arguments:
@@ -246,11 +267,11 @@ class Solution:
                 raise ValueError("When h_sym is a dictionary, the keys must contain"
                                  " the indices -1..max_order + 2")
 
-        self.verbose = kwargs.pop("verbose", False)
-        self.delayed = kwargs.pop("delayed", True)
-        self.compute_grid = kwargs.pop("compute_grid", True)
+        self.verbose = verbose
+        self.delayed = delayed
+        self.compute_grid = compute_grid
 
-        compute_txt = kwargs.pop("compute_txt", False)
+        compute_txt = compute_txt
 
         if self.verbose:
             np.seterr(divide="raise",
@@ -262,9 +283,6 @@ class Solution:
                       over="raise",
                       under="ignore",
                       invalid="raise")
-
-        if kwargs:
-            raise ValueError(f"Unexpected keyword arguments: {kwargs}")
 
         self.e_field_text = ""
 
@@ -292,7 +310,7 @@ class Solution:
 
         for ind, _ in np.ndenumerate(zeros(self._shape)):
             ind = np.array(ind)
-            if npsum(ind) <= self.max_order:
+            if np_sum(ind) <= self.max_order:
                 a1, a2, a3 = ind
                 if self.verbose:
                     sys.stdout.write("\rComputing index {}...".format(ind))
@@ -304,8 +322,7 @@ class Solution:
                     self.e_field += self._single_term_multipole(ind,
                                                                 charge_moment,
                                                                 hs_integral,
-                                                                t, x1, x2, x3, self._r,
-                                                                **kwargs)
+                                                                x1, x2, x3, self._r)
                     if compute_txt:
                         self.e_field_text += self._single_term_multipole_txt(ind,
                                                                              charge_moment,
@@ -314,12 +331,11 @@ class Solution:
                     self.e_field += self._single_term_multipole(ind,
                                                                 current_moment,
                                                                 hs_derivative,
-                                                                t, x1, x2, x3, self._r,
-                                                                **kwargs)
+                                                                x1, x2, x3, self._r)
                     if compute_txt:
                         self.e_field_text += self._single_term_multipole_txt(ind,
                                                                              current_moment,
-                                                                             "dhdt")
+                                                                             "dh_dt")
 
         if self.verbose:
             print("Done.")
@@ -388,21 +404,22 @@ class Solution:
                                ind: ndarray,
                                moment: ndarray,
                                hs: ndarray,
-                               *args,
-                               **kwargs):
-        return (-1) ** npsum(ind) / fact(ind) \
-               * moment * self._evaluate(tuple(ind), *args, hs, **kwargs) / 4 / np.pi
+                               *args):
+        return (-1) ** np_sum(ind) / fact(ind) \
+               * moment * self._evaluate(tuple(ind), *args, hs) / 4 / np.pi
 
     def _single_term_multipole_txt(self,
                                    ind: ndarray,
                                    moment: ndarray,
                                    hs: str):
-        return f"""  {(-1) ** npsum(ind):+d}/{fact(ind)}"""\
+        return f"""  {(-1) ** np_sum(ind):+d}/{fact(ind)}"""\
                f"""*{list(map('{:.2e}%'.format, moment.flatten()))}*{self._evaluate_txt(tuple(ind), hs)}/(4pi)\n"""
 
     def __repr__(self) -> str:
-        return ""
-   #     return f"Solution({self.max_order=}, {self.c=}, {self.ran_recurse=})"
+        return f"Solution {self.max_order}, {self.c}, {self.ran_recurse}"
+
+    def get_e_field_text(self):
+        return self.e_field_text
 
 
 def fact(a) -> numbers.Number:

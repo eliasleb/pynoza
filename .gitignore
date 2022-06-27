@@ -1,6 +1,9 @@
 *~
 .DS_Store
 
+src/pynoza/*.so
+src/pynoza/*.c
+
 build/
 
 .ipynb_checkpoints
@@ -8,7 +11,7 @@ build/
 .tox
 .idea
 src/pynoza.egg-info/
-
+setup.c
 git_ignore/
 .idea/
 dist/

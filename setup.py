@@ -24,6 +24,6 @@ setuptools.setup(
     package_dir={"": "src"},
     packages=setuptools.find_packages(where="src"),
     python_requires=">=3.10",
-    ext_modules=cythonize("src/pynoza/solution.pyx",
+    ext_modules=cythonize("src/pynoza/solution.py",
                           compiler_directives={'language_level': "3"}),
 )

@@ -246,7 +246,7 @@ if __name__ == "__main__":
     parser.add_argument("--scale")
     parser.add_argument("--find_center")
     parser.add_argument("--max_global_tries")
-    parser.add_argument("--filename")
+    parser.add_argument("--filename", required=True)
 
     kwargs = parser.parse_args()
     inverse_problem_hira(**vars(kwargs))
