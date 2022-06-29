@@ -8,11 +8,8 @@ import time
 import pickle
 
 
-def inverse_problem_hira(**kwargs):
-    filename = kwargs.get("filename",
-                          "../../../git_ignore/GLOBALEM/hira_v12.txt")
-    data = pd.read_csv(filename,
-                       delim_whitespace=True, header=8)
+def read_comsol_file(filename):
+    data = pd.read_csv(filename, delim_whitespace=True, header=8)
     names = ["x", "y", "z"]
     t = 0
 
@@ -24,27 +21,9 @@ def inverse_problem_hira(**kwargs):
 
     names = names[:len(data.columns)]
     data.set_axis(names, axis=1, inplace=True)
-
-    c0 = 3e8
-    f = 500e6 / c0
-    gamma = np.sqrt(12 / 7) / f
-    t0 = 3 * gamma
-    dt = 1e-10  # s
-    down_sample_time = int(kwargs.get("down_sample_time", 6))
-    obs_r = np.linspace(float(kwargs.get("r_obs_min", 1)),
-                        float(kwargs.get("r_obs_max", 1.6)),
-                        int(kwargs.get("n_r_obs", 2)))
-    obs_theta = np.linspace(float(kwargs.get("theta_obs_min", 0.)),
-                            float(kwargs.get("theta_obs_max", np.pi)),
-                            int(kwargs.get("n_theta_obs", 3)))
-    obs_phi = np.linspace(float(kwargs.get("phi_obs_min", 0.)),
-                          float(kwargs.get("phi_obs_max", 2 * np.pi)),
-                          int(kwargs.get("n_phi_obs", 8)))
     n_times = 1
     while not np.isnan(data.iloc[0, 3 + 3 * n_times]):
         n_times += 1
-    dt *= c0
-    t = np.arange(0, n_times * dt, dt)
 
     x1 = data["x"]
     x2 = data["y"]
@@ -58,12 +37,12 @@ def inverse_problem_hira(**kwargs):
     assert np.all(["Ex" in name for name in ex.columns])
     assert np.all(["Ey" in name for name in ey.columns])
     assert np.all(["Ez" in name for name in ez.columns])
-    x1 = np.array(x1)
-    x2 = np.array(x2)
-    x3 = np.array(x3)
-    ex = np.array(ex)
-    ey = np.array(ey)
-    ez = np.array(ez)
+
+    return np.array(x1), np.array(x2), np.array(x3), np.array(ex), np.array(ey), np.array(ez)
+
+
+def add_symmetries(*args):
+    x1, x2, x3, ex, ey, ez = args
     times_added = 3
     x1_symmetry = np.zeros((x1.size * times_added))
     x2_symmetry = np.zeros((x1.size * times_added))
@@ -82,30 +61,59 @@ def inverse_problem_hira(**kwargs):
             i_sym += 1
 
         apply_symmetry(-1, 1, 1, -1, 1, 1)
-    #    apply_symmetry(1, -1, 1, 1, -1, 1)
-    #    apply_symmetry(-1, -1, 1, -1, -1, 1)
+        # apply_symmetry(1, -1, 1, 1, -1, 1)
+        # apply_symmetry(-1, -1, 1, -1, -1, 1)
         apply_symmetry(1, 1, -1, -1, -1, 1)
         apply_symmetry(-1, 1, -1, 1, -1, 1)
-    #    apply_symmetry(1, -1, -1, -1, 1, 1)
-    #    apply_symmetry(-1, -1, -1, 1, 1, 1)
+        # apply_symmetry(1, -1, -1, -1, 1, 1)
+        # apply_symmetry(-1, -1, -1, 1, 1, 1)
 
     assert i_sym // x1.size == times_added
 
-    x1 = np.concatenate((x1, x1_symmetry))
-    x2 = np.concatenate((x2, x2_symmetry))
-    x3 = np.concatenate((x3, x3_symmetry))
-    ex = np.concatenate((ex, ex_symmetry), axis=0)[:, ::down_sample_time]
-    ey = np.concatenate((ey, ey_symmetry), axis=0)[:, ::down_sample_time]
-    ez = np.concatenate((ez, ez_symmetry), axis=0)[:, ::down_sample_time]
+    return np.concatenate((x1, x1_symmetry)), \
+           np.concatenate((x2, x2_symmetry)), \
+           np.concatenate((x3, x3_symmetry)), \
+           np.concatenate((ex, ex_symmetry), axis=0), \
+           np.concatenate((ey, ey_symmetry), axis=0), \
+           np.concatenate((ez, ez_symmetry), axis=0)
+
+
+def inverse_problem_hira(**kwargs):
+    filename = kwargs.get("filename",
+                          "../../../git_ignore/GLOBALEM/hira_v12.txt")
+    x1, x2, x3, ex, ey, ez = read_comsol_file(filename)
+    c0 = 3e8
+    f = 500e6 / c0
+    gamma = np.sqrt(12 / 7) / f
+    t0 = 3 * gamma
+    dt = float(kwargs["dt"])
+    dt *= c0
+    t = np.arange(0, ex.shape[1] * dt, dt)
+    down_sample_time = int(kwargs.get("down_sample_time", 6))
+    obs_r = np.linspace(float(kwargs.get("r_obs_min", 1)),
+                        float(kwargs.get("r_obs_max", 1.6)),
+                        int(kwargs.get("n_r_obs", 2)))
+    obs_theta = np.linspace(float(kwargs.get("theta_obs_min", 0.)),
+                            float(kwargs.get("theta_obs_max", np.pi)),
+                            int(kwargs.get("n_theta_obs", 3)))
+    obs_phi = np.linspace(float(kwargs.get("phi_obs_min", 0.)),
+                          float(kwargs.get("phi_obs_max", 2 * np.pi)),
+                          int(kwargs.get("n_phi_obs", 8)))
+
+    x1, x2, x3, ex, ey, ez = add_symmetries(x1, x2, x3, ex, ey, ez)
+
+    ex = ex[:, ::down_sample_time]
+    ey = ey[:, ::down_sample_time]
+    ez = ez[:, ::down_sample_time]
     t = t[::down_sample_time]
 
     def to_cartesian(radius, theta, phi):
-        return radius*np.cos(phi)*np.sin(theta),  radius*np.sin(phi)*np.sin(theta), radius*np.cos(theta)
+        return radius * np.cos(phi) * np.sin(theta), radius * np.sin(phi) * np.sin(theta), radius * np.cos(theta)
 
     indices_obs = list()
     for ri, ti, pi in itertools.product(obs_r, obs_theta, obs_phi):
         obs_x, obs_y, obs_z = to_cartesian(ri, ti, pi)
-        dist = (x1 - obs_x)**2 + (x2 - obs_y)**2 + (x3 - obs_z)**2
+        dist = (x1 - obs_x) ** 2 + (x2 - obs_y) ** 2 + (x3 - obs_z) ** 2
         indices_obs.append(dist.argmin())
 
     x1 = x1[indices_obs]
@@ -116,17 +124,6 @@ def inverse_problem_hira(**kwargs):
     ez = ez[indices_obs, :]
 
     r = np.sqrt(x1 ** 2 + x2 ** 2 + x3 ** 2)
-    t_max = t.max()
-
-    def force_decay(e, t_delay):
-        cut = 0.5 * t_max
-        return e * ((t_delay <= cut) + (t_delay > cut)*np.exp(-((t_delay-cut)/gamma)**2))
-
-    td = t.reshape(1, t.size) - r.reshape(r.size, 1)
-
-    ex = force_decay(ex, td)
-    ey = force_decay(ey, td)
-    ez = force_decay(ez, td)
 
     print(f"{ex.shape=}")
 
@@ -141,14 +138,16 @@ def inverse_problem_hira(**kwargs):
         plt.figure()
         plt.plot(r, energy / energy_max, '.')
         r_min = r.min()
-        plt.plot(r, 1 / (r/r_min)**1, '.')
-        plt.plot(r, 1 / (r/r_min)**2, '.')
-        plt.plot(r, 1 / (r/r_min)**3, '.')
+        plt.plot(r, 1 / (r / r_min) ** 1, '.')
+        plt.plot(r, 1 / (r / r_min) ** 2, '.')
+        plt.plot(r, 1 / (r / r_min) ** 3, '.')
 
         plt.legend(("data", "1/_r", "1/_r^2", "1/_r^3"))
 
         plt.show()
         input("[Enter] to continue...")
+
+    tail = int(kwargs["n_tail"])
 
     def get_h_num(h, t):
         if h.size == 0:
@@ -156,12 +155,11 @@ def inverse_problem_hira(**kwargs):
             return h_num
         elif h.size == 2:
             h_num = lambda delay: np.exp(-((t - t0 - delay) / gamma) ** 2) * (4 * ((t - t0 - delay) / gamma) ** 2 - 2)
-            return h_num(0) + h[0] * h_num(h[1]**2)
+            return h_num(0) + h[0] * h_num(h[1] ** 2)
         else:
-            tail = 10
             return scipy.interpolate.interp1d(np.linspace(t.min(), t.max(), 1 + h.size + tail),
-                                              np.concatenate((np.array((0, )), h.ravel(), np.zeros((tail, )))),
-                                              kind="cubic")(t) * np.exp(-1/((t/0.1)**2 + 1e-16))
+                                              np.concatenate((np.array((0,)), h.ravel(), np.zeros((tail,)))),
+                                              kind="cubic")(t)  # * np.exp(-1/((t/0.1)**2 + 1e-16))
 
     estimate = None
 
@@ -194,7 +192,6 @@ def inverse_problem_hira(**kwargs):
 
     args = (order + 1, e_true, x1, x2, x3, t, get_current_moment, dim_mom)
     current_moment, h, center, e_opt = inverse_problem.inverse_problem(*args, **kwargs)
-    estimate = (current_moment, h, center)
 
     if kwargs["plot"]:
         plt.ion()
@@ -217,12 +214,12 @@ def inverse_problem_hira(**kwargs):
         match answer:
             case ("y" | "Y"):
                 res = pd.DataFrame(data={"t": x1, "x2": x2, "x3": x3}
-                                   | {f"ex_opt@t={t[i]}": e_opt[0, :, i] for i in range(ex.shape[1])}
-                                   | {f"ey_opt@t={t[i]}": e_opt[1, :, i] for i in range(ey.shape[1])}
-                                   | {f"ez_opt@t={t[i]}": e_opt[2, :, i] for i in range(ez.shape[1])}
-                                   | {f"ex_true@t={t[i]}": ex[:, i] for i in range(ex.shape[1])}
-                                   | {f"ey_true@t={t[i]}": ey[:, i] for i in range(ey.shape[1])}
-                                   | {f"ez_true@t={t[i]}": ez[:, i] for i in range(ez.shape[1])})
+                                        | {f"ex_opt@t={t[i]}": e_opt[0, :, i] for i in range(ex.shape[1])}
+                                        | {f"ey_opt@t={t[i]}": e_opt[1, :, i] for i in range(ey.shape[1])}
+                                        | {f"ez_opt@t={t[i]}": e_opt[2, :, i] for i in range(ez.shape[1])}
+                                        | {f"ex_true@t={t[i]}": ex[:, i] for i in range(ex.shape[1])}
+                                        | {f"ey_true@t={t[i]}": ey[:, i] for i in range(ey.shape[1])}
+                                        | {f"ez_true@t={t[i]}": ez[:, i] for i in range(ez.shape[1])})
                 filename = f"../../../git_ignore/GLOBALEM/opt-result-{time.asctime()}.csv"
                 res.to_csv(path_or_buf=filename)
                 with open(filename + "_params.pickle", 'wb') as handle:
@@ -250,12 +247,14 @@ if __name__ == "__main__":
     parser.add_argument("--order")
     parser.add_argument("--tol")
     parser.add_argument("--n_points")
+    parser.add_argument("--n_tail", required=True)
     parser.add_argument("--verbose_every")
     parser.add_argument("--plot")
     parser.add_argument("--scale")
     parser.add_argument("--find_center")
     parser.add_argument("--max_global_tries")
     parser.add_argument("--filename", required=True)
+    parser.add_argument("--dt", help="Sampling time, in second", required=True)
 
     kwargs = parser.parse_args()
     inverse_problem_hira(**vars(kwargs))
