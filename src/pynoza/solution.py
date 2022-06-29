@@ -12,6 +12,13 @@ import numbers
 import typing
 
 
+X1: int = 0
+X2: int = 1
+X3: int = 2
+H: int = 3
+R: int = 4
+
+
 class Solution:
     """A class to compute solutions of Maxwell's equations, based on"""
     """time-domain multipole moments."""
@@ -71,10 +78,10 @@ class Solution:
                 except KeyError:
                     self._aux_func[index][tuple(identity_first_term)] \
                         = coefficient * exponent_x_i
-            exponent_r: int = signature[-1]
+            exponent_r: int = signature[R]
             identity_second_term: list[int, int, int, int, int] = list(signature)
             identity_second_term[known_dim] += 1  # numerator
-            identity_second_term[-1] += 2  # denominator
+            identity_second_term[R] += 2  # denominator
             try:
                 self._aux_func[index][tuple(identity_second_term)] -= \
                     coefficient * exponent_r
@@ -84,8 +91,8 @@ class Solution:
             # Time-derivative term
             identity_third_term: list[int, int, int, int, int] = list(signature)
             identity_third_term[known_dim] += 1
-            identity_third_term[3] += 1  # time-derivative
-            identity_third_term[-1] += 1  # denominator
+            identity_third_term[H] += 1  # time-derivative
+            identity_third_term[R] += 1  # denominator
             try:
                 self._aux_func[index][tuple(identity_third_term)] -= \
                     coefficient / self.c
@@ -136,17 +143,17 @@ class Solution:
         dy: np.ndarray = np.zeros(x1.shape)
         for signature in self._aux_func[ind]:
             if self.delayed:
-                dy = hs[signature[3]](t - r / self.c) * self._aux_func[ind][signature]
+                dy = hs[signature[H]](t - r / self.c) * self._aux_func[ind][signature]
             else:
-                dy = hs[signature[3]](t) * self._aux_func[ind][signature]
-            if signature[0] > 0:
-                dy *= x1 ** signature[0]
-            if signature[1] > 0:
-                dy *= x2 ** signature[1]
-            if signature[2] > 0:
-                dy *= x3 ** signature[2]
-            if signature[-1] > 0:
-                dy /= r ** signature[-1]
+                dy = hs[signature[H]](t) * self._aux_func[ind][signature]
+            if signature[X1] > 0:
+                dy *= x1 ** signature[X1]
+            if signature[X2] > 0:
+                dy *= x2 ** signature[X2]
+            if signature[X3] > 0:
+                dy *= x3 ** signature[X3]
+            if signature[R] > 0:
+                dy /= r ** signature[R]
             y += dy
         return y
 
@@ -162,15 +169,15 @@ class Solution:
         y: str = ""
         for signature in self._aux_func[ind]:
             dy = ""
-            dy += f"{self._aux_func[ind][signature]:.2e}*{h}^({signature[3]})(t-r/{self.c:.1f})"
-            if signature[0] > 0:
-                dy += f"x1^{signature[0]}"
-            if signature[1] > 0:
-                dy += f"x2^{signature[1]}"
-            if signature[2] > 0:
-                dy += f"x3^{signature[2]}"
-            if signature[-1] > 0:
-                dy += f"/r^{signature[-1]}"
+            dy += f"{self._aux_func[ind][signature]:.2e}*{h}^({signature[H]})(t-r/{self.c:.1f})"
+            if signature[X1] > 0:
+                dy += f"x1^{signature[X1]}"
+            if signature[X2] > 0:
+                dy += f"x2^{signature[X2]}"
+            if signature[X3] > 0:
+                dy += f"x3^{signature[X3]}"
+            if signature[R] > 0:
+                dy += f"/r^{signature[R]}"
             y += dy
         return y
 
