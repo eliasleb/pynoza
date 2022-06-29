@@ -202,14 +202,6 @@ def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_m
                 if max_h > 0:
                     plt.plot(t, h / max_h * max_true, "k-.")
 
-                #plt.subplot(2, 1, 2)
-                #directivity = np.sum(e_opt**2, axis=(0, 2))
-                #max_directivity = directivity.max()
-                #if max_directivity > 0:
-                #    for xi, yi, zi, direc in zip(x1, x2, x3, directivity):
-                #        if abs(zi):
-                #            plt.plot(xi, yi, 'o', mfc=(direc/max_directivity, direc/max_directivity, direc/max_directivity), mec=(0,0,0))
-                #plt.draw#()
                 plt.pause(0.001)
 
             os.system("clear")
@@ -218,8 +210,10 @@ def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_m
         return error
 
     options = {'maxiter': 1e3,
-               'disp': False,
-               'seed': 0
+               "ftol": tol,
+               "maxfun": 1000000,
+               "maxls": x0.size,
+               "iprint": 0
                }
 
     np.random.seed(0)
@@ -234,8 +228,8 @@ def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_m
         n_calls = 0
 
         res = scipy.optimize.minimize(get_error, x0,
-                                      method=None,
-                                      options=options, tol=tol, )
+                                      method="BFGS",
+                                      options=options)
 
         if res.fun <= error_tol:
             break
