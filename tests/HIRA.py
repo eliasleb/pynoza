@@ -53,6 +53,8 @@ def inverse_problem_hira(**kwargs):
     ey = data.iloc[:, 4:3 * n_times + 3:3]
     ez = data.iloc[:, 5:3 * n_times + 3:3]
 
+    del data
+
     assert np.all(["Ex" in name for name in ex.columns])
     assert np.all(["Ey" in name for name in ey.columns])
     assert np.all(["Ez" in name for name in ez.columns])
@@ -134,24 +136,27 @@ def inverse_problem_hira(**kwargs):
     energy_max = energy.max(initial=0)
 
     assert np.all(r > 0)
+    if kwargs.get("plot").lower() == "true":
+        plt.ion()
+        plt.figure()
+        plt.plot(r, energy / energy_max, '.')
+        r_min = r.min()
+        plt.plot(r, 1 / (r/r_min)**1, '.')
+        plt.plot(r, 1 / (r/r_min)**2, '.')
+        plt.plot(r, 1 / (r/r_min)**3, '.')
 
-    plt.ion()
-    plt.figure()
-    plt.plot(r, energy / energy_max, '.')
-    r_min = r.min()
-    plt.plot(r, 1 / (r/r_min)**1, '.')
-    plt.plot(r, 1 / (r/r_min)**2, '.')
-    plt.plot(r, 1 / (r/r_min)**3, '.')
+        plt.legend(("data", "1/_r", "1/_r^2", "1/_r^3"))
 
-    plt.legend(("data", "1/_r", "1/_r^2", "1/_r^3"))
-
-    plt.show()
-    input("[Enter] to continue...")
+        plt.show()
+        input("[Enter] to continue...")
 
     def get_h_num(h, t):
         if h.size == 0:
             h_num = np.exp(-((t - t0) / gamma) ** 2) * (4 * ((t - t0) / gamma) ** 2 - 2)
             return h_num
+        elif h.size == 2:
+            h_num = lambda delay: np.exp(-((t - t0 - delay) / gamma) ** 2) * (4 * ((t - t0 - delay) / gamma) ** 2 - 2)
+            return h_num(0) + h[0] * h_num(h[1]**2)
         else:
             tail = 10
             return scipy.interpolate.interp1d(np.linspace(t.min(), t.max(), 1 + h.size + tail),
@@ -166,7 +171,7 @@ def inverse_problem_hira(**kwargs):
               "error_tol": float(kwargs.get("error_tol", 1E-3)),
               "coeff_derivative": 0,
               "verbose_every": int(kwargs.get("verbose_every", 100)),
-              "plot": bool(kwargs.get("plot", True)),
+              "plot": kwargs.get("plot").lower() == "true",
               "scale": float(kwargs.get("scale", 1e4)),
               "h_num": get_h_num,
               "find_center": bool(kwargs.get("find_center", True)),
@@ -191,7 +196,7 @@ def inverse_problem_hira(**kwargs):
     current_moment, h, center, e_opt = inverse_problem.inverse_problem(*args, **kwargs)
     estimate = (current_moment, h, center)
 
-    if kwargs.get("plot", True):
+    if kwargs["plot"]:
         plt.ion()
 
         print(f"{center=}")
@@ -205,7 +210,11 @@ def inverse_problem_hira(**kwargs):
         plt.title("Current vs time")
         plt.pause(0.1)
         plt.show()
-        match input("Save? [y/*] "):
+        if kwargs["plot"]:
+            answer = input("Save? [y/*] ")
+        else:
+            answer = "y"
+        match answer:
             case ("y" | "Y"):
                 res = pd.DataFrame(data={"t": x1, "x2": x2, "x3": x3}
                                    | {f"ex_opt@t={t[i]}": e_opt[0, :, i] for i in range(ex.shape[1])}
