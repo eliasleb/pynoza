@@ -56,7 +56,6 @@ def test_inverse_problem_simple():
     dt = np.max(np.diff(t))
     f = np.linspace(0, 1/dt, t.size)
 
-
     def get_h_num(h, t):
         h[-h.size//3:] = 0
         h[0] = 0
@@ -73,7 +72,7 @@ def test_inverse_problem_simple():
               "h_num": get_h_num,
               "find_center": True,
               "scale": 1,
-              "max_global_tries": 10}
+              "max_global_tries": 1}
 
     order = 2
 
@@ -122,11 +121,11 @@ def direct_problem_simple(x1, x2, x3, t, h, order=2):
     def charge_moment(a1, a2, a3):
         a = (a1, a2, a3)
         if a == (1, 0, 1):
-            return [1, 0, 0]
+            return [-1, 0, 0]
         elif a == (0, 1, 1):
-            return [0, 1, 0]
+            return [0, -1, 0]
         elif a == (0, 0, 2):
-            return [0, 0, 2]
+            return [0, 0, -2]
         else:
             return [0, 0, 0]
 
