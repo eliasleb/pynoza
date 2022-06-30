@@ -34,7 +34,6 @@ def complement(*args):
 
 def get_charge_moment(current_moment):
     charge_moment = np.zeros(current_moment.shape)
-    b = [0, 0, 0]
     for ind, _ in np.ndenumerate(charge_moment):
         a1, a2, a3, i = ind
         a = (a1, a2, a3)
@@ -134,7 +133,10 @@ def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_m
 
     center = np.zeros((3, ))
     current_moment = np.zeros((dim_moment, ))
+
+    current_moment[0] = 1
     h = np.zeros((n_points, ))
+    h[1] = 1
 
     if find_center:
         def ravel_params(current_moments, h, center):
@@ -172,51 +174,49 @@ def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_m
         errors_comp = []
 
         for c1, c2 in zip(e_true, e_opt):
-            errors_comp.append(np.sum(np.abs(c1 - c2 * scale)))
-            normal += np.sum(np.abs(c1))
+            errors_comp.append(np.sum((c1 - c2 * scale)**4))
+            normal += np.sum(c1**4)
         error = np.sum(errors_comp) / normal
 
         if coeff_derivative > 0:
             error += coeff_derivative*np.sum(np.diff(h)**2)/np.sum(h**2)*dt
 
-        error = np.clip(error, error_tol, 10)
-
         if n_calls % verbose_every == 0:
             if plot:
                 plt.clf()
-                #plt.subplot(2,1,1)
                 max_true = np.max(np.abs(e_true))
                 max_opt = np.max(np.abs(e_opt))
-                colors = ["_r", "b", "g"]
+                colors = ["r", "b", "g"]
                 for i in range(3):
-                    plt.plot(t, e_true[i].reshape(-1, t.size).T, f"{colors[i]}--")
-                    plt.plot(t, e_true[i].reshape(-1, t.size).T, f"{colors[i]}--")
-                    plt.plot(t, e_true[i].reshape(-1, t.size).T, f"{colors[i]}--")
+                    plt.subplot(2, 3, i + 1)
+                    plt.plot(t, e_true[i].reshape(-1, t.size).T, f"b--")
+                    plt.plot(t, e_true[i].reshape(-1, t.size).T, f"b--")
+                    plt.plot(t, e_true[i].reshape(-1, t.size).T, f"b--")
 
-                    plt.plot(t, e_opt[i].reshape(-1, t.size).T*scale, f"{colors[i]}-")
-                    plt.plot(t, e_opt[i].reshape(-1, t.size).T*scale, f"{colors[i]}-")
-                    plt.plot(t, e_opt[i].reshape(-1, t.size).T*scale, f"{colors[i]}-")
+                    plt.plot(t, e_opt[i].reshape(-1, t.size).T*scale, f"k-")
+                    plt.plot(t, e_opt[i].reshape(-1, t.size).T*scale, f"k-")
+                    plt.plot(t, e_opt[i].reshape(-1, t.size).T*scale, f"k-")
 
                 #       print(np.max(np.abs(e_opt)), np.max(np.abs(current_moment)), np.max(np.abs(charge_moment)))
                 max_h = np.max(np.abs(h))
                 if max_h > 0:
+                    plt.subplot(2, 3, 5)
                     plt.plot(t, h / max_h * max_true, "k-.")
 
                 plt.pause(0.001)
 
             os.system("clear")
-            print(f"{'#'*int(error*50)}{error:.3f}, {n_calls=}, {errors_comp/normal=}", end='\r')
+            print(f"{'#'*np.clip(int(error*50), 0, 50)}{error:.3f}, {n_calls=}, {errors_comp/normal=}", end='\r')
 
         return error
 
     options = {'maxiter': 1e3,
-               "ftol": tol,
-               "maxfun": 1000000,
-               "maxls": x0.size,
-               "iprint": 0
+               "disp": True,
+               "gtol": tol
                }
 
     np.random.seed(0)
+    print(f"There are {x0.size} degrees of freedom.")
 
     for i_try in range(max_global_tries):
         print("Try", i_try)
@@ -226,7 +226,6 @@ def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_m
         else:
             x0 = ravel_params(*estimate)
         n_calls = 0
-
         res = scipy.optimize.minimize(get_error, x0,
                                       method="BFGS",
                                       options=options)
@@ -235,4 +234,4 @@ def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_m
             break
     current_moment, h, center = unravel_params(res.x)
 
-    return current_moment_callable(current_moment), get_h_num(h, t), center, e_opt.squeeze()
+    return current_moment_callable(current_moment), get_h_num(h, t), center, e_opt.squeeze() * scale
