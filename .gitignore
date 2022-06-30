@@ -6,6 +6,8 @@ src/pynoza/*.c
 
 build/
 
+tests/data/order*
+
 .ipynb_checkpoints
 .pytest_cache
 .tox
