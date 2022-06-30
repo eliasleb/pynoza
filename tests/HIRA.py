@@ -79,6 +79,9 @@ def add_symmetries(*args):
 
 
 def inverse_problem_hira(**kwargs):
+
+    print(f"{kwargs=}")
+
     filename = kwargs.get("filename",
                           "../../../git_ignore/GLOBALEM/hira_v12.txt")
     x1, x2, x3, ex, ey, ez = read_comsol_file(filename)
@@ -124,6 +127,17 @@ def inverse_problem_hira(**kwargs):
     ez = ez[indices_obs, :]
 
     r = np.sqrt(x1 ** 2 + x2 ** 2 + x3 ** 2)
+    t_max = t.max()
+
+    def force_decay(e, t_delay):
+        cut = 0.5 * t_max
+        return e * ((t_delay <= cut) + (t_delay > cut) * np.exp(-((t_delay - cut) / gamma) ** 2))
+
+    td = t.reshape(1, t.size) - r.reshape(r.size, 1)
+
+    ex = force_decay(ex, td)
+    ey = force_decay(ey, td)
+    ez = force_decay(ez, td)
 
     print(f"{ex.shape=}")
 
@@ -207,26 +221,26 @@ def inverse_problem_hira(**kwargs):
         plt.title("Current vs time")
         plt.pause(0.1)
         plt.show()
-        if kwargs["plot"]:
-            answer = input("Save? [y/*] ")
-        else:
-            answer = "y"
-        match answer:
-            case ("y" | "Y"):
-                res = pd.DataFrame(data={"t": x1, "x2": x2, "x3": x3}
-                                        | {f"ex_opt@t={t[i]}": e_opt[0, :, i] for i in range(ex.shape[1])}
-                                        | {f"ey_opt@t={t[i]}": e_opt[1, :, i] for i in range(ey.shape[1])}
-                                        | {f"ez_opt@t={t[i]}": e_opt[2, :, i] for i in range(ez.shape[1])}
-                                        | {f"ex_true@t={t[i]}": ex[:, i] for i in range(ex.shape[1])}
-                                        | {f"ey_true@t={t[i]}": ey[:, i] for i in range(ey.shape[1])}
-                                        | {f"ez_true@t={t[i]}": ez[:, i] for i in range(ez.shape[1])})
-                filename = f"../../../git_ignore/GLOBALEM/opt-result-{time.asctime()}.csv"
-                res.to_csv(path_or_buf=filename)
-                with open(filename + "_params.pickle", 'wb') as handle:
-                    pickle.dump((current_moment, h, center, e_true, e_opt), handle, protocol=pickle.HIGHEST_PROTOCOL)
-                print(f"Saved as '{filename}'.")
-            case _:
-                pass
+    if kwargs["plot"]:
+        answer = input("Save? [y/*] ")
+    else:
+        answer = "y"
+    match answer:
+        case ("y" | "Y"):
+            res = pd.DataFrame(data={"t": x1, "x2": x2, "x3": x3}
+                                    | {f"ex_opt@t={t[i]}": e_opt[0, :, i] for i in range(ex.shape[1])}
+                                    | {f"ey_opt@t={t[i]}": e_opt[1, :, i] for i in range(ey.shape[1])}
+                                    | {f"ez_opt@t={t[i]}": e_opt[2, :, i] for i in range(ez.shape[1])}
+                                    | {f"ex_true@t={t[i]}": ex[:, i] for i in range(ex.shape[1])}
+                                    | {f"ey_true@t={t[i]}": ey[:, i] for i in range(ey.shape[1])}
+                                    | {f"ez_true@t={t[i]}": ez[:, i] for i in range(ez.shape[1])})
+            filename = f"../../../git_ignore/GLOBALEM/opt-result-{time.asctime()}.csv"
+            res.to_csv(path_or_buf=filename)
+            with open(filename + "_params.pickle", 'wb') as handle:
+                pickle.dump((current_moment, h, center, e_true, e_opt), handle, protocol=pickle.HIGHEST_PROTOCOL)
+            print(f"Saved as '{filename}'.")
+        case _:
+            pass
 
 
 if __name__ == "__main__":
