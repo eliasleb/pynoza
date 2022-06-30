@@ -1,12 +1,19 @@
 *~
 .DS_Store
 
+src/pynoza/*.so
+src/pynoza/*.c
+
+build/
+
+tests/data/order*
+
 .ipynb_checkpoints
 .pytest_cache
 .tox
 .idea
 src/pynoza.egg-info/
-
+setup.c
 git_ignore/
 .idea/
 dist/
@@ -16,7 +23,7 @@ __pycache__/
 .ipynb_checkpoints/
 
 *.djvu
-
+*.prof
 # Latex
 *.aux
 *.fls

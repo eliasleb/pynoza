@@ -73,7 +73,7 @@ def c_r(a1, a2, a3, x1, x2, w, h):
     return int_r(x1, w, a1) * int_j(x2, h, a2)
 
 
-@pytest.mark.parametrize("test_case", ["logo", "disc"])
+@pytest.mark.parametrize("test_case", ["logo", "disc", "logo_num"],)
 def test_solution(test_case):
     """
     Test the pynoza :solution: class by comparing
@@ -83,6 +83,12 @@ def test_solution(test_case):
     :param test_case: either "logo" or "disc"
     :return:
     """
+
+    if test_case == "logo_num":
+        num = True
+        test_case = "logo"
+    else:
+        num = False
 
     case_ = test_case
 
@@ -184,6 +190,9 @@ def test_solution(test_case):
     h_sym = (3*gamma_SI*sympy.sqrt(np.pi/2))**-.5\
         * sympy.exp(-((t_sym-3*gamma)/gamma)**2)*(4*((t_sym-3*gamma)/gamma)**2-2)
 
+    if num:
+        h_sym = sympy.lambdify(t_sym, h_sym)(t)
+
     sol = pynoza.solution.Solution(max_order=24,
                                    wave_speed=c0)
     sol.recurse()
@@ -213,7 +222,13 @@ def test_solution(test_case):
                                                    fill_value="extrapolate")(t * gamma_SI)
             e_cmsl_3a = scipy.interpolate.interp1d(data_cmsl["t"], data_cmsl["E3a"],
                                                    fill_value="extrapolate")(t * gamma_SI)
-            assert np.linalg.norm(e_cmsl_2a / 2 - E1[0, 0, 0, :], ord=2) / t.size < 160 \
+            if num:
+                E1 = pynoza.set_extremities(E1, 0.1, dim = 3)
+                norm1 = 200
+            else:
+                norm1 = 160
+                
+            assert np.linalg.norm(e_cmsl_2a / 2 - E1[0, 0, 0, :], ord=2) / t.size < norm1 \
                    and np.linalg.norm(e_cmsl_3a / 2 - E1[0, 0, 1, :], ord=2) / t.size < 170
         case "disc":
             fname = "data/ratio-0-5-v6.txt"
@@ -231,7 +246,7 @@ def test_solution(test_case):
                    and np.linalg.norm(e_paper3 * 1e2 - E1[0, 0, 2, :] * x3[2] / 1e6, ord=2) / t.size < 0.3
 
     with open(f"tests/data/field-{case_}.txt", "w+") as fd:
-        fd.write(sol.e_field_text)
+        fd.write(sol.get_e_field_text())
 
 
 if __name__ == "__main__":
