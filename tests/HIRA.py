@@ -228,12 +228,12 @@ def inverse_problem_hira(**kwargs):
     match answer:
         case ("y" | "Y"):
             res = pd.DataFrame(data={"t": x1, "x2": x2, "x3": x3}
-                                    | {f"ex_opt@t={t[i]}": e_opt[0, :, i] for i in range(ex.shape[1])}
-                                    | {f"ey_opt@t={t[i]}": e_opt[1, :, i] for i in range(ey.shape[1])}
-                                    | {f"ez_opt@t={t[i]}": e_opt[2, :, i] for i in range(ez.shape[1])}
-                                    | {f"ex_true@t={t[i]}": ex[:, i] for i in range(ex.shape[1])}
-                                    | {f"ey_true@t={t[i]}": ey[:, i] for i in range(ey.shape[1])}
-                                    | {f"ez_true@t={t[i]}": ez[:, i] for i in range(ez.shape[1])})
+                                     | {f"ex_opt@t={t[i]}": e_opt[0, :, i] for i in range(ex.shape[1])}
+                                     | {f"ey_opt@t={t[i]}": e_opt[1, :, i] for i in range(ey.shape[1])}
+                                     | {f"ez_opt@t={t[i]}": e_opt[2, :, i] for i in range(ez.shape[1])}
+                                     | {f"ex_true@t={t[i]}": ex[:, i] for i in range(ex.shape[1])}
+                                     | {f"ey_true@t={t[i]}": ey[:, i] for i in range(ey.shape[1])}
+                                     | {f"ez_true@t={t[i]}": ez[:, i] for i in range(ez.shape[1])})
             filename = f"../../../git_ignore/GLOBALEM/opt-result-{time.asctime()}.csv"
             res.to_csv(path_or_buf=filename)
             with open(filename + "_params.pickle", 'wb') as handle:

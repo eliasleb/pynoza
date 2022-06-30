@@ -1,9 +1,9 @@
 import pynoza
 import numpy as np
-import pytest
 import matplotlib.pyplot as plt
 import inverse_problem
 import scipy
+import scipy.interpolate
 
 
 def test_charge_moment_computation():
@@ -35,7 +35,6 @@ def test_charge_moment_computation():
         input("Press Enter to continue...")
 
 
-@pytest.mark.skip(reason="Not done yet")
 def test_inverse_problem_simple():
     """
     Test the pynoza :solution: class by solving inverse problem on a dipole source
@@ -45,16 +44,12 @@ def test_inverse_problem_simple():
     x3 = x1.copy()
 
     t = np.linspace(0, 20, 100)
-    c0 = 3e8
     wavelength = 1
     f = 1 / wavelength
     gamma = np.sqrt(12/7)/f
-    t0 = 5*gamma
+    t0 = 5 * gamma
 
     h_true = np.exp(-((t-t0)/gamma)**2) * (4 * ((t-t0)/gamma)**2 - 2)
-
-    dt = np.max(np.diff(t))
-    f = np.linspace(0, 1/dt, t.size)
 
     def get_h_num(h, t):
         h[-h.size//3:] = 0
@@ -63,7 +58,7 @@ def test_inverse_problem_simple():
                                           h,
                                           kind="cubic")(t)
 
-    kwargs = {"tol": 1e-10,
+    kwargs = {"tol": 1e-4,
               "n_points": 30,
               "error_tol": 5e-2,
               "coeff_derivative": 0,
@@ -87,6 +82,7 @@ def test_inverse_problem_simple():
     e_true = direct_problem_simple(x1, x2, x3, t, h_true, order=order)
     current_moment, h, center, e_opt = inverse_problem.inverse_problem(order, e_true, x1, x2, x3, t,
                                                                        get_current_moment, dim_mom, **kwargs)
+    assert np.sum((e_true - e_opt)**2)/np.sum(e_opt**2) < 1e-2
 
     if __name__ == "__main__":
 
@@ -137,5 +133,4 @@ def direct_problem_simple(x1, x2, x3, t, h, order=2):
 
 
 if __name__ == "__main__":
-#    test_charge_moment_computation()
     test_inverse_problem_simple()
