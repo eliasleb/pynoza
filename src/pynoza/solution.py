@@ -82,8 +82,8 @@ class Solution:
 
         self.ran_recurse = False
         self.ran_set_moments = False
-        self.current_moment = lambda a1, a2, a3: [0, 0, 0]
-        self.charge_moment = lambda a1, a2, a3: [0, 0, 0]
+        self.current_moment = None
+        self.charge_moment = None
         self.verbose = False
         self.delayed = True
         self.compute_grid = True
@@ -229,8 +229,13 @@ class Solution:
             raise ValueError(":current_moment: and :charge_moment: callables must return a list of numbers")
 
         self.ran_set_moments = True
-        self.current_moment = current_moment
-        self.charge_moment = charge_moment
+        self.current_moment = np.zeros((3, self.max_order + 1, self.max_order + 1, self.max_order + 1))
+        self.charge_moment = self.current_moment.copy()
+
+        for ind, _ in np.ndenumerate(zeros(self._shape)):
+            self.current_moment[:, ind[0], ind[1], ind[2]] = current_moment(*ind)
+            self.charge_moment[:, ind[0], ind[1], ind[2]] = charge_moment(*ind)
+
 
     @cython.ccall
     def compute_e_field(self,
@@ -314,10 +319,8 @@ class Solution:
                 a1, a2, a3 = ind
                 if self.verbose:
                     sys.stdout.write("\rComputing index {}...".format(ind))
-                charge_moment = -self.mu * self.c ** 2 * np.array(
-                    self.charge_moment(a1, a2, a3)).reshape(moment_shape)
-                current_moment = -self.mu * np.array(
-                    self.current_moment(a1, a2, a3)).reshape(moment_shape)
+                charge_moment = -self.mu * self.c ** 2 * self.charge_moment[:, a1, a2, a3].reshape(moment_shape)
+                current_moment = -self.mu * self.current_moment[:, a1, a2, a3].reshape(moment_shape)
                 if np.any(charge_moment) > self.thresh:
                     self.e_field += self._single_term_multipole(ind,
                                                                 charge_moment,
