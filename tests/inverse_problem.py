@@ -102,6 +102,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_m
     max_global_tries = kwargs.pop("max_global_tries", 10)
     compute_grid = kwargs.pop("compute_grid", True)
     estimate = kwargs.pop("estimate", None)
+    p = kwargs.pop("p", 2)
 
     if kwargs:
         raise ValueError(f"Unknown keyword arguments: {kwargs}")
@@ -172,10 +173,9 @@ def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_m
         normal = 0
 
         errors_comp = []
-
         for c1, c2 in zip(e_true, e_opt):
-            errors_comp.append(np.sum((c1 - c2 * scale)**4))
-            normal += np.sum(c1**4)
+            errors_comp.append(np.sum(np.abs(c1 - c2 * scale)**p))
+            normal += np.sum(np.abs(c1)**p)
         error = np.sum(errors_comp) / normal
 
         if coeff_derivative > 0:
