@@ -32,12 +32,12 @@ def ez_mikheev(x, y, z, t, v, *args):
     if np.any(np.abs(k) > 1) or np.any(np.abs(p) > 1):
         raise RuntimeError("k and p must be smaller than 1")
 
-    return 1 / 2 / f_g / np.pi * (v(t - r / c) / 2 / r * ((np.sin(beta) + z / r) / (1 + ((y - cot(beta * d / 2))
+    return 1 / 2 / f_g / np.pi * (v(t - r / c) / 2 / r * ((np.sin(beta) + z / r) / (1 + ((y - cot(beta) * d / 2)
                                                                                          * np.cos(beta)
                                                                                          + z * np.sin(beta)) / r)
-                                                          + (np.sin(beta) - z / r) / (1 + ((y - cot(beta * d / 2)
-                                                                                            * np.cos(beta)
-                                                                                            - z * np.sin(beta))) / r))
+                                                          + (np.sin(beta) - z / r) / (1 + ((y - cot(beta) * d / 2)
+                                                                                           * np.cos(beta)
+                                                                                           - z * np.sin(beta))) / r)
                                   - v(t - l / c - r2 / c) / 2 / r2 * (np.sin(beta) - (z - d / 2) / r2) /
                                   (1 + (y * np.cos(beta) + (d / 2 - z) * np.sin(beta)) / r2)
                                   - v(t - l / c - r2p / c) / 2 / r2p * (np.sin(beta) + (z + d / 2) / r2p) /
@@ -64,25 +64,25 @@ def mikheev(**kwargs):
     def v(t_):
         return np.exp(-((t_ - t0) / gamma) ** 2) * (4 * ((t_ - t0) / gamma) ** 2 - 2)
 
-    t = np.linspace(0, 10 * gamma)
     xg = np.linspace(-d / 3, d / 3, 3)
-    yg = np.linspace(d, 2 * d, 3)
+    yg = np.linspace(10 * d, 20 * d, 3)
     zg = xg.copy()
+
+    t = np.arange(0, 6 * gamma + yg.max(), 1 / f / 100)
+
     x1, x2, x3 = [], [], []
-
-
     for xi, yi, zi in itertools.product(xg, yg, zg):
         x1.append(xi)
         x2.append(yi)
         x3.append(zi)
 
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection="3d")
-    ax.scatter(x1, x2, x3)
-    ax.set_xlim(min(x1), max(x1))
-    ax.set_ylim(-f, max(x2))
-    ax.set_zlim(min(x3), max(x3))
-    plt.show()
+#    fig = plt.figure()
+#    ax = fig.add_subplot(111, projection="3d")
+#    ax.scatter(x1, x2, x3)
+#    ax.set_xlim(min(x1), max(x1))
+#    ax.set_ylim(-f, max(x2))
+#    ax.set_zlim(min(x3), max(x3))
+#    plt.show()
 
     x1 = np.array(x1).reshape((len(x1), 1))
     x2 = np.array(x2).reshape((len(x1), 1))
@@ -126,16 +126,16 @@ def mikheev(**kwargs):
               "p": int(kwargs.get("norm"))}
 
     shape_mom = (order + 2, order + 2, order + 2, 3)
-    dim_mom = 3 * sum([1 for i, j, k in
-                       itertools.product(range(order + 1), range(order + 1), range(order + 1)) if i + j + k <= order])
+    dim_mom = sum([1 for i, j, k in
+                   itertools.product(range(order + 1), range(order + 1), range(order + 1)) if i + j + k <= order])
 
     def get_current_moment(moment):
         current_moment_ = np.zeros(shape_mom)
         ind = 0
         for a1, a2, a3 in itertools.product(range(order + 1), range(order + 1), range(order + 1)):
             if a1 + a2 + a3 <= order:
-                current_moment_[a1, a2, a3, :] = moment[ind:ind + 3]
-                ind += 3
+                current_moment_[a1, a2, a3, 2] = moment[ind]
+                ind += 1
         assert ind == moment.size
         return current_moment_
 
@@ -162,7 +162,7 @@ def mikheev(**kwargs):
         answer = "y"
     match answer:
         case ("y" | "Y"):
-            res = pd.DataFrame(data={"t": x1, "x2": x2, "x3": x3}
+            res = pd.DataFrame(data={"x1": x1.squeeze(), "x2": x2.squeeze(), "x3": x3.squeeze()}
                                      | {f"ex_opt@t={t[i]}": e_opt[0, :, i] for i in range(ex.shape[1])}
                                      | {f"ey_opt@t={t[i]}": e_opt[1, :, i] for i in range(ey.shape[1])}
                                      | {f"ez_opt@t={t[i]}": e_opt[2, :, i] for i in range(ez.shape[1])}
