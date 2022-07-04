@@ -90,6 +90,8 @@ def plot_moment(moment):
 
 def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_moment, **kwargs):
 
+    print(f"{kwargs=}")
+
     tol = kwargs.pop("tol", 1e-1)
     n_points = kwargs.pop("n_points", 3)
     error_tol = kwargs.pop("error_tol", 1e-1)
@@ -137,7 +139,6 @@ def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_m
 
     current_moment[0] = 1
     h = np.zeros((n_points, ))
-    h[1] = 1
 
     if find_center:
         def ravel_params(current_moments, h, center):
