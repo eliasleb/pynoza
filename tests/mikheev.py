@@ -7,14 +7,42 @@ import pandas as pd
 import scipy.interpolate
 import time
 import pickle
+import scipy.special
+import pandas as pd
 
 
-def cot(*args, **kwargs):
-    return 1 / np.tan(*args, **kwargs)
+def cot(x, *args, **kwargs):
+    return 1 / np.tan(x, *args, **kwargs)
 
 
 def focal_point_y_coordinate(f, d):
     return f * (1 - d ** 2 / 16)
+
+
+def read_paper_data():
+    first_part = pd.read_csv("data/data_mikheev_part_1.csv", skiprows=1)
+    second_part = pd.read_csv("data/data_mikheev_part_2.csv", skiprows=1)
+    points_first_part = [1, 2, 3, 6, 10, 7]
+    points_second_part = [4, 5, 8, 9]
+    data = {}
+
+    def scroll_through_cols(df, points):
+        d = {}
+        for i, p in enumerate(points):
+            if i == 0:
+                name_x = "X"
+                name_y = "Y"
+            else:
+                name_x = f"X.{i}"
+                name_y = f"Y.{i}"
+            d[p] = {"x": np.array(df[name_x][np.isfinite(df[name_x])]),
+                    "y": np.array(df[name_y][np.isfinite(df[name_y])])}
+        return d
+
+    data = data | scroll_through_cols(first_part, points_first_part)
+    data = data | scroll_through_cols(second_part, points_second_part)
+
+    return data
 
 
 def ez_mikheev(x, y, z, t, v, *args):
@@ -22,10 +50,10 @@ def ez_mikheev(x, y, z, t, v, *args):
     t = t.reshape((1, t.size))
     fpy = focal_point_y_coordinate(f, d)
     r = np.sqrt(x ** 2 + (y - fpy) ** 2 + z ** 2)
-    r2 = np.sqrt(x ** 2 + y ** 2 + (z - d / 2) ** 2)
-    r2p = np.sqrt(x ** 2 + y ** 2 + (z + d / 2) ** 2)
+    r2 = np.sqrt(x ** 2 + y ** 2 + (z + d / 2) ** 2)
+    r2p = np.sqrt(x ** 2 + y ** 2 + (z - d / 2) ** 2)
     l = np.sqrt(fpy ** 2 + (d / 2) ** 2)
-    beta = np.arctan2(d / 2, f)
+    beta = np.arctan2(d / 2, fpy)
     k = 2 * x / d
     p = 2 * z / d
 
@@ -37,52 +65,47 @@ def ez_mikheev(x, y, z, t, v, *args):
                                                                                          + z * np.sin(beta)) / r)
                                                           + (np.sin(beta) - z / r) / (1 + ((y - cot(beta) * d / 2)
                                                                                            * np.cos(beta)
-                                                                                           - z * np.sin(beta))) / r)
+                                                                                           - z * np.sin(beta)) / r))
                                   - v(t - l / c - r2 / c) / 2 / r2 * (np.sin(beta) - (z - d / 2) / r2) /
                                   (1 + (y * np.cos(beta) + (d / 2 - z) * np.sin(beta)) / r2)
                                   - v(t - l / c - r2p / c) / 2 / r2p * (np.sin(beta) + (z + d / 2) / r2p) /
                                   (1 + (y * np.cos(beta) + (d / 2 + z) * np.sin(beta)) / r2p)
                                   - 4 * v(t - 2 * f / c - y / c + (d / 2 / c) * cot(beta)) / d
                                   * (1 + k ** 2 - p ** 2) / (
-                                              1 + 2 * k ** 2 - 2 * p ** 2 + 2 * k ** 2 * p ** 2 + k ** 4 + p ** 4)
+                                          1 + 2 * k ** 2 - 2 * p ** 2 + 2 * k ** 2 * p ** 2 + k ** 4 + p ** 4)
                                   + v(t - l / c - r2 / c) / 2 / r2 * (d / 2 - z) / (r2 - y)
                                   + v(t - l / c - r2p / c) / 2 / r2p * (d / 2 + z) / (r2p - y))
 
 
 def mikheev(**kwargs):
-    z_f = 50
+    plot = kwargs.get("plot").lower() == "true"
+
+    z_f = 500
     c0 = 3e8
     eta0 = 377
     f_g = z_f / eta0
-    f = 500e6 / c0
-    gamma = np.sqrt(12 / 7) / f
-    t0 = 3 * gamma
-
-    f = .25
-    d = 1
+    f_over_d = 0.37
+    d = .9
+    f = f_over_d * d
+    amplitude = 9.9
+    rise_time = 80e-12 * c0
+    duration = 50e-9 * c0
 
     def v(t_):
-        return np.exp(-((t_ - t0) / gamma) ** 2) * (4 * ((t_ - t0) / gamma) ** 2 - 2)
+        return (t_ > 0) * (t_ < rise_time) * t_ / rise_time * amplitude \
+               + (t_ >= rise_time) * (t_ < rise_time + duration) * amplitude
 
-    xg = np.linspace(-d / 3, d / 3, 3)
-    yg = np.linspace(10 * d, 20 * d, 3)
-    zg = xg.copy()
+    x1 = np.array((0, .3, 0, 0, .3, 0, 0, .3, 0, .21,)) * d
+    x2 = np.array((.6, .6, .6, 1, 1, 1, 1.5, 1.5, 1.5, 1,)) * d
+    x3 = np.array((0, 0, .3, 0, 0, .3, 0, 0, .3, .21,)) * d
 
-    t = np.arange(0, 6 * gamma + yg.max(), 1 / f / 100)
+    assert len(x1) == 10 and len(x2) == 10 and len(x3) == 10
 
-    x1, x2, x3 = [], [], []
-    for xi, yi, zi in itertools.product(xg, yg, zg):
-        x1.append(xi)
-        x2.append(yi)
-        x3.append(zi)
-
-#    fig = plt.figure()
-#    ax = fig.add_subplot(111, projection="3d")
-#    ax.scatter(x1, x2, x3)
-#    ax.set_xlim(min(x1), max(x1))
-#    ax.set_ylim(-f, max(x2))
-#    ax.set_zlim(min(x3), max(x3))
-#    plt.show()
+    #   indices = slice(0, 1)
+    #   x1 = x1[indices]
+    #   x2 = x2[indices]
+    #   x3 = x3[indices]
+    t = np.arange(0, rise_time + .1 * duration + x2.max(), rise_time / 10)
 
     x1 = np.array(x1).reshape((len(x1), 1))
     x2 = np.array(x2).reshape((len(x1), 1))
@@ -91,22 +114,31 @@ def mikheev(**kwargs):
     ez = ez_mikheev(x1, x2, x3, t, v, f_g, 1, d, f)
     ex = np.zeros(ez.shape)
     ey = np.zeros(ez.shape)
-
+    x2 = x2 - focal_point_y_coordinate(f, d)
     e_true = np.stack((ex, ey, ez))
+
+    data_paper = read_paper_data()
+
+    if plot:
+        plt.figure()
+        plt.ion()
+        r = np.sqrt(x1 ** 2 + x2 ** 2 + x3 ** 2)
+        for p in data_paper:
+            plt.subplot(5, 2, p)
+            plt.plot(data_paper[p]["x"] * 1e-9 * c0, data_paper[p]["y"])
+            plt.plot(t.squeeze(), ez[p - 1, :])
+            plt.title(f"r={r[p - 1]}")
+        plt.tight_layout()
+        plt.pause(0.001)
+        plt.show()
+        input("[Enter] to continue...")
 
     tail = int(kwargs["n_tail"])
 
-    def get_h_num(h, t):
-        if h.size == 0:
-            h_num = np.exp(-((t - t0) / gamma) ** 2) * (4 * ((t - t0) / gamma) ** 2 - 2)
-            return h_num
-        elif h.size == 2:
-            h_num = lambda delay: np.exp(-((t - t0 - delay) / gamma) ** 2) * (4 * ((t - t0 - delay) / gamma) ** 2 - 2)
-            return h_num(0) + h[0] * h_num(h[1] ** 2)
-        else:
-            return scipy.interpolate.interp1d(np.linspace(t.min(), t.max(), 1 + h.size + tail),
-                                              np.concatenate((np.array((0,)), h.ravel(), np.zeros((tail,)))),
-                                              kind="cubic")(t)  # * np.exp(-1/((t/0.1)**2 + 1e-16))
+    def get_h_num(h, t_):
+        return scipy.interpolate.interp1d(np.linspace(t_.min(), t_.max(), 1 + h.size + tail),
+                                          np.concatenate((np.array((0,)), h.ravel(), np.zeros((tail,)))),
+                                          kind="cubic")(t_)
 
     estimate = None
 
@@ -116,7 +148,7 @@ def mikheev(**kwargs):
               "error_tol": float(kwargs.get("error_tol", 1E-3)),
               "coeff_derivative": 0,
               "verbose_every": int(kwargs.get("verbose_every", 100)),
-              "plot": kwargs.get("plot").lower() == "true",
+              "plot": plot,
               "scale": float(kwargs.get("scale", 1e4)),
               "h_num": get_h_num,
               "find_center": bool(kwargs.get("find_center", True)),
@@ -142,7 +174,7 @@ def mikheev(**kwargs):
     args = (order + 1, e_true, x1, x2, x3, t, get_current_moment, dim_mom)
     current_moment, h, center, e_opt = inverse_problem.inverse_problem(*args, **kwargs)
 
-    if kwargs["plot"]:
+    if plot:
         plt.ion()
 
         print(f"{center=}")
@@ -163,12 +195,12 @@ def mikheev(**kwargs):
     match answer:
         case ("y" | "Y"):
             res = pd.DataFrame(data={"x1": x1.squeeze(), "x2": x2.squeeze(), "x3": x3.squeeze()}
-                                     | {f"ex_opt@t={t[i]}": e_opt[0, :, i] for i in range(ex.shape[1])}
-                                     | {f"ey_opt@t={t[i]}": e_opt[1, :, i] for i in range(ey.shape[1])}
-                                     | {f"ez_opt@t={t[i]}": e_opt[2, :, i] for i in range(ez.shape[1])}
-                                     | {f"ex_true@t={t[i]}": ex[:, i] for i in range(ex.shape[1])}
-                                     | {f"ey_true@t={t[i]}": ey[:, i] for i in range(ey.shape[1])}
-                                     | {f"ez_true@t={t[i]}": ez[:, i] for i in range(ez.shape[1])})
+                                    | {f"ex_opt@t={t[i]}": e_opt[0, :, i] for i in range(ex.shape[1])}
+                                    | {f"ey_opt@t={t[i]}": e_opt[1, :, i] for i in range(ey.shape[1])}
+                                    | {f"ez_opt@t={t[i]}": e_opt[2, :, i] for i in range(ez.shape[1])}
+                                    | {f"ex_true@t={t[i]}": ex[:, i] for i in range(ex.shape[1])}
+                                    | {f"ey_true@t={t[i]}": ey[:, i] for i in range(ey.shape[1])}
+                                    | {f"ez_true@t={t[i]}": ez[:, i] for i in range(ez.shape[1])})
             filename = f"../../../git_ignore/GLOBALEM/opt-result-{time.asctime()}.csv"
             res.to_csv(path_or_buf=filename)
             with open(filename + "_params.pickle", 'wb') as handle:
