@@ -22,13 +22,13 @@ class Interpolator(scipy.interpolate.interp1d):
         self.__doc__ = scipy.interpolate.interp1d.__doc__
 
     def __call__(self, *args, **kwargs) -> ndarray:
-        x: ndarray = args[0]
+        x: ndarray = args[0].copy()
         idx: ndarray = (x < self.x.min()) | (x > self.x.max())
 
         x[x < self.x.min()] = self.x.min()
         x[x > self.x.max()] = self.x.max()
 
-        y: ndarray = super().__call__(*args, **kwargs)
+        y: ndarray = super().__call__(*((x, ) + args[1:]), **kwargs)
         y[idx] = 0
         return y
 
