@@ -109,10 +109,6 @@ def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_m
     if kwargs:
         raise ValueError(f"Unknown keyword arguments: {kwargs}")
 
-    if plot:
-        plt.ion()
-        plt.show()
-
     dt = np.max(np.diff(t))
 
     sol = pynoza.Solution(max_order=order,
@@ -188,23 +184,22 @@ def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_m
                 max_true = np.max(np.abs(e_true))
                 max_opt = np.max(np.abs(e_opt))
                 colors = ["r", "b", "g"]
-                for i in range(3):
-                    plt.subplot(2, 3, i + 1)
-                    plt.plot(t, e_true[i].reshape(-1, t.size).T, f"b--")
-                    plt.plot(t, e_true[i].reshape(-1, t.size).T, f"b--")
-                    plt.plot(t, e_true[i].reshape(-1, t.size).T, f"b--")
+                with pynoza.PlotAndWait(wait_for_enter_keypress=False) as paw:
+                    for i in range(3):
+                        plt.subplot(2, 3, i + 1)
+                        plt.plot(t, e_true[i].reshape(-1, t.size).T, f"b--")
+                        plt.plot(t, e_true[i].reshape(-1, t.size).T, f"b--")
+                        plt.plot(t, e_true[i].reshape(-1, t.size).T, f"b--")
 
-                    plt.plot(t, e_opt[i].reshape(-1, t.size).T*scale, f"k-")
-                    plt.plot(t, e_opt[i].reshape(-1, t.size).T*scale, f"k-")
-                    plt.plot(t, e_opt[i].reshape(-1, t.size).T*scale, f"k-")
+                        plt.plot(t, e_opt[i].reshape(-1, t.size).T*scale, f"k-")
+                        plt.plot(t, e_opt[i].reshape(-1, t.size).T*scale, f"k-")
+                        plt.plot(t, e_opt[i].reshape(-1, t.size).T*scale, f"k-")
 
-                #       print(np.max(np.abs(e_opt)), np.max(np.abs(current_moment)), np.max(np.abs(charge_moment)))
-                max_h = np.max(np.abs(h))
-                if max_h > 0:
-                    plt.subplot(2, 3, 5)
-                    plt.plot(t, h / max_h * max_true, "k-.")
-
-                plt.pause(0.001)
+                    #       print(np.max(np.abs(e_opt)), np.max(np.abs(current_moment)), np.max(np.abs(charge_moment)))
+                    max_h = np.max(np.abs(h))
+                    if max_h > 0:
+                        plt.subplot(2, 3, 5)
+                        plt.plot(t, h / max_h * max_true, "k-.")
 
             os.system("clear")
             print(f"{'#'*np.clip(int(error*50), 0, 50)}{error:.3f}, {n_calls=}, {errors_comp/normal=}", end='\r')
