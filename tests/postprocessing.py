@@ -71,6 +71,8 @@ def postprocessing_globalem(*args):
 
 def postprocessing_mikheev(*args):
     current_moment, t, h, h_true, center, sol, order, filename = args
+    if center is None:
+        center = [0, 0, 0]
 
     filename_csv = filename.split("_params.pickle")[0]
     data = pd.read_csv(filename_csv)
