@@ -120,7 +120,7 @@ def mikheev(**kwargs):
     #     x2.append(y)
     #     x3.append(z)
 
-    t = np.linspace(0, 3.5, 200)
+    t = np.linspace(0, 3.5, 50)
 
     x1 = np.array(x1).reshape((len(x1), 1))
     x2 = np.array(x2).reshape((len(x1), 1))
@@ -143,7 +143,10 @@ def mikheev(**kwargs):
             # ez_symmetrical_x.append(ezi)
             # ez_symmetrical_z.append(ezi)
         ez = np.array([(ez + ez + ez)[i] for i in unique_indices])
-        ez = np.array(ez)  # + ez_symmetrical_x + ez_symmetrical_z)
+        # ez = np.concatenate((ez, ez), axis=0)
+        # x1 = np.concatenate((x1, x1))
+        # x2 = np.concatenate((x2, -x2))
+        # x3 = np.concatenate((x3, x3))
 
     ex = np.zeros(ez.shape)
     ey = np.zeros(ez.shape)
@@ -187,13 +190,13 @@ def mikheev(**kwargs):
     shape_mom = (order + 3, order + 3, order + 3, 3)
     dim_mom = 3 * sum((1 for i, j, k in
                       itertools.product(range(order + 1), range(order + 1), range(order + 1)) if i + j + k <= order))
-    #  dim_mom = order + 1
+    # dim_mom = order + 1
 
     def get_current_moment(moment):
         current_moment_ = np.zeros(shape_mom)
-        #  for i, m in enumerate(moment):
-        #      current_moment_[0, i, 0, 2] = m
-        #  return current_moment_
+        # for i, m in enumerate(moment):
+        #     current_moment_[0, i, 0, 2] = m
+        # return current_moment_
         ind = 0
         for a1, a2, a3 in itertools.product(range(order + 1), range(order + 1), range(order + 1)):
             if a1 + a2 + a3 <= order:

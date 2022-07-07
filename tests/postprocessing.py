@@ -79,8 +79,8 @@ def postprocessing_mikheev(*args):
     x1, x2, x3 = data["x1"], data["x2"], data["x3"]
     x1, x2, x3 = np.array(x1), np.array(x2), np.array(x3)
 
-    n_added = 1
-    r = n_added * x2.max()
+    n_added = 3
+    r = 1.414 * x2.max()
     theta = np.linspace(0, np.pi, 30)
     phi = np.linspace(0, 2 * np.pi, 60)
     coords_directivity = [[], [], []]
@@ -98,7 +98,7 @@ def postprocessing_mikheev(*args):
     with pynoza.PlotAndWait(new_figure=True):
         plt.plot(t, e_pred[2, :, :].T)
 
-    energy = np.sum(e_pred**2, axis=(0, 2))
+    energy = np.max(np.abs(e_pred), axis=(0, 2))  # np.sum(e_pred**2, axis=(0, 2))
     energy = energy / energy.max()
 
     with pynoza.PlotAndWait(new_figure=False):
