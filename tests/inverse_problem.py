@@ -74,9 +74,9 @@ def plot_moment(moment):
         x1s[i[-1]].append(i[0])
         x2s[i[-1]].append(i[1])
         x3s[i[-1]].append(i[2])
-        colors[i[-1]].append(cmap(m / m_max / 2 + 0.5))
+        colors[i[-1]].append(colormap(m / m_max / 2 + 0.5))
 
-    for i, text in zip(range(3), ("x", "y", "z")):
+    for i, text in enumerate(("x", "y", "z")):
         plt.subplot(1, 3, i + 1)
         axes[i].scatter(x1s[i], x2s[i], x3s[i], color=colors[i])
         axes[i].set_xlabel("x")
