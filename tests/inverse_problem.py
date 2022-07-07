@@ -4,10 +4,7 @@ import scipy.optimize
 import scipy.interpolate
 import sympy
 import matplotlib.pyplot as plt
-import itertools
-import sys
 import os
-from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 
 
