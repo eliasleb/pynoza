@@ -143,7 +143,6 @@ def mikheev(**kwargs):
     #      x3 = np.concatenate((x3, np.array([d * np.cos(theta_i)]).reshape((1, 1))), axis=0)
     ex = np.zeros(ez.shape)
     ey = np.zeros(ez.shape)
-    x2 = x2 - focal_point_y_coordinate(f, d)
     e_true = np.stack((ex, ey, ez))
 
     with pynoza.PlotAndWait():
