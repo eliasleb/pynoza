@@ -101,7 +101,7 @@ def postprocessing_mikheev(*args):
     #      plt.plot(t, e_pred[2, :, :].T)
 
     n_added = 1
-    r = n_added * x2.max() / 2
+    r = n_added * x2.max()
     theta = np.linspace(0, np.pi, 30)
     phi = np.linspace(0, 2 * np.pi, 60)
     coords_directivity = [[], [], []]
