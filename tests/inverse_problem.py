@@ -62,7 +62,7 @@ def plot_moment(moment):
     x2 = np.arange(order)
     x3 = np.arange(order)
     x1, x2, x3 = np.meshgrid(x1, x2, x3, indexing='ij')
-    cmap = cm.get_cmap('RdBu')
+    colormap = cm.get_cmap('RdBu')
 
     m_max = np.abs(moment).max()
 
