@@ -33,8 +33,8 @@ def read_paper_data():
                 name_x = "X"
                 name_y = "Y"
             else:
-                name_x = f"X.{i}"
-                name_y = f"Y.{i}"
+                name_x = f"X.{i + len(points)}"
+                name_y = f"Y.{i + len(points)}"
             d[p] = {"x": np.array(df[name_x][np.isfinite(df[name_x])]),
                     "y": np.array(df[name_y][np.isfinite(df[name_y])])}
         return d
@@ -111,27 +111,60 @@ def mikheev(**kwargs):
     x2 = np.array(x2).reshape((len(x1), 1))
     x3 = np.array(x3).reshape((len(x1), 1))
 
-    ez = ez_mikheev(x1, x2, x3, t, v, f_g, 1, d, f)
+    if False:
+        ez = ez_mikheev(x1, x2, x3, t, v, f_g, 1, d, f)
+    else:
+        ez = []
+        ez_symmetrical_x = []
+        ez_symmetrical_z = []
+        thresh = 0.1
+        for p, xi, yi, zi in zip(data_paper, x1, x2, x3):
+            ri = np.sqrt(xi ** 2 + yi ** 2 + zi ** 2)
+            start = np.where(np.abs(data_paper[p]["y"]) > thresh)[0][0]
+            ezi = pynoza.solution.Interpolator(data_paper[p]["x"][start:] * 1e-9 * c0,
+                                               data_paper[p]["y"][start:])(t - ri)
+            ez.append(ezi)
+            ez_symmetrical_x.append(ezi)
+            ez_symmetrical_z.append(ezi)
+        ez = np.array(ez + ez_symmetrical_x + ez_symmetrical_z)
+
+    #  theta = np.linspace(0, np.pi, 5)
+    #  phi = np.concatenate((np.linspace(0, 40, 5),
+    #                        np.linspace(140, 180, 5))) / 180 * np.pi
+    #  for theta_i, phi_i in itertools.product(theta, phi):
+    #      ez = np.concatenate((ez, np.zeros((1, t.size))), axis=0)
+    #      x1 = np.concatenate((x1, np.array([d * np.sin(theta_i) * np.cos(phi_i)]).reshape((1, 1))), axis=0)
+    #      x2 = np.concatenate((x2, np.array([d * np.sin(theta_i) * np.sin(phi_i)]).reshape((1, 1))), axis=0)
+    #      x3 = np.concatenate((x3, np.array([d * np.cos(theta_i)]).reshape((1, 1))), axis=0)
     ex = np.zeros(ez.shape)
     ey = np.zeros(ez.shape)
     x2 = x2 - focal_point_y_coordinate(f, d)
     e_true = np.stack((ex, ey, ez))
 
-    data_paper = read_paper_data()
+    with pynoza.PlotAndWait():
+        ax = plt.figure().add_subplot(projection='3d')
+        ax.quiver(x1.squeeze(), x2.squeeze(), x3.squeeze(),
+                  ex.max(axis=1), ey.max(axis=1), ez.max(axis=1),
+                  length=.1, normalize=False)
+        indices = np.max(ez, axis=1) == 0
+        ax.scatter(x1.squeeze()[indices],
+                   x2.squeeze()[indices],
+                   x3.squeeze()[indices])
 
-    if plot:
-        plt.figure()
-        plt.ion()
-        r = np.sqrt(x1 ** 2 + x2 ** 2 + x3 ** 2)
-        for p in data_paper:
-            plt.subplot(5, 2, p)
-            plt.plot(data_paper[p]["x"] * 1e-9 * c0, data_paper[p]["y"])
-            plt.plot(t.squeeze(), ez[p - 1, :])
-            plt.title(f"r={r[p - 1]}")
-        plt.tight_layout()
-        plt.pause(0.001)
-        plt.show()
-        input("[Enter] to continue...")
+
+#   if plot:
+#       plt.figure()
+#       plt.ion()
+#       r = np.sqrt(x1 ** 2 + x2 ** 2 + x3 ** 2)
+#       for p in data_paper:
+#           plt.subplot(5, 2, p)
+#           plt.plot(data_paper[p]["x"] * 1e-9 * c0, data_paper[p]["y"])
+#           plt.plot(t.squeeze(), ez[p - 1, :])
+#           plt.title(f"r={r[p - 1]}")
+#       plt.tight_layout()
+#       plt.pause(0.001)
+#       plt.show()
+#       input("[Enter] to continue...")
 
     tail = int(kwargs["n_tail"])
 
@@ -142,7 +175,7 @@ def mikheev(**kwargs):
 
     estimate = None
 
-    order = int(kwargs.get("order", 1))
+    order = int(kwargs.get("order", 0))
     kwargs = {"tol": float(kwargs.get("tol", 1e-3)),
               "n_points": int(kwargs.get("n_points", 20)),
               "error_tol": float(kwargs.get("error_tol", 1E-3)),
