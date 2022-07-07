@@ -195,9 +195,9 @@ def mikheev(**kwargs):
               "estimate": estimate,
               "p": int(kwargs.get("norm"))}
 
-    shape_mom = (order + 2, order + 2, order + 2, 3)
-    dim_mom = sum([1 for i, j, k in
-                   itertools.product(range(order + 1), range(order + 1), range(order + 1)) if i + j + k <= order])
+    shape_mom = (order + 3, order + 3, order + 3, 3)
+    dim_mom = 1 * sum((1 for i, j, k in
+                      itertools.product(range(order + 1), range(order + 1), range(order + 1)) if i + j + k <= order))
 
     def get_current_moment(moment):
         current_moment_ = np.zeros(shape_mom)
@@ -209,7 +209,7 @@ def mikheev(**kwargs):
         assert ind == moment.size
         return current_moment_
 
-    args = (order + 1, e_true, x1, x2, x3, t, get_current_moment, dim_mom)
+    args = (order + 2, e_true, x1, x2 - focal_point_y_coordinate(f, d), x3, t, None, get_current_moment, dim_mom)
     current_moment, h, center, e_opt = inverse_problem.inverse_problem(*args, **kwargs)
 
     if plot:
