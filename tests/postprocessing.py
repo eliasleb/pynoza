@@ -79,27 +79,6 @@ def postprocessing_mikheev(*args):
     x1, x2, x3 = data["x1"], data["x2"], data["x3"]
     x1, x2, x3 = np.array(x1), np.array(x2), np.array(x3)
 
-    t0 = t.max() * 0.2
-    t1 = t.max() * 0.3
-    gamma = t.max() * 0.05
-
-    ti = np.linspace(0, t.max(), 40)
-    yi = np.array((0, 0, 1, 3, 3, 1, -1, 0, ))
-
-    h_step = scipy.interpolate.interp1d(ti, np.concatenate((yi.ravel(), yi[-1] * np.ones((ti.size - yi.size)))),
-                                        kind="linear")(t)
-    for _ in range(1):
-        h_step = np.cumsum(h_step)
-
-    e_pred = sol.compute_e_field(x1 - center[0], x2 - center[1], x3 - center[2], t, -h_step, None,
-                                 compute_grid=False)
-
-    #  with pynoza.PlotAndWait(new_figure=True):
-    #      plt.subplot(2, 1, 1)
-    #      plt.plot(t, h_step)
-    #      plt.subplot(2, 1, 2)
-    #      plt.plot(t, e_pred[2, :, :].T)
-
     n_added = 1
     r = n_added * x2.max()
     theta = np.linspace(0, np.pi, 30)
