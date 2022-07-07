@@ -99,6 +99,9 @@ def mikheev(**kwargs):
     x1 = np.array((0, .3, 0, 0, .3, 0, 0, .3, 0, .21,)) * d
     x2 = np.array((.6, .6, .6, 1, 1, 1, 1.5, 1.5, 1.5, 1,)) * d
     x3 = np.array((0, 0, .3, 0, 0, .3, 0, 0, .3, .21,)) * d
+    x1 = np.concatenate((x1, -x1, x1))
+    x2 = np.concatenate((x2, x2, x2))
+    x3 = np.concatenate((x3, x3, -x3))
 
     assert len(x1) == len(x2) and len(x2) == len(x3)
 
@@ -106,7 +109,7 @@ def mikheev(**kwargs):
     #   x1 = x1[indices]
     #   x2 = x2[indices]
     #   x3 = x3[indices]
-    t = np.arange(0, rise_time + .1 * duration + x2.max(), rise_time / 10)
+    t = np.linspace(0, 3.5, 50)
 
     x1 = np.array(x1).reshape((len(x1), 1))
     x2 = np.array(x2).reshape((len(x1), 1))
