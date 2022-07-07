@@ -85,7 +85,7 @@ def plot_moment(moment):
         plt.title(text + " component")
 
 
-def inverse_problem(order, e_true, x1, x2, x3, t, current_moment_callable, dim_moment, **kwargs):
+def inverse_problem(order, e_true, x1, x2, x3, t, t_sym, current_moment_callable, dim_moment, **kwargs):
 
     print(f"{kwargs=}")
 
