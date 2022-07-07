@@ -9,7 +9,6 @@ import scipy.interpolate
 import time
 import pickle
 import scipy.special
-import pandas as pd
 
 
 def cot(x, *args, **kwargs):
@@ -34,8 +33,8 @@ def read_paper_data():
                 name_x = "X"
                 name_y = "Y"
             else:
-                name_x = f"X.{i + len(points)}"
-                name_y = f"Y.{i + len(points)}"
+                name_x = f"X.{i}"  #  + len(points)
+                name_y = f"Y.{i}"  #  + len(points)
             d[p] = {"x": np.array(df[name_x][np.isfinite(df[name_x])]),
                     "y": np.array(df[name_y][np.isfinite(df[name_y])])}
         return d
@@ -80,6 +79,7 @@ def ez_mikheev(x, y, z, t, v, *args):
 
 def mikheev(**kwargs):
     plot = kwargs.get("plot").lower() == "true"
+    find_center = kwargs.get("find_center").lower() == "true"
 
     z_f = 500
     c0 = 3e8
@@ -102,14 +102,25 @@ def mikheev(**kwargs):
     x1 = np.concatenate((x1, -x1, x1))
     x2 = np.concatenate((x2, x2, x2))
     x3 = np.concatenate((x3, x3, -x3))
+    unique_indices = []
+    points = []
+    for i, p in enumerate(zip(x1, x2, x3)):
+        if p not in points:
+            points.append(p)
+            unique_indices.append(i)
+    x1 = x1[unique_indices]
+    x2 = x2[unique_indices]
+    x3 = x3[unique_indices]
 
     assert len(x1) == len(x2) and len(x2) == len(x3)
+    # points = {(x, y, z) for x, y, z in zip(x1, x2, x3)}
+    # x1, x2, x3 = [], [], []
+    # for x, y, z in points:
+    #     x1.append(x)
+    #     x2.append(y)
+    #     x3.append(z)
 
-    #   indices = slice(0, 1)
-    #   x1 = x1[indices]
-    #   x2 = x2[indices]
-    #   x3 = x3[indices]
-    t = np.linspace(0, 3.5, 50)
+    t = np.linspace(0, 3.5, 200)
 
     x1 = np.array(x1).reshape((len(x1), 1))
     x2 = np.array(x2).reshape((len(x1), 1))
@@ -120,8 +131,8 @@ def mikheev(**kwargs):
         ez = ez_mikheev(x1, x2, x3, t, v, f_g, 1, d, f)
     else:
         ez = []
-        ez_symmetrical_x = []
-        ez_symmetrical_z = []
+        # ez_symmetrical_x = []
+        # ez_symmetrical_z = []
         thresh = 0.1
         for p, xi, yi, zi in zip(data_paper, x1, x2, x3):
             ri = np.sqrt(xi ** 2 + yi ** 2 + zi ** 2)
@@ -129,46 +140,25 @@ def mikheev(**kwargs):
             ezi = pynoza.solution.Interpolator(data_paper[p]["x"][start:] * 1e-9 * c0,
                                                data_paper[p]["y"][start:])(t - ri)
             ez.append(ezi)
-            ez_symmetrical_x.append(ezi)
-            ez_symmetrical_z.append(ezi)
-        ez = np.array(ez + ez_symmetrical_x + ez_symmetrical_z)
+            # ez_symmetrical_x.append(ezi)
+            # ez_symmetrical_z.append(ezi)
+        ez = np.array([(ez + ez + ez)[i] for i in unique_indices])
+        ez = np.array(ez)  # + ez_symmetrical_x + ez_symmetrical_z)
 
-    #  theta = np.linspace(0, np.pi, 5)
-    #  phi = np.concatenate((np.linspace(0, 40, 5),
-    #                        np.linspace(140, 180, 5))) / 180 * np.pi
-    #  for theta_i, phi_i in itertools.product(theta, phi):
-    #      ez = np.concatenate((ez, np.zeros((1, t.size))), axis=0)
-    #      x1 = np.concatenate((x1, np.array([d * np.sin(theta_i) * np.cos(phi_i)]).reshape((1, 1))), axis=0)
-    #      x2 = np.concatenate((x2, np.array([d * np.sin(theta_i) * np.sin(phi_i)]).reshape((1, 1))), axis=0)
-    #      x3 = np.concatenate((x3, np.array([d * np.cos(theta_i)]).reshape((1, 1))), axis=0)
     ex = np.zeros(ez.shape)
     ey = np.zeros(ez.shape)
     e_true = np.stack((ex, ey, ez))
 
-    with pynoza.PlotAndWait():
-        ax = plt.figure().add_subplot(projection='3d')
-        ax.quiver(x1.squeeze(), x2.squeeze(), x3.squeeze(),
-                  ex.max(axis=1), ey.max(axis=1), ez.max(axis=1),
-                  length=.1, normalize=False)
-        indices = np.max(ez, axis=1) == 0
-        ax.scatter(x1.squeeze()[indices],
-                   x2.squeeze()[indices],
-                   x3.squeeze()[indices])
-
-
-#   if plot:
-#       plt.figure()
-#       plt.ion()
-#       r = np.sqrt(x1 ** 2 + x2 ** 2 + x3 ** 2)
-#       for p in data_paper:
-#           plt.subplot(5, 2, p)
-#           plt.plot(data_paper[p]["x"] * 1e-9 * c0, data_paper[p]["y"])
-#           plt.plot(t.squeeze(), ez[p - 1, :])
-#           plt.title(f"r={r[p - 1]}")
-#       plt.tight_layout()
-#       plt.pause(0.001)
-#       plt.show()
-#       input("[Enter] to continue...")
+    if plot:
+        with pynoza.PlotAndWait():
+            ax = plt.figure().add_subplot(projection='3d')
+            ax.quiver(x1.squeeze(), x2.squeeze(), x3.squeeze(),
+                      ex.max(axis=1), ey.max(axis=1), ez.max(axis=1),
+                      length=.1, normalize=False)
+            indices = np.max(ez, axis=1) == 0
+            ax.scatter(x1.squeeze()[indices],
+                       x2.squeeze()[indices],
+                       x3.squeeze()[indices])
 
     tail = int(kwargs["n_tail"])
 
@@ -188,27 +178,31 @@ def mikheev(**kwargs):
               "plot": plot,
               "scale": float(kwargs.get("scale", 1e4)),
               "h_num": get_h_num,
-              "find_center": bool(kwargs.get("find_center", True)),
+              "find_center": find_center,
               "max_global_tries": 1,
               "compute_grid": False,
               "estimate": estimate,
               "p": int(kwargs.get("norm"))}
 
     shape_mom = (order + 3, order + 3, order + 3, 3)
-    dim_mom = 1 * sum((1 for i, j, k in
+    dim_mom = 3 * sum((1 for i, j, k in
                       itertools.product(range(order + 1), range(order + 1), range(order + 1)) if i + j + k <= order))
+    #  dim_mom = order + 1
 
     def get_current_moment(moment):
         current_moment_ = np.zeros(shape_mom)
+        #  for i, m in enumerate(moment):
+        #      current_moment_[0, i, 0, 2] = m
+        #  return current_moment_
         ind = 0
         for a1, a2, a3 in itertools.product(range(order + 1), range(order + 1), range(order + 1)):
             if a1 + a2 + a3 <= order:
-                current_moment_[a1, a2, a3, 2] = moment[ind]
-                ind += 1
+                current_moment_[a1, a2, a3, :] = moment[ind:ind + 3]
+                ind += 3
         assert ind == moment.size
         return current_moment_
 
-    args = (order + 2, e_true, x1, x2 - focal_point_y_coordinate(f, d), x3, t, None, get_current_moment, dim_mom)
+    args = (order + 2, e_true, x1, x2, x3, t, None, get_current_moment, dim_mom)
     current_moment, h, center, e_opt = inverse_problem.inverse_problem(*args, **kwargs)
 
     if plot:
@@ -225,7 +219,8 @@ def mikheev(**kwargs):
         plt.title("Current vs time")
         plt.pause(0.1)
         plt.show()
-    if kwargs["plot"]:
+
+    if plot:
         answer = input("Save? [y/*] ")
     else:
         answer = "y"
