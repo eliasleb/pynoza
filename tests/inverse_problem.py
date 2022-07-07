@@ -191,8 +191,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, t_sym, current_moment_callable
                         plt.plot(t, e_opt[i].reshape(-1, t.size).T*scale, f"k-")
                         plt.plot(t, e_opt[i].reshape(-1, t.size).T*scale, f"k-")
                         plt.plot(t, e_opt[i].reshape(-1, t.size).T*scale, f"k-")
-
-                    #       print(np.max(np.abs(e_opt)), np.max(np.abs(current_moment)), np.max(np.abs(charge_moment)))
+                        plt.ylim((-1.1 * max_true, 1.1 * max_true))
                     max_h = np.max(np.abs(h))
                     if max_h > 0:
                         plt.subplot(2, 3, 5)
