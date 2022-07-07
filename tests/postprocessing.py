@@ -1,3 +1,4 @@
+import itertools
 import pickle
 
 import pandas as pd
@@ -91,29 +92,39 @@ def postprocessing_mikheev(*args):
     e_pred = sol.compute_e_field(x1 - center[0], x2 - center[1], x3 - center[2], t, -h_step, None,
                                  compute_grid=False)
 
-    with pynoza.PlotAndWait():
-        plt.subplot(2, 1, 1)
-        plt.plot(t, h_step)
+    #  with pynoza.PlotAndWait(new_figure=True):
+    #      plt.subplot(2, 1, 1)
+    #      plt.plot(t, h_step)
+    #      plt.subplot(2, 1, 2)
+    #      plt.plot(t, e_pred[2, :, :].T)
 
-        plt.subplot(2, 1, 2)
+    n_added = 1
+    r = n_added * x2.max() / 2
+    theta = np.linspace(0, np.pi, 30)
+    phi = np.linspace(0, 2 * np.pi, 60)
+    coords_directivity = [[], [], []]
+    for theta_i, phi_i in itertools.product(theta, phi):
+        coords_directivity[0].append(r * np.sin(theta_i) * np.cos(phi_i))
+        coords_directivity[1].append(r * np.sin(theta_i) * np.sin(phi_i))
+        coords_directivity[2].append(r * np.cos(theta_i))
+
+    coords_directivity = np.array(coords_directivity)
+    t = np.concatenate((t, np.linspace(t[-1], t[-1] + n_added * t[-1], n_added * t.size)))
+    h = np.concatenate((h, np.zeros(n_added * h.size)))
+    e_pred = sol.compute_e_field(coords_directivity[0], coords_directivity[1], coords_directivity[2],
+                                 t, h, None, compute_grid=False)
+
+    with pynoza.PlotAndWait(new_figure=True):
         plt.plot(t, e_pred[2, :, :].T)
 
-    h_ = np.fft.fft(h)
-    h_true_ = np.fft.fft(h_true)
-    frequencies = np.linspace(0, 1/(t[1]-t[0]), t.size)
-    h_true_abs = np.abs(h_true_)
-    h_abs = np.abs(h_)
-    h_int = np.gradient(h)
-    h_int = h_int / h_int.max()
+    energy = np.sum(e_pred**2, axis=(0, 2))
+    energy = energy / energy.max()
 
-    with pynoza.PlotAndWait():
-        plt.subplot(2, 1, 1)
-        plt.plot(frequencies, h_true_abs / h_true_abs.max(), frequencies, h_abs / h_abs.max())
-        plt.subplot(2, 1, 2)
-        plt.plot(frequencies, np.angle(h_true_), frequencies, np.angle(h_))
-
-    with pynoza.PlotAndWait():
-        plt.plot(t, h_true / h_true.max(), t, h_int)
+    with pynoza.PlotAndWait(new_figure=False):
+        ax = plt.figure().add_subplot(projection='3d')
+        ax.scatter(coords_directivity[0] / r * energy,
+                   coords_directivity[1] / r * energy,
+                   coords_directivity[2] / r * energy, color="b")
 
 
 def postprocessing(**kwargs):
@@ -133,7 +144,7 @@ def postprocessing(**kwargs):
     t0 = 3 * gamma
     h_true = np.exp(-((t - t0) / gamma)**2) * (4 * ((t - t0) / gamma)**2 - 2)
 
-    with pynoza.PlotAndWait(wait_for_enter_keypress=True, figsize=(5, 3)) as paw:
+    with pynoza.PlotAndWait(wait_for_enter_keypress=True, figsize=(5, 3), new_figure=True):
         plt.plot(t, h / np.abs(h).max())
         plt.plot(t, h_true / np.abs(h_true).max(), "--")
         plt.xlabel("Time (1)")
@@ -142,11 +153,12 @@ def postprocessing(**kwargs):
         plt.tight_layout()
 
         plt.figure(figsize=(10, 5))
-
+        e_max = np.abs(e_true).max() * 1.1
         for component in range(3):
             plt.subplot(1, 3, component + 1)
             plt.plot(t, e_true[component].T, "g--")
             plt.plot(t, e_opt[component].T, "b-")
+            plt.ylim((-e_max, e_max))
             plt.xlabel("Time (1)")
             plt.ylabel("Amplitude (1)")
             plt.title(f"{['x', 'y', 'z'][component]}-component")
