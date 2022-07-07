@@ -1,5 +1,6 @@
 import numpy as np
 import pynoza
+import pynoza.solution
 import matplotlib.pyplot as plt
 import itertools
 import inverse_problem
@@ -50,9 +51,9 @@ def ez_mikheev(x, y, z, t, v, *args):
     t = t.reshape((1, t.size))
     fpy = focal_point_y_coordinate(f, d)
     r = np.sqrt(x ** 2 + (y - fpy) ** 2 + z ** 2)
-    r2 = np.sqrt(x ** 2 + y ** 2 + (z + d / 2) ** 2)
-    r2p = np.sqrt(x ** 2 + y ** 2 + (z - d / 2) ** 2)
-    l = np.sqrt(fpy ** 2 + (d / 2) ** 2)
+    r2 = np.sqrt(x ** 2 + y ** 2 + (z - d / 2) ** 2)
+    r2p = np.sqrt(x ** 2 + y ** 2 + (z + d / 2) ** 2)
+    length = np.sqrt(fpy ** 2 + (d / 2) ** 2)
     beta = np.arctan2(d / 2, fpy)
     k = 2 * x / d
     p = 2 * z / d
@@ -66,15 +67,15 @@ def ez_mikheev(x, y, z, t, v, *args):
                                                           + (np.sin(beta) - z / r) / (1 + ((y - cot(beta) * d / 2)
                                                                                            * np.cos(beta)
                                                                                            - z * np.sin(beta)) / r))
-                                  - v(t - l / c - r2 / c) / 2 / r2 * (np.sin(beta) - (z - d / 2) / r2) /
+                                  - v(t - length / c - r2 / c) / 2 / r2 * (np.sin(beta) - (z - d / 2) / r2) /
                                   (1 + (y * np.cos(beta) + (d / 2 - z) * np.sin(beta)) / r2)
-                                  - v(t - l / c - r2p / c) / 2 / r2p * (np.sin(beta) + (z + d / 2) / r2p) /
+                                  - v(t - length / c - r2p / c) / 2 / r2p * (np.sin(beta) + (z + d / 2) / r2p) /
                                   (1 + (y * np.cos(beta) + (d / 2 + z) * np.sin(beta)) / r2p)
                                   - 4 * v(t - 2 * f / c - y / c + (d / 2 / c) * cot(beta)) / d
                                   * (1 + k ** 2 - p ** 2) / (
                                           1 + 2 * k ** 2 - 2 * p ** 2 + 2 * k ** 2 * p ** 2 + k ** 4 + p ** 4)
-                                  + v(t - l / c - r2 / c) / 2 / r2 * (d / 2 - z) / (r2 - y)
-                                  + v(t - l / c - r2p / c) / 2 / r2p * (d / 2 + z) / (r2p - y))
+                                  + v(t - length / c - r2 / c) / 2 / r2 * (d / 2 - z) / (r2 - y)
+                                  + v(t - length / c - r2p / c) / 2 / r2p * (d / 2 + z) / (r2p - y))
 
 
 def mikheev(**kwargs):
@@ -99,7 +100,7 @@ def mikheev(**kwargs):
     x2 = np.array((.6, .6, .6, 1, 1, 1, 1.5, 1.5, 1.5, 1,)) * d
     x3 = np.array((0, 0, .3, 0, 0, .3, 0, 0, .3, .21,)) * d
 
-    assert len(x1) == 10 and len(x2) == 10 and len(x3) == 10
+    assert len(x1) == len(x2) and len(x2) == len(x3)
 
     #   indices = slice(0, 1)
     #   x1 = x1[indices]
@@ -110,6 +111,7 @@ def mikheev(**kwargs):
     x1 = np.array(x1).reshape((len(x1), 1))
     x2 = np.array(x2).reshape((len(x1), 1))
     x3 = np.array(x3).reshape((len(x1), 1))
+    data_paper = read_paper_data()
 
     if False:
         ez = ez_mikheev(x1, x2, x3, t, v, f_g, 1, d, f)
@@ -228,12 +230,12 @@ def mikheev(**kwargs):
     match answer:
         case ("y" | "Y"):
             res = pd.DataFrame(data={"x1": x1.squeeze(), "x2": x2.squeeze(), "x3": x3.squeeze()}
-                                    | {f"ex_opt@t={t[i]}": e_opt[0, :, i] for i in range(ex.shape[1])}
-                                    | {f"ey_opt@t={t[i]}": e_opt[1, :, i] for i in range(ey.shape[1])}
-                                    | {f"ez_opt@t={t[i]}": e_opt[2, :, i] for i in range(ez.shape[1])}
-                                    | {f"ex_true@t={t[i]}": ex[:, i] for i in range(ex.shape[1])}
-                                    | {f"ey_true@t={t[i]}": ey[:, i] for i in range(ey.shape[1])}
-                                    | {f"ez_true@t={t[i]}": ez[:, i] for i in range(ez.shape[1])})
+                                     | {f"ex_opt@t={t[i]}": e_opt[0, :, i] for i in range(ex.shape[1])}
+                                     | {f"ey_opt@t={t[i]}": e_opt[1, :, i] for i in range(ey.shape[1])}
+                                     | {f"ez_opt@t={t[i]}": e_opt[2, :, i] for i in range(ez.shape[1])}
+                                     | {f"ex_true@t={t[i]}": ex[:, i] for i in range(ex.shape[1])}
+                                     | {f"ey_true@t={t[i]}": ey[:, i] for i in range(ey.shape[1])}
+                                     | {f"ez_true@t={t[i]}": ez[:, i] for i in range(ez.shape[1])})
             filename = f"../../../git_ignore/GLOBALEM/opt-result-{time.asctime()}.csv"
             res.to_csv(path_or_buf=filename)
             with open(filename + "_params.pickle", 'wb') as handle:
