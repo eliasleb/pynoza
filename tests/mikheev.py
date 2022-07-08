@@ -33,8 +33,8 @@ def read_paper_data():
                 name_x = "X"
                 name_y = "Y"
             else:
-                name_x = f"X.{i}"  #  + len(points)
-                name_y = f"Y.{i}"  #  + len(points)
+                name_x = f"X.{i + len(points)}"
+                name_y = f"Y.{i + len(points)}"
             d[p] = {"x": np.array(df[name_x][np.isfinite(df[name_x])]),
                     "y": np.array(df[name_y][np.isfinite(df[name_y])])}
         return d

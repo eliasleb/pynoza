@@ -243,7 +243,6 @@ class Solution:
             self.current_moment[:, ind[0], ind[1], ind[2]] = current_moment(*ind)
             self.charge_moment[:, ind[0], ind[1], ind[2]] = charge_moment(*ind)
 
-
     @cython.ccall
     def compute_e_field(self,
                         x1: ndarray,

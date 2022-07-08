@@ -106,6 +106,9 @@ def postprocessing_mikheev(*args):
         ax.scatter(coords_directivity[0] / r * energy,
                    coords_directivity[1] / r * energy,
                    coords_directivity[2] / r * energy, color="b")
+        ax.set_xlabel("x")
+        ax.set_ylabel("y")
+        ax.set_zlabel("z")
 
 
 def postprocessing(**kwargs):
@@ -127,10 +130,10 @@ def postprocessing(**kwargs):
 
     with pynoza.PlotAndWait(wait_for_enter_keypress=True, figsize=(5, 3), new_figure=True):
         plt.plot(t, h / np.abs(h).max())
-        plt.plot(t, h_true / np.abs(h_true).max(), "--")
+        #plt.plot(t, h_true / np.abs(h_true).max(), "--")
         plt.xlabel("Time (1)")
         plt.ylabel("Amplitude (1)")
-        plt.legend(("Fitted", "Simulation"))
+        #plt.legend(("Fitted", "Simulation"))
         plt.tight_layout()
 
         plt.figure(figsize=(10, 5))
