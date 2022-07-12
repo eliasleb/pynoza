@@ -81,35 +81,10 @@ def postprocessing_mikheev(*args):
 
     n_added = 3
     r = 1.414 * x2.max()
-    theta = np.linspace(0, np.pi, 30)
-    phi = np.linspace(0, 2 * np.pi, 60)
-    coords_directivity = [[], [], []]
-    for theta_i, phi_i in itertools.product(theta, phi):
-        coords_directivity[0].append(r * np.sin(theta_i) * np.cos(phi_i))
-        coords_directivity[1].append(r * np.sin(theta_i) * np.sin(phi_i))
-        coords_directivity[2].append(r * np.cos(theta_i))
-
-    coords_directivity = np.array(coords_directivity)
     t = np.concatenate((t, np.linspace(t[-1], t[-1] + n_added * t[-1], n_added * t.size)))
     h = np.concatenate((h, np.zeros(n_added * h.size)))
-    e_pred = sol.compute_e_field(coords_directivity[0], coords_directivity[1], coords_directivity[2],
-                                 t, h, None, compute_grid=False)
-
-    with pynoza.PlotAndWait(new_figure=True):
-        plt.plot(t, e_pred[2, :, :].T)
-
-    energy = np.max(np.abs(e_pred), axis=(0, 2))  # np.sum(e_pred**2, axis=(0, 2))
-    energy = energy / energy.max()
-
-    with pynoza.PlotAndWait(new_figure=False):
-        ax = plt.figure().add_subplot(projection='3d')
-        ax.scatter(coords_directivity[0] / r * energy,
-                   coords_directivity[1] / r * energy,
-                   coords_directivity[2] / r * energy, color="b")
-        ax.set_xlabel("x")
-        ax.set_ylabel("y")
-        ax.set_zlabel("z")
-
+    import synthetic
+    synthetic.plot_directivity(sol, r, h, t)
 
 def postprocessing(**kwargs):
 
