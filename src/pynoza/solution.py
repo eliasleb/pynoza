@@ -425,7 +425,7 @@ class Solution:
                f"""*{list(map('{:.2e}%'.format, moment.flatten()))}*{self._evaluate_txt(tuple(ind), hs)}/(4pi)\n"""
 
     def __repr__(self) -> str:
-        return f"Solution {self.max_order}, {self.c}, {self.ran_recurse}"
+        return f"Solution: max_order={self.max_order}, c={self.c}, ran_recurse={self.ran_recurse}"
 
     def get_e_field_text(self):
         return self.e_field_text
