@@ -73,8 +73,8 @@ def c_r(a1, a2, a3, x1, x2, w, h):
     return int_r(x1, w, a1) * int_j(x2, h, a2)
 
 
-@pytest.mark.parametrize("test_case", ["logo", "disc", "logo_num"],)
-def test_solution(test_case):
+@pytest.mark.parametrize("test_case, order", [("logo", 8), ("disc", 24), ("logo_num", 8)])
+def test_solution(test_case, order, plot=False):
     """
     Test the pynoza :solution: class by comparing
     with either COMSOL simulation (case_="logo") or
@@ -100,7 +100,7 @@ def test_solution(test_case):
     Tg = np.sqrt(7 / 12)
     wavelength = c0 * Tg
 
-    print(f"Computing {case_=}")
+    print(f"Computing {case_=}, {order=}")
     match case_:
         case "logo":
             a = wavelength / 2
@@ -193,7 +193,7 @@ def test_solution(test_case):
     if num:
         h_sym = sympy.lambdify(t_sym, h_sym)(t)
 
-    sol = pynoza.solution.Solution(max_order=24,
+    sol = pynoza.solution.Solution(max_order=order,
                                    wave_speed=c0)
     sol.recurse()
     sol.set_moments(current_moment=current_moment,
@@ -227,7 +227,15 @@ def test_solution(test_case):
                 norm1 = 200
             else:
                 norm1 = 160
-                
+
+            if plot:
+                import matplotlib.pyplot as plt
+                with pynoza.PlotAndWait(new_figure=True):
+                    plt.plot(t, e_cmsl_2a / 2, "k--")
+                    plt.plot(t, e_cmsl_3a / 2, "k--")
+                    plt.plot(t, E1[0, 0, 0, :], "b")
+                    plt.plot(t, E1[0, 0, 1, :], "b")
+
             assert np.linalg.norm(e_cmsl_2a / 2 - E1[0, 0, 0, :], ord=2) / t.size < norm1 \
                    and np.linalg.norm(e_cmsl_3a / 2 - E1[0, 0, 1, :], ord=2) / t.size < 170
         case "disc":
@@ -241,6 +249,16 @@ def test_solution(test_case):
                                                   fill_value="extrapolate")(t * gamma_SI * 1e9)
             e_paper3 = scipy.interpolate.interp1d(d["X"] * Tg * gamma_SI * 1e9 - delay, d["Y"],
                                                   fill_value="extrapolate")(t * gamma_SI * 1e9)
+            if plot:
+                import matplotlib.pyplot as plt
+                with pynoza.PlotAndWait(new_figure=True):
+                    plt.plot(e_paper1 * 1e2, "k--")
+                    plt.plot(e_paper2 * 1e2, "k--")
+                    plt.plot(e_paper3 * 1e2, "k--")
+                    plt.plot(E1[0, 0, 0, :] * x3[0] / 1e6, "b")
+                    plt.plot(E1[0, 0, 1, :] * x3[1] / 1e6, "b")
+                    plt.plot(E1[0, 0, 2, :] * x3[2] / 1e6, "b")
+
             assert np.linalg.norm(e_paper1 * 1e2 - E1[0, 0, 0, :] * x3[0] / 1e6, ord=2) / t.size < 0.3 \
                    and np.linalg.norm(e_paper2 * 1e2 - E1[0, 0, 1, :] * x3[1] / 1e6, ord=2) / t.size < 0.3 \
                    and np.linalg.norm(e_paper3 * 1e2 - E1[0, 0, 2, :] * x3[2] / 1e6, ord=2) / t.size < 0.3
@@ -250,4 +268,9 @@ def test_solution(test_case):
 
 
 if __name__ == "__main__":
-    test_solution("logo")
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--order", metavar="order", type=int, required=True)
+    parser.add_argument("--case", metavar="case", type=str, choices=["logo", "logo_num", "disc"], required=True)
+    args = parser.parse_args()
+    test_solution(args.case, args.order, plot=True)
