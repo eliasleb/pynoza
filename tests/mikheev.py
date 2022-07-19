@@ -107,6 +107,8 @@ def mikheev(**kwargs):
     amplitude = 9.9
     rise_time = 80e-12 * c0
     duration = 50e-9 * c0
+    fpy = focal_point_y_coordinate(f, d)
+    print(f"{fpy=}")
 
     def v(t_):
         return (t_ > 0) * (t_ < rise_time) * t_ / rise_time * amplitude \
@@ -204,7 +206,7 @@ def mikheev(**kwargs):
         p = int(kwargs.get("norm"))
     except ValueError:
         p = np.inf
-
+    n_sources = kwargs["n_sources"]
     kwargs = {"tol": float(kwargs.get("tol", 1e-3)),
               "n_points": int(kwargs.get("n_points", 20)),
               "error_tol": float(kwargs.get("error_tol", 1E-3)),
@@ -217,7 +219,8 @@ def mikheev(**kwargs):
               "max_global_tries": 1,
               "compute_grid": False,
               "estimate": estimate,
-              "p": p}
+              "p": p,
+              "n_sources": n_sources}
 
     shape_mom = (order + 3, order + 3, order + 3, 3)
 
@@ -252,19 +255,18 @@ def mikheev(**kwargs):
     current_moment, h, center, e_opt = inverse_problem.inverse_problem(*args, **kwargs)
 
     if plot:
-        plt.ion()
+        with pynoza.PlotAndWait():
+            print(f"{center=}")
 
-        print(f"{center=}")
+            for i in range(n_sources):
+                inverse_problem.plot_moment(get_current_moment(current_moment[i, :]))
 
-        inverse_problem.plot_moment(current_moment)
-
-        plt.figure()
-        plt.plot(t, h / np.max(np.abs(h)))
-        plt.xlabel("Time (relative)")
-        plt.ylabel("Amplitude (normalized)")
-        plt.title("Current vs time")
-        plt.pause(0.1)
-        plt.show()
+                plt.figure()
+                h_source = get_h_num(h[i, :], t)
+                plt.plot(t, h_source / np.max(np.abs(h_source)))
+                plt.xlabel("Time (relative)")
+                plt.ylabel("Amplitude (normalized)")
+                plt.title("Current vs time")
 
     if plot:
         answer = input("Save? [y/*] ")
@@ -300,5 +302,6 @@ if __name__ == "__main__":
     parser.add_argument("--scale", required=True)
     parser.add_argument("--find_center", required=True)
     parser.add_argument("--norm", required=True)
+    parser.add_argument("--n_sources", metavar="n_sources", type=int, required=True)
     kwargs = parser.parse_args()
     mikheev(**vars(kwargs))
