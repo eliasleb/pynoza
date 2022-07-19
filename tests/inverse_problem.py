@@ -130,7 +130,6 @@ def inverse_problem(order, e_true, x1, x2, x3, t, t_sym, current_moment_callable
     center = np.zeros((3, ))
     current_moment = np.zeros((dim_moment, ))
 
-    current_moment[0] = 1
     h = np.zeros((n_points, ))
 
     if find_center:

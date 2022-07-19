@@ -11,12 +11,12 @@ import pickle
 import scipy.special
 
 
-def cot(x, *args, **kwargs):
-    return 1 / np.tan(x, *args, **kwargs)
+def cot(x, *args, **kwargs_tan):
+    return 1 / np.tan(x, *args, **kwargs_tan)
 
 
 def focal_point_y_coordinate(f, d):
-    return f * (1 - d ** 2 / 16)
+    return f - d ** 2 / 16 / f
 
 
 def read_paper_data():
@@ -33,8 +33,8 @@ def read_paper_data():
                 name_x = "X"
                 name_y = "Y"
             else:
-                name_x = f"X.{i + len(points)}"
-                name_y = f"Y.{i + len(points)}"
+                name_x = f"X.{i}"  # + len(points)
+                name_y = f"Y.{i}"  # + len(points)
             d[p] = {"x": np.array(df[name_x][np.isfinite(df[name_x])]),
                     "y": np.array(df[name_y][np.isfinite(df[name_y])])}
         return d
@@ -77,6 +77,22 @@ def ez_mikheev(x, y, z, t, v, *args):
                                   + v(t - length / c - r2p / c) / 2 / r2p * (d / 2 + z) / (r2p - y))
 
 
+def ez_mikheev_on_mirror_axis(y, t, v, *args):
+    f_g, c, d, f = args
+    t = t.reshape((1, t.size))
+    fpy = focal_point_y_coordinate(f, d)
+    r = y - fpy
+    r2 = np.sqrt(y ** 2 + (d / 2) ** 2)
+    length = np.sqrt(fpy ** 2 + (d / 2) ** 2)
+    beta = np.arctan2(d / 2, fpy)
+    gamma = np.arctan(d / 2, y)
+    return 1 / 2 / f_g / np.pi * ((v(t - r / c) / r * np.sin(beta) / (1 + np.cos(beta))
+                                   - v(t - length / c - r2 / c) / r2 * (np.sin(beta) + np.sin(gamma))
+                                   / (1 + np.cos(beta - gamma))) - (4 * v(t - 2 * f / c - r / c) / d
+                                                                    - (2 + 2 * np.cos(gamma))
+                                                                    * v(t - length / c - r2 / c) / d))
+
+
 def mikheev(**kwargs):
     plot = kwargs.get("plot").lower() == "true"
     find_center = kwargs.get("find_center").lower() == "true"
@@ -113,55 +129,66 @@ def mikheev(**kwargs):
     x3 = x3[unique_indices]
 
     assert len(x1) == len(x2) and len(x2) == len(x3)
-    # points = {(x, y, z) for x, y, z in zip(x1, x2, x3)}
-    # x1, x2, x3 = [], [], []
-    # for x, y, z in points:
-    #     x1.append(x)
-    #     x2.append(y)
-    #     x3.append(z)
+    t = np.linspace(0, 3.5, 100)
 
-    t = np.linspace(0, 3.5, 50)
+    y = np.linspace(1, 2, 10).reshape((10, 1))
+    ez_full = ez_mikheev(0, y, 0, t, v, f_g, 1, d, f)
+    ez_axis = ez_mikheev_on_mirror_axis(y, t, v, f_g, 1, d, f)
+    # with pynoza.PlotAndWait():
+    #     plt.plot(t.squeeze(), (ez_full * y).T, "r")
+    #     plt.plot(t.squeeze(), (ez_axis * y).T, "k--")
+
 
     x1 = np.array(x1).reshape((len(x1), 1))
     x2 = np.array(x2).reshape((len(x1), 1))
     x3 = np.array(x3).reshape((len(x1), 1))
     data_paper = read_paper_data()
 
-    if False:
-        ez = ez_mikheev(x1, x2, x3, t, v, f_g, 1, d, f)
-    else:
-        ez = []
-        # ez_symmetrical_x = []
-        # ez_symmetrical_z = []
-        thresh = 0.1
-        for p, xi, yi, zi in zip(data_paper, x1, x2, x3):
-            ri = np.sqrt(xi ** 2 + yi ** 2 + zi ** 2)
-            start = np.where(np.abs(data_paper[p]["y"]) > thresh)[0][0]
-            ezi = pynoza.solution.Interpolator(data_paper[p]["x"][start:] * 1e-9 * c0,
-                                               data_paper[p]["y"][start:])(t - ri)
-            ez.append(ezi)
-            # ez_symmetrical_x.append(ezi)
-            # ez_symmetrical_z.append(ezi)
-        ez = np.array([(ez + ez + ez)[i] for i in unique_indices])
-        # ez = np.concatenate((ez, ez), axis=0)
-        # x1 = np.concatenate((x1, x1))
-        # x2 = np.concatenate((x2, -x2))
-        # x3 = np.concatenate((x3, x3))
+    ez_analytical = ez_mikheev(x1, x2, x3, t, v, f_g, 1, d, f)
+    ez = []
+    # ez_symmetrical_x = []
+    # ez_symmetrical_z = []
+    thresh = 0.1
+    for p, xi, yi, zi in zip(data_paper, x1, x2, x3):
+        ri = np.sqrt(xi ** 2 + yi ** 2 + zi ** 2)
+        start = np.where(np.abs(data_paper[p]["y"]) > thresh)[0][0]
+        ezi = pynoza.solution.Interpolator(data_paper[p]["x"][start:] * 1e-9 * c0,
+                                           data_paper[p]["y"][start:])(t - ri)
+        ez.append(ezi)
+        # ez_symmetrical_x.append(ezi)
+        # ez_symmetrical_z.append(ezi)
+    ez = np.array([(ez + ez + ez)[i] for i in unique_indices])
+    # ez = np.concatenate((ez, ez), axis=0)
+    # x1 = np.concatenate((x1, x1))
+    # x2 = np.concatenate((x2, -x2))
+    # x3 = np.concatenate((x3, x3))
+
+    # plt.figure(figsize=(10, 10))
+    # with pynoza.PlotAndWait(new_figure=False):
+    #     for point in range(10):
+    #         plt.subplot(5, 2, point + 1)
+    #         plt.title(f"{point + 1}")
+    #         plt.plot(t, ez[point, :], "--")
+    #         plt.plot(t, ez_analytical[point, :])
+
+    #         plt.tight_layout()
 
     ex = np.zeros(ez.shape)
     ey = np.zeros(ez.shape)
     e_true = np.stack((ex, ey, ez))
 
-    if plot:
-        with pynoza.PlotAndWait():
-            ax = plt.figure().add_subplot(projection='3d')
-            ax.quiver(x1.squeeze(), x2.squeeze(), x3.squeeze(),
-                      ex.max(axis=1), ey.max(axis=1), ez.max(axis=1),
-                      length=.1, normalize=False)
-            indices = np.max(ez, axis=1) == 0
-            ax.scatter(x1.squeeze()[indices],
-                       x2.squeeze()[indices],
-                       x3.squeeze()[indices])
+    # if plot:
+    #     with pynoza.PlotAndWait(new_figure=True):
+    #         ax = plt.figure().add_subplot(projection='3d')
+    #         ax.quiver(x1.squeeze(), x2.squeeze(), x3.squeeze(),
+    #                   ex.max(axis=1), ey.max(axis=1), ez.max(axis=1),
+    #                   length=.1, normalize=False)
+    #         indices = np.max(ez, axis=1) == 0
+    #         ax.scatter(x1.squeeze()[indices],
+    #                    x2.squeeze()[indices],
+    #                    x3.squeeze()[indices])
+    #         for i, (x, y, z) in enumerate(zip(x1.squeeze(), x2.squeeze(), x3.squeeze())):
+    #             ax.text(x, y, z, f"{i}")
 
     tail = int(kwargs["n_tail"])
 
@@ -173,6 +200,11 @@ def mikheev(**kwargs):
     estimate = None
 
     order = int(kwargs.get("order", 0))
+    try:
+        p = int(kwargs.get("norm"))
+    except ValueError:
+        p = np.inf
+
     kwargs = {"tol": float(kwargs.get("tol", 1e-3)),
               "n_points": int(kwargs.get("n_points", 20)),
               "error_tol": float(kwargs.get("error_tol", 1E-3)),
@@ -185,24 +217,35 @@ def mikheev(**kwargs):
               "max_global_tries": 1,
               "compute_grid": False,
               "estimate": estimate,
-              "p": int(kwargs.get("norm"))}
+              "p": p}
 
     shape_mom = (order + 3, order + 3, order + 3, 3)
-    dim_mom = 3 * sum((1 for i, j, k in
-                      itertools.product(range(order + 1), range(order + 1), range(order + 1)) if i + j + k <= order))
-    # dim_mom = order + 1
 
-    def get_current_moment(moment):
+    def use_moment(a1, a2, a3):
+        return a1 + a2 + a3 <= order and a2 % 2 == 1
+
+    dim_mom = 1 * sum(1 for i, j, k in itertools.product(range(order + 1), repeat=3) if use_moment(i, j, k))
+    #    + sum(1 for i, j, k in itertools.product(range(order + 1), repeat=3) if i + j + k <= order)
+    #          + sum(1 for i, j, k in itertools.product(range(order + 1), repeat=3) if use_moment(i, j, k, 1))
+    dim_mom = (order + 1) // 2
+
+    def get_current_moment(moment_):
         current_moment_ = np.zeros(shape_mom)
-        # for i, m in enumerate(moment):
-        #     current_moment_[0, i, 0, 2] = m
-        # return current_moment_
+        for i in range((order + 1) // 2):
+            current_moment_[0, 2 * i + 1, 0, 2] = moment_[i]
+        return current_moment_
         ind = 0
-        for a1, a2, a3 in itertools.product(range(order + 1), range(order + 1), range(order + 1)):
-            if a1 + a2 + a3 <= order:
-                current_moment_[a1, a2, a3, :] = moment[ind:ind + 3]
-                ind += 3
-        assert ind == moment.size
+        for a1, a2, a3 in itertools.product(range(order + 1), repeat=3):
+            if use_moment(a1, a2, a3):
+                # current_moment_[a1, a2, a3, 0] = moment_[ind]
+                # ind += 1
+                current_moment_[a1, a2, a3, 2] = moment_[ind]
+                ind += 1
+            # if a1 + a2 + a3 <= order:
+            #     current_moment_[a1, a2, a3, 1] = moment_[ind]
+            #     ind += 1
+
+        assert ind == moment_.size
         return current_moment_
 
     args = (order + 2, e_true, x1, x2, x3, t, None, get_current_moment, dim_mom)
@@ -247,19 +290,7 @@ def mikheev(**kwargs):
 
 if __name__ == "__main__":
     import argparse
-
     parser = argparse.ArgumentParser()
-
-    parser.add_argument("--down_sample_time", help="Time down-sampling factor")
-    parser.add_argument("--r_obs_min")
-    parser.add_argument("--r_obs_max")
-    parser.add_argument("--n_r_obs")
-    parser.add_argument("--n_theta_obs")
-    parser.add_argument("--n_phi_obs")
-    parser.add_argument("--phi_obs_min")
-    parser.add_argument("--phi_obs_max")
-    parser.add_argument("--theta_obs_min")
-    parser.add_argument("--theta_obs_max")
     parser.add_argument("--order", required=True)
     parser.add_argument("--tol", required=True)
     parser.add_argument("--n_points", required=True)
@@ -269,6 +300,5 @@ if __name__ == "__main__":
     parser.add_argument("--scale", required=True)
     parser.add_argument("--find_center", required=True)
     parser.add_argument("--norm", required=True)
-
     kwargs = parser.parse_args()
     mikheev(**vars(kwargs))
