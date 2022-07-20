@@ -102,7 +102,6 @@ def inverse_problem(order, e_true, x1, x2, x3, t, t_sym, current_moment_callable
     compute_grid = kwargs.pop("compute_grid", True)
     estimate = kwargs.pop("estimate", None)
     p = kwargs.pop("p", 2)
-    n_sources = kwargs.pop("n_sources", 1)
 
     if kwargs:
         raise ValueError(f"Unknown keyword arguments: {kwargs}")
@@ -128,10 +127,10 @@ def inverse_problem(order, e_true, x1, x2, x3, t, t_sym, current_moment_callable
         else:
             return sol.compute_e_field(x1, x2, x3, t, h_sym, t_sym, compute_grid=compute_grid)
 
-    center = np.zeros((n_sources, 3, ))
-    current_moment = np.zeros((n_sources, dim_moment, ))
+    center = np.zeros((3, ))
+    current_moment = np.zeros((dim_moment, ))
 
-    h = np.zeros((n_sources, n_points, ))
+    h = np.zeros((n_points, ))
 
     if find_center:
         def ravel_params(current_moments, h, center):
@@ -146,14 +145,14 @@ def inverse_problem(order, e_true, x1, x2, x3, t, t_sym, current_moment_callable
         def unravel_params(params):
             return params[:dim_moment], params[dim_moment:], None
 
-    x0 = ravel_params(current_moment[0, :], h[0, :], center[0, :])
+    x0 = ravel_params(current_moment, h, center)
+    t_sym = sympy.Symbol("t", real=True)
 
     n_calls = 0
     e_opt = None
-    e_total = [np.zeros((x1.size, t.size,))] * 3
 
     def get_error(x):
-        nonlocal n_calls, e_opt, e_total
+        nonlocal n_calls, e_opt
 
         n_calls += 1
 
@@ -161,11 +160,12 @@ def inverse_problem(order, e_true, x1, x2, x3, t, t_sym, current_moment_callable
         h = get_h_num(h, t)
         current_moment = current_moment_callable(current_moment)
         e_opt = get_fields(current_moment, h, None, center)
+
         error = 0
         normal = 0
 
         errors_comp = []
-        for c1, c2 in zip(e_true, [e1 + e2 for e1, e2 in zip(e_opt, e_total)]):
+        for c1, c2 in zip(e_true, e_opt):
             errors_comp.append(np.sum(np.abs(c1 - c2 * scale)**p))
             normal += np.sum(np.abs(c1)**p)
         error = np.sum(errors_comp) / normal
@@ -193,7 +193,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, t_sym, current_moment_callable
                     max_h = np.max(np.abs(h))
                     if max_h > 0:
                         plt.subplot(2, 3, 5)
-                        plt.plot(t, h / max_h * max_true,)
+                        plt.plot(t, h / max_h * max_true, "k-.")
 
             os.system("clear")
             print(f"{'#'*np.clip(int(error*50), 0, 50)}{error:.3f}, {n_calls=}, {errors_comp/normal=}", end='\r')
@@ -208,14 +208,20 @@ def inverse_problem(order, e_true, x1, x2, x3, t, t_sym, current_moment_callable
     np.random.seed(0)
     print(f"There are {x0.size} degrees of freedom.")
 
-    x0 = np.random.random(x0.shape) * 2 - 1
-    x0[-3:] = np.zeros((3, ))
-    for source_id in range(n_sources):
+    for i_try in range(max_global_tries):
+        print("Try", i_try)
+        if estimate is None:
+            x0 = np.random.random(x0.shape) * 2 - 1
+            x0[-3:] = np.array([0, 0, 0])
+        else:
+            x0 = ravel_params(*estimate)
         n_calls = 0
         res = scipy.optimize.minimize(get_error, x0,
                                       method="BFGS",
                                       options=options)
-        e_total = e_total + e_opt
-        current_moment[source_id, :], h[source_id, :], center[source_id, :] = unravel_params(res.x)
 
-    return current_moment, h, center, e_opt.squeeze() * scale
+        if res.fun <= error_tol:
+            break
+    current_moment, h, center = unravel_params(res.x)
+
+    return current_moment_callable(current_moment), get_h_num(h, t), center, e_opt.squeeze() * scale
