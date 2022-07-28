@@ -71,6 +71,10 @@ def postprocessing_globalem(*args):
 
 def postprocessing_mikheev(*args):
     current_moment, t, h, h_true, center, sol, order, filename = args
+    sol.compute_e_field(np.array([1, ]), np.array([1, ]), np.array([1, ]), np.linspace(0, 1, 100),
+                        np.zeros((100, )), None, compute_grid=False, compute_txt=True)
+
+    print(to_mathematica(sol.get_e_field_text()))
     if center is None:
         center = [0, 0, 0]
 
@@ -80,7 +84,7 @@ def postprocessing_mikheev(*args):
     x1, x2, x3 = np.array(x1), np.array(x2), np.array(x3)
 
     n_added = 3
-    r = 1.414 * x2.max()
+    r = 8 * x2.max()
     t = np.concatenate((t, np.linspace(t[-1], t[-1] + n_added * t[-1], n_added * t.size)))
     h = np.concatenate((h, np.zeros(n_added * h.size)))
     import synthetic
@@ -142,6 +146,16 @@ def postprocessing(**kwargs):
             postprocessing_mikheev(current_moment, t, h, h_true, center, sol, order, kwargs.get("filename"))
         case _:
             raise ValueError(f"Unknown --case: `{kwargs['case']}`")
+
+
+def to_mathematica(expr: str):
+    expr = expr.replace("%", "").replace("'", "").replace("[", "{").replace("]", "}").replace("e+", "*^")\
+        .replace("e-", "*^-").replace("\n","")
+    for order in range(100):
+        expr = expr.replace(f"dh_dt^({order})(t-r/1.0)", f"D[H[t-r/c], {{t, {order+1}}}]")
+        expr = expr.replace(f"int_h^({order})(t-r/1.0)", f"D[H[t-r/c], {{t, {order}}}]")
+
+    return expr
 
 
 if __name__ == "__main__":

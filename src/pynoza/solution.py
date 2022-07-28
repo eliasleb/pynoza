@@ -205,20 +205,20 @@ class Solution:
             param h: name of the function
             return: a string describing the auxiliary function
             """
-        y: str = ""
+        y: str = "("
         for signature in self._aux_func[ind]:
-            dy = ""
+            dy = "+("
             dy += f"{self._aux_func[ind][signature]:.2e}*{h}^({signature[H]})(t-r/{self.c:.1f})"
             if signature[X1] > 0:
-                dy += f"x1^{signature[X1]}"
+                dy += f"*x1^{signature[X1]}"
             if signature[X2] > 0:
-                dy += f"x2^{signature[X2]}"
+                dy += f"*x2^{signature[X2]}"
             if signature[X3] > 0:
-                dy += f"x3^{signature[X3]}"
+                dy += f"*x3^{signature[X3]}"
             if signature[R] > 0:
                 dy += f"/r^{signature[R]}"
-            y += dy
-        return y
+            y += dy + ")"
+        return y + ")"
 
     def set_moments(self,
                     current_moment=lambda a1, a2, a3: [0, 0, 0],
@@ -422,7 +422,7 @@ class Solution:
                                    moment: ndarray,
                                    hs: str):
         return f"""  {(-1) ** np_sum(ind):+d}/{fact(ind)}"""\
-               f"""*{list(map('{:.2e}%'.format, moment.flatten()))}*{self._evaluate_txt(tuple(ind), hs)}/(4pi)\n"""
+               f"""*{list(map('{:.2e}'.format, moment.flatten()))}*{self._evaluate_txt(tuple(ind), hs)}/(4pi)\n"""
 
     def __repr__(self) -> str:
         return f"Solution: max_order={self.max_order}, c={self.c}, ran_recurse={self.ran_recurse}"
