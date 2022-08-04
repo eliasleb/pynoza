@@ -85,7 +85,7 @@ def ez_mikheev_on_mirror_axis(y, t, v, *args):
     r2 = np.sqrt(y ** 2 + (d / 2) ** 2)
     length = np.sqrt(fpy ** 2 + (d / 2) ** 2)
     beta = np.arctan2(d / 2, fpy)
-    gamma = np.arctan(d / 2, y)
+    gamma = np.arctan2(d / 2, y)
     return 1 / 2 / f_g / np.pi * ((v(t - r / c) / r * np.sin(beta) / (1 + np.cos(beta))
                                    - v(t - length / c - r2 / c) / r2 * (np.sin(beta) + np.sin(gamma))
                                    / (1 + np.cos(beta - gamma))) - (4 * v(t - 2 * f / c - r / c) / d
@@ -131,15 +131,19 @@ def mikheev(**kwargs):
     x3 = x3[unique_indices]
 
     assert len(x1) == len(x2) and len(x2) == len(x3)
+
     t = np.linspace(0, 3.5, 100)
 
-    y = np.linspace(1, 2, 10).reshape((10, 1))
-    ez_full = ez_mikheev(0, y, 0, t, v, f_g, 1, d, f)
-    ez_axis = ez_mikheev_on_mirror_axis(y, t, v, f_g, 1, d, f)
-    # with pynoza.PlotAndWait():
-    #     plt.plot(t.squeeze(), (ez_full * y).T, "r")
-    #     plt.plot(t.squeeze(), (ez_axis * y).T, "k--")
-
+    def compare_on_axis():
+        nonlocal t
+        y = np.linspace(10, 11, 10).reshape((10, 1))
+        t += y.min() - 1
+        ez_full = ez_mikheev(0, y, 0, t, v, f_g, 1, d, f)
+        ez_axis = ez_mikheev_on_mirror_axis(y, t, v, f_g, 1, d, f)
+        with pynoza.PlotAndWait():
+            plt.plot(t.squeeze(), ez_full.T, "r")
+            plt.plot(t.squeeze(), ez_axis.T, "k--")
+    # compare_on_axis()
 
     x1 = np.array(x1).reshape((len(x1), 1))
     x2 = np.array(x2).reshape((len(x1), 1))
@@ -166,13 +170,22 @@ def mikheev(**kwargs):
     # x3 = np.concatenate((x3, x3))
 
     # plt.figure(figsize=(10, 10))
+    # delays = [1.06-.351,
+    #           1.102-.413,
+    #           0.994-.417,
+    #           1.368-.706,
+    #           1.441-.744,
+    #           1.343-.740,
+    #           1.828-1.166,
+    #           1.833-1.205,
+    #           1.837-1.200,
+    #           1.377-.757]
     # with pynoza.PlotAndWait(new_figure=False):
     #     for point in range(10):
     #         plt.subplot(5, 2, point + 1)
     #         plt.title(f"{point + 1}")
     #         plt.plot(t, ez[point, :], "--")
-    #         plt.plot(t, ez_analytical[point, :])
-
+    #         plt.plot(t + delays[point], ez_analytical[point, :])
     #         plt.tight_layout()
 
     ex = np.zeros(ez.shape)
