@@ -115,6 +115,15 @@ pub mod solution {
         fn order(&self) -> i32 {
             self.i + self.j + self.k
         }
+
+        fn from_vec(v: Vec<i32>) -> MultiIndex {
+            assert!(v.len() >= 3);
+            MultiIndex {
+                i: v[0],
+                j: v[1],
+                k: v[2]
+            }
+        }
     }
 
     impl Display for MultiIndex {
@@ -136,8 +145,8 @@ pub mod solution {
 
         fn next(&mut self) -> Option<Self::Item> {
             let next_index = match self {
-                MultiIndexIterator { index, max_order } if index.order() > *max_order =>
-                    return None,
+                MultiIndexIterator { index, max_order }
+                    if index.order() > *max_order => return None,
                 MultiIndexIterator { index: MultiIndex { i: 0, j: 0, k }, .. } => Some(MultiIndex {
                     i: *k + 1,
                     j: 0,
@@ -154,14 +163,28 @@ pub mod solution {
                     k: *k
                 }),
             };
-            self.index = next_index.unwrap();
-            next_index
+            match next_index {
+                Some(next_index) => {
+                    let current = self.index;
+                    self.index = next_index;
+                    Some(current)
+                }
+                _ => None,
+            }
         }
     }
 
     pub struct MultiIndexRange {
-        pub start: MultiIndex,
-        pub max_order: i32,
+        start: MultiIndex,
+        max_order: i32,
+    }
+
+    impl MultiIndexRange {
+        pub fn new(start: MultiIndex, max_order: i32) -> MultiIndexRange {
+            MultiIndexRange {
+                start, max_order
+            }
+        }
     }
 
     impl IntoIterator for MultiIndexRange {
@@ -188,6 +211,7 @@ pub mod solution {
 #[cfg(test)]
 mod tests {
     use super::solution::*;
+    use std::iter::*;
 
     #[test]
     fn auxiliary_function() {
@@ -203,12 +227,18 @@ mod tests {
 
     #[test]
     fn test_iteration() {
-        let range = MultiIndexRange {
-            start: MULTI_INDEX_ZERO,
-            max_order: 1,
-        };
-        for i in range.into_iter() {
-            println!("{i:?}");
-        }
+        let indices: Vec<MultiIndex> = MultiIndexRange::new(MULTI_INDEX_ZERO, 1)
+            .into_iter().collect();
+        let is = vec![0, 1, 0, 0];
+        let js = vec![0, 0, 1, 0];
+        let ks = vec![0, 0, 0, 1];
+        let indices_true: Vec<MultiIndex> = is.iter().zip(js.iter()).zip(ks.iter())
+            .map( | ((i, j), k) | MultiIndex {
+                i: *i, j: *j, k: *k
+            } ).collect();
+        assert_eq!(
+            indices,
+            indices_true
+        );
     }
 }
