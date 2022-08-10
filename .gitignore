@@ -4,6 +4,8 @@
 src/pynoza/*.so
 src/pynoza/*.c
 
+rust/target/
+
 build/
 
 tests/data/order*
