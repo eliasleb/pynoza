@@ -6,6 +6,6 @@ fn main() {
         max_order: 2
     };
     for index in range.into_iter() {
-        println!("{index:?}");
+        println!("{index}");
     }
 }

@@ -3,6 +3,7 @@ pub mod solution {
     use std::collections::HashMap;
     use std::hash::Hash;
     use std::cmp::{Eq};
+    use std::fmt::{Display, Formatter};
 
     pub static MULTI_INDEX_ZERO: MultiIndex = MultiIndex {
         i: 0,
@@ -116,6 +117,15 @@ pub mod solution {
         }
     }
 
+    impl Display for MultiIndex {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            f.write_str(&*format!(
+                "({}, {}, {})",
+                self.i, self.j, self.k
+            ))
+        }
+    }
+    
     pub struct MultiIndexIterator {
         index: MultiIndex,
         max_order: i32,
@@ -125,9 +135,9 @@ pub mod solution {
         type Item = MultiIndex;
 
         fn next(&mut self) -> Option<Self::Item> {
-            match self {
+            let next_index = match self {
                 MultiIndexIterator { index, max_order } if index.order() > *max_order =>
-                    None,
+                    return None,
                 MultiIndexIterator { index: MultiIndex { i: 0, j: 0, k }, .. } => Some(MultiIndex {
                     i: *k + 1,
                     j: 0,
@@ -143,7 +153,9 @@ pub mod solution {
                     j: *j + 1,
                     k: *k
                 }),
-            }
+            };
+            self.index = next_index.unwrap();
+            next_index
         }
     }
 
