@@ -4,13 +4,16 @@ pub mod helpers;
 pub mod solution {
     use crate::helpers::multi_index::*;
     use std::ops::{Index, IndexMut};
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
     use std::hash::Hash;
     use std::cmp::{Eq};
+    use ndarray::{Array2, ArrayView2, ArrayViewMut2, Zip};
+
+    pub type Real = f64;
 
     pub struct Solution {
         max_order: i32,
-        aux_fun: HashMap<MultiIndex, HashMap<Signature, f64>>,
+        aux_fun: HashMap<MultiIndex, HashMap<Signature, Real>>,
     }
 
     impl Solution {
@@ -26,7 +29,7 @@ pub mod solution {
             );
             let mut sol = Solution {
                 max_order,
-                aux_fun
+                aux_fun,
             };
             sol.recurse();
             sol
@@ -66,7 +69,7 @@ pub mod solution {
                     *self.aux_fun.entry(new)
                         .or_insert(HashMap::new())
                         .entry(identity_first_term)
-                        .or_insert(0.) += *coefficient * (exponent_x_i as f64);
+                        .or_insert(0.) += *coefficient * (exponent_x_i as Real);
                 }
 
                 // Second term
@@ -77,7 +80,7 @@ pub mod solution {
                 *self.aux_fun.entry(new)
                     .or_insert(HashMap::new())
                     .entry(identity_second_term)
-                    .or_insert(0.) -= *coefficient * (exponent_r as f64);
+                    .or_insert(0.) -= *coefficient * (exponent_r as Real);
 
                 // Third term (time-derivative)
                 let mut identity_third_term = signature.clone();
@@ -96,7 +99,7 @@ pub mod solution {
             Self::term_to_string(self.aux_fun.get(index).unwrap())
         }
 
-        fn term_to_string(term: &HashMap<Signature, f64>) -> String {
+        fn term_to_string(term: &HashMap<Signature, Real>) -> String {
             let stuff: Vec<String> = term.iter().map(| (signature, coefficient) |
                 String::from(format!(
                     "({}) * {}",
@@ -107,6 +110,67 @@ pub mod solution {
 
             stuff.join(" + ")
         }
+
+        fn evaluate(&self, ret: ArrayViewMut2<Real>, index: MultiIndex, x1: ArrayView2<Real>, x2: ArrayView2<Real>,
+                    x3: ArrayView2<Real>, r: ArrayView2<Real>, h: Vec<ArrayView2<Real>>) {
+
+        }
+
+        pub fn compute_e_field<'a>(&self,
+                               x1: ArrayView2<Real>,
+                               x2: ArrayView2<Real>,
+                               x3: ArrayView2<Real>,
+                               t: ArrayView2<Real>,
+                               h: ArrayView2<Real>) -> Array2<Real> {
+            let r = Self::radius(x1, x2, x3);
+            let hs = self.handle_h(t, h);
+
+            r
+        }
+
+        pub fn handle_h(&self, t: ArrayView2<Real>, h: ArrayView2<Real>) -> HashMap<i32, Array2<Real>> {
+            let mut hs: HashMap<i32, Array2<Real>> = HashMap::new();
+            hs.insert(0, h.to_owned());
+            let dt = t[[1, 0]] - t[[0, 0]];
+            hs.insert(-1, Self::antiderivative(dt, h.view()));
+            let mut derivative = Self::derivative(dt, h.view());
+            for order in 1..=self.max_order + 2 {
+                hs.insert(order, derivative.clone());
+                derivative = Self::derivative(dt, derivative.view());
+            }
+            hs
+        }
+
+        fn derivative(dt: Real, x: ArrayView2<Real>) -> Array2<Real> {
+            let mut y = Array2::zeros((x.len(), 1));
+            for (index, yi) in y.iter_mut().enumerate() {
+                if index > 0 {
+                    *yi = (x[[index, 0]] - x[[index - 1, 0]]) / dt;
+                }
+            }
+            y
+        }
+
+        fn antiderivative(dt: Real, x: ArrayView2<Real>) -> Array2<Real> {
+            let mut y = Array2::zeros((x.len(), 1));
+            let mut sum: Real = 0.;
+
+            for (i, (yi, xi)) in y.iter_mut().zip(x.iter()).enumerate() {
+                *yi = sum;
+                sum += xi * dt;
+            }
+            y
+        }
+
+        fn radius(x1: ArrayView2<Real>, x2: ArrayView2<Real>, x3: ArrayView2<Real>) -> Array2<Real> {
+            let mut r = Array2::zeros((1, x1.len()));
+            Zip::from(&mut r).and(&x1).and(&x2).and(&x3)
+                .apply(|r, &x1, &x2, &x3 | {
+                    *r = f64::sqrt(x1 * x1 + x2 * x2 + x3 * x3)
+                });
+            r
+        }
+
     }
 
     impl Signature {
@@ -163,6 +227,13 @@ pub mod solution {
         }
     }
 
+    pub fn check_equality(expr1: &str, expr2: &str) -> bool {
+        let lhs: HashSet<&str> = expr1.split("+").map(| x | x.trim() ).collect();
+        let rhs: HashSet<&str> = expr2.split("+").map(| x | x.trim() ).collect();
+
+        lhs == rhs
+    }
+
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     struct Signature {
         x1: i32,
@@ -175,21 +246,63 @@ pub mod solution {
 
 #[cfg(test)]
 mod tests {
-    use super::solution::Solution;
+    extern crate csv;
+    extern crate ndarray_csv;
+
+    use csv::{ReaderBuilder, WriterBuilder};
+    use ndarray_csv::{Array2Reader, Array2Writer};
+    use std::error::Error;
+    use std::fs::File;
+    use super::solution::*;
     use super::helpers::multi_index::{MULTI_INDEX_ZERO, MultiIndex};
+    use ndarray::{Array2, Array, s, array, stack};
+    use itertools::Itertools;
 
     #[test]
-    fn auxiliary_function() {
+    fn test_auxiliary_function() {
         let sol = Solution::new(1);
-        assert_eq!(
-            sol.get_human_readable_aux_fun(&MULTI_INDEX_ZERO).trim(),
-            String::from("(1) *  h / r").trim()
-            );
-        assert_eq!(
-            sol.get_human_readable_aux_fun(&MultiIndex {
-                    i: 1, j: 0, k: 0
-                }).trim(),
-            String::from("(-1) * x h / r^3 + (-1) * x h' / r^2").trim()
-        );
+        assert!(check_equality(
+            &sol.get_human_readable_aux_fun(&MULTI_INDEX_ZERO),
+            &String::from("(1) *  h / r")));
+        assert!(check_equality(
+           &sol.get_human_readable_aux_fun(&MultiIndex { i: 1, j: 0, k: 0 }),
+           &String::from("(-1) * x h / r^3 + (-1) * x h' / r^2")
+        ));
     }
+
+    #[test]
+    fn test_derivatives_and_integral() -> Result<(), Box<dyn Error>> {
+        let sol = Solution::new(2);
+        let t: Array2<Real> =  ndarray::Array::linspace(0., 15., 100)
+                .into_shape((100, 1)).unwrap();
+        let h = t.mapv(f64::sin);
+        let hs = sol.handle_h(t.view(), h.view());
+        let mut hs_vec: Array2<Real> = Array2::zeros((h.len(), hs.len()));
+        for (i, j) in (0..h.len() as i32).cartesian_product((-1)..(hs.len()-1) as i32) {
+            hs_vec[[i as usize, (j+1) as usize]] = hs.get(&j).unwrap().column(0)[i as usize];
+        }
+
+        // Write the array into the file.
+        {
+            let file = File::create("data/test_derivatives_and_integral.csv")?;
+            let mut writer = WriterBuilder::new().has_headers(false).from_writer(file);
+            writer.serialize_array2(&hs_vec)?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test() {
+        let sol = Solution::new(2);
+        let x1: Array2<Real> = ndarray::array![[1., 1., 0.]];
+        let x2: Array2<Real> = ndarray::array![[0., 1., 0.]];
+        let x3: Array2<Real> = ndarray::array![[0., 0., 1.]];
+        let t: Array2<Real> =  ndarray::Array::linspace(0., 10., 50)
+            .into_shape((50, 1)).unwrap();
+        let h = t.mapv(f64::sin);
+        let e_field = sol.compute_e_field(x1.view(), x2.view(), x3.view(),
+                                          t.view(), h.view());
+
+    }
+
 }
