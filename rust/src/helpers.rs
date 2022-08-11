@@ -1,8 +1,11 @@
 pub mod multi_index {
+    extern crate factorial;
+
     use std::ops::{Add, Index, IndexMut, Neg, Sub};
     use std::hash::Hash;
     use std::cmp::{Eq};
     use std::fmt::{Display, Formatter};
+    use factorial::Factorial;
 
     pub static MULTI_INDEX_ZERO: MultiIndex = MultiIndex {
         i: 0,
@@ -97,6 +100,10 @@ pub mod multi_index {
                 j: v[1],
                 k: v[2]
             }
+        }
+
+        pub fn factorial(&self) -> u32 {
+            (self.i as u32).factorial() * (self.j as u32).factorial() * (self.k as u32).factorial()
         }
     }
 

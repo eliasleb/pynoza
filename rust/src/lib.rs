@@ -7,7 +7,8 @@ pub mod solution {
     use std::collections::{HashMap, HashSet};
     use std::hash::Hash;
     use std::cmp::{Eq};
-    use ndarray::{Array2, ArrayView2, ArrayViewMut2, Zip};
+    use ndarray::{Array, Array2, ArrayView2, ArrayViewMut2, ArrayView4, Array4, ArrayViewMut4, Zip,
+    Dim, Ix};
 
     pub type Real = f64;
 
@@ -121,7 +122,8 @@ pub mod solution {
                                x2: ArrayView2<Real>,
                                x3: ArrayView2<Real>,
                                t: ArrayView2<Real>,
-                               h: ArrayView2<Real>) -> Array2<Real> {
+                               h: ArrayView2<Real>,
+                               current_moment: ArrayView4<Real>) -> Array2<Real> {
             let r = Self::radius(x1, x2, x3);
             let hs = self.handle_h(t, h);
 
@@ -171,7 +173,44 @@ pub mod solution {
             r
         }
 
+        pub fn get_charge_moment(&self, current_moment: ArrayView4<Real>) -> Array4<Real> {
+            let dim = (self.max_order + 1) as usize;
+            let mut charge_moment: Array4<Real> = Array::zeros((3, dim, dim, dim));
+            for i in 0..3 {
+                for a in MultiIndexRange::new(MULTI_INDEX_ZERO, self.max_order) {
+                    let (a1, a2, a3) = (a.i, a.j, a.k);
+                    for j in 0..3 {
+                        let mut b = a.clone();
+                        if i == j {
+                            if a[j] >= 2 {
+                                b[j] = a[j] - 2;
+                            }
+                            charge_moment[[i as usize, a1 as usize, a2 as usize, a3 as usize]] +=
+                                f64::from(a[j] * (a[j] - 1)) * current_moment[[j as usize,
+                                    b[0] as usize, b[1] as usize, b[2] as usize]];
+                        }
+                        else {
+                            b[i] -= 1;
+                            b[j] -= 1;
+                            if a[j] >= 1 && a[i] >= 1 {
+                                charge_moment[[i as usize, a1 as usize, a2 as usize, a3 as usize]]
+                                    += f64::from(a[j] * a[i]) * current_moment[[j as usize,
+                                    b[0] as usize, b[1] as usize, b[2] as usize]]
+                            }
+                        }
+                    }
+                }
+            }
+            -charge_moment
+        }
+
+        fn get_single_term_multipole(&self, index: MultiIndex, moment: ArrayView2<Real>,
+            hs: HashMap<i32, Array2<Real>>) -> Array2<Real> {
+
+            (-1.).powi(index.order()) / index.factorial()
+        }
     }
+
 
     impl Signature {
         fn to_string(&self) -> String {
@@ -255,7 +294,7 @@ mod tests {
     use std::fs::File;
     use super::solution::*;
     use super::helpers::multi_index::{MULTI_INDEX_ZERO, MultiIndex};
-    use ndarray::{Array2, Array, s, array, stack};
+    use ndarray::{Array2, Array, s, array, Array4, stack};
     use itertools::Itertools;
 
     #[test]
@@ -300,9 +339,26 @@ mod tests {
         let t: Array2<Real> =  ndarray::Array::linspace(0., 10., 50)
             .into_shape((50, 1)).unwrap();
         let h = t.mapv(f64::sin);
+        let mut current_moment = Array4::zeros((3, 5, 5, 5));
+        current_moment[[2, 0, 0, 0]] = 1.;
         let e_field = sol.compute_e_field(x1.view(), x2.view(), x3.view(),
-                                          t.view(), h.view());
+                                          t.view(), h.view(), current_moment.view());
 
+    }
+
+    #[test]
+    fn test_current_moment_conversion() {
+        let max_order = 3;
+        let sol = Solution::new(max_order);
+        let dim = (max_order + 1) as usize;
+        let mut current_moment: Array4<Real> = Array::zeros((3, dim, dim, dim));
+        current_moment[[2, 0, 0, 0]] = 1.;
+        let charge_moment = sol.get_charge_moment(current_moment.view());
+        let mut charge_moment_true: Array4<Real> = Array::zeros((3, dim, dim, dim));
+        charge_moment_true[[0, 1, 0, 1]] = -1.;
+        charge_moment_true[[1, 0, 1, 1]] = -1.;
+        charge_moment_true[[2, 0, 0, 2]] = -2.;
+        assert_eq!(charge_moment_true, charge_moment);
     }
 
 }
