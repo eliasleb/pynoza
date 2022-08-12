@@ -178,7 +178,7 @@ class Solution:
         X1 -- evaluated first coordinate (aka x)
         X2 -- evaluated second coordinate (aka y)
         X3 -- evaluated third coordinate (aka z)
-        R -- equal to X1**2+X2**2+X3**2. Passed to avoid computing it repeatedly.
+        R -- equal to (X1**2+X2**2+X3**2)^1/2. Passed to avoid computing it repeatedly.
         Hs -- dictionary of the derivatives of the time-dependent excitation function.
               Must be in the form {order:derivative of order} for order=-1..max_order+2
         """

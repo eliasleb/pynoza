@@ -3,7 +3,7 @@
 
 src/pynoza/*.so
 src/pynoza/*.c
-
+env/
 rust/target/
 
 build/
