@@ -10,6 +10,7 @@ build/
 
 tests/data/order*
 
+venv/
 .ipynb_checkpoints
 .pytest_cache
 .tox
