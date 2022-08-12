@@ -8,10 +8,7 @@ pub mod solution {
     use std::hash::Hash;
     use std::cmp::{Eq};
     use ndarray::{Array, Array2, ArrayView2, ArrayViewMut2, ArrayView4, Array4, ArrayViewMut4, Zip,
-    Dim, Ix, Array1, ArrayView1, ArrayViewMut1, Array3, s};
-    use std::iter::FromIterator;
-    use pyo3::prelude::*;
-
+    Dim, Ix};
 
     pub type Real = f64;
 
@@ -115,61 +112,28 @@ pub mod solution {
             stuff.join(" + ")
         }
 
-        // fn evaluate(&self, index: MultiIndex, t: ArrayView1<Real>, hs: HashMap<i32, Array1<Real>>,
-        //             x1: ArrayView1<Real>, x2: ArrayView1<Real>, x3: ArrayView1<Real>,
-        //             r: ArrayView1<Real>) -> Array2<Real> {
-        //     let mut ret: Array2<Real> = Array2::zeros((t.len(), x1.len()));
-        //     for (signature, coefficient,) in self.aux_fun.get(&index)
-        //         .unwrap().iter() {
-        //         for i_t in 0..t.len() {
-        //             for i_x in 0..x1.len() {
-        //                 ret[[i_t, i_x]] += hs.get(&signature.h).unwrap()[i_t] * coefficient
-        //                 * match signature.x1  {
-        //                     pow if pow > 0 => x1[i_x].powi(pow),
-        //                     _ => 1.
-        //                 } * match signature.x2  {
-        //                     pow if pow > 0 => x2[i_x].powi(pow),
-        //                     _ => 1.
-        //                 } * match signature.x3  {
-        //                     pow if pow > 0 => x3[i_x].powi(pow),
-        //                     _ => 1.
-        //                 } * match signature.r  {
-        //                     pow if pow > 0 => 1. / r[i_x].powi(pow),
-        //                     _ => 1.
-        //                 }
-        //             }
-        //         }
-        //     }
-        //     ret
-        // }
+        fn evaluate(&self, ret: ArrayViewMut2<Real>, index: MultiIndex, x1: ArrayView2<Real>, x2: ArrayView2<Real>,
+                    x3: ArrayView2<Real>, r: ArrayView2<Real>, h: Vec<ArrayView2<Real>>) {
 
-        pub fn compute_e_field(&self,
-                               x1: ArrayView1<Real>,
-                               x2: ArrayView1<Real>,
-                               x3: ArrayView1<Real>,
-                               t: ArrayView1<Real>,
-                               h: ArrayView1<Real>,
-                               current_moment: ArrayView4<Real>) -> Array3<Real> {
-            let r = Self::radius(x1, x2, x3);
-            let hs = self.handle_h(t, h);
-            let (hs_integral, hs_derivative)
-                = self.repack_hs(hs);
-
-            let mut e_field = Array3::zeros((3, t.len(), x1.len()));
-            for index in MultiIndexRange::new(MULTI_INDEX_ZERO, self.max_order) {
-                let cms = current_moment.slice(s![.., index.i, index.j, index.k]).clone();
-
-                e_field = e_field + self.get_single_term_multipole(index,
-                    Array::from_iter(cms.iter().cloned()).view(),
-                    t,&hs_derivative, x1, x2, x3, r.view());
-            }
-            e_field
         }
 
-        pub fn handle_h(&self, t: ArrayView1<Real>, h: ArrayView1<Real>) -> HashMap<i32, Array1<Real>> {
-            let mut hs: HashMap<i32, Array1<Real>> = HashMap::new();
+        pub fn compute_e_field<'a>(&self,
+                               x1: ArrayView2<Real>,
+                               x2: ArrayView2<Real>,
+                               x3: ArrayView2<Real>,
+                               t: ArrayView2<Real>,
+                               h: ArrayView2<Real>,
+                               current_moment: ArrayView4<Real>) -> Array2<Real> {
+            let r = Self::radius(x1, x2, x3);
+            let hs = self.handle_h(t, h);
+
+            r
+        }
+
+        pub fn handle_h(&self, t: ArrayView2<Real>, h: ArrayView2<Real>) -> HashMap<i32, Array2<Real>> {
+            let mut hs: HashMap<i32, Array2<Real>> = HashMap::new();
             hs.insert(0, h.to_owned());
-            let dt = t[1] - t[0];
+            let dt = t[[1, 0]] - t[[0, 0]];
             hs.insert(-1, Self::antiderivative(dt, h.view()));
             let mut derivative = Self::derivative(dt, h.view());
             for order in 1..=self.max_order + 2 {
@@ -179,30 +143,18 @@ pub mod solution {
             hs
         }
 
-        fn repack_hs(&self, hs: HashMap<i32, Array1<Real>>) -> (HashMap<i32, Array1<Real>>,
-                                                                HashMap<i32, Array1<Real>>) {
-            let mut hs_integral: HashMap<i32, Array1<Real>> = HashMap::new();
-            let mut hs_derivative: HashMap<i32, Array1<Real>> = HashMap::new();
-            for order in 0..self.max_order + 1 {
-                hs_integral.insert(order, hs.get(&(order - 1)).unwrap().clone());
-                hs_derivative.insert(order, hs.get(&(order + 1)).unwrap().clone());
-            }
-
-            (hs_integral, hs_derivative)
-        }
-
-        fn derivative(dt: Real, x: ArrayView1<Real>) -> Array1<Real> {
-            let mut y = Array1::zeros(x.len());
+        fn derivative(dt: Real, x: ArrayView2<Real>) -> Array2<Real> {
+            let mut y = Array2::zeros((x.len(), 1));
             for (index, yi) in y.iter_mut().enumerate() {
                 if index > 0 {
-                    *yi = (x[index] - x[index - 1]) / dt;
+                    *yi = (x[[index, 0]] - x[[index - 1, 0]]) / dt;
                 }
             }
             y
         }
 
-        fn antiderivative(dt: Real, x: ArrayView1<Real>) -> Array1<Real> {
-            let mut y = Array1::zeros(x.len());
+        fn antiderivative(dt: Real, x: ArrayView2<Real>) -> Array2<Real> {
+            let mut y = Array2::zeros((x.len(), 1));
             let mut sum: Real = 0.;
 
             for (i, (yi, xi)) in y.iter_mut().zip(x.iter()).enumerate() {
@@ -212,8 +164,8 @@ pub mod solution {
             y
         }
 
-        fn radius(x1: ArrayView1<Real>, x2: ArrayView1<Real>, x3: ArrayView1<Real>) -> Array1<Real> {
-            let mut r = Array1::zeros(x1.len());
+        fn radius(x1: ArrayView2<Real>, x2: ArrayView2<Real>, x3: ArrayView2<Real>) -> Array2<Real> {
+            let mut r = Array2::zeros((1, x1.len()));
             Zip::from(&mut r).and(&x1).and(&x2).and(&x3)
                 .apply(|r, &x1, &x2, &x3 | {
                     *r = f64::sqrt(x1 * x1 + x2 * x2 + x3 * x3)
@@ -252,36 +204,10 @@ pub mod solution {
             -charge_moment
         }
 
-        fn get_single_term_multipole(&self, index: MultiIndex, moment: ArrayView1<Real>,
-                                     t: ArrayView1<Real>, hs: &HashMap<i32, Array1<Real>>,
-                                     x1: ArrayView1<Real>, x2: ArrayView1<Real>,
-                                     x3: ArrayView1<Real>, r: ArrayView1<Real>) -> Array3<Real> {
-            let mut ret = Array3::zeros((3, t.len(), x1.len()));
-            for dim in 0..3 {
-                for (signature, coefficient,) in self.aux_fun.get(&index)
-                    .unwrap().iter() {
-                    for i_t in 0..t.len() {
-                        for i_x in 0..x1.len() {
-                            ret[[dim, i_t, i_x]] += hs.get(&signature.h).unwrap()[i_t] * coefficient
-                                * match signature.x1  {
-                                pow if pow > 0 => x1[i_x].powi(pow),
-                                _ => 1.
-                            } * match signature.x2  {
-                                pow if pow > 0 => x2[i_x].powi(pow),
-                                _ => 1.
-                            } * match signature.x3  {
-                                pow if pow > 0 => x3[i_x].powi(pow),
-                                _ => 1.
-                            } * match signature.r  {
-                                pow if pow > 0 => 1. / r[i_x].powi(pow),
-                                _ => 1.
-                            } * f64::powi(-1., index.order()) / (index.factorial() as f64)
-                                * moment[dim];
-                        }
-                    }
-                }
-            }
-            ret
+        fn get_single_term_multipole(&self, index: MultiIndex, moment: ArrayView2<Real>,
+            hs: HashMap<i32, Array2<Real>>) -> Array2<Real> {
+
+            (-1.).powi(index.order()) / index.factorial()
         }
     }
 
@@ -355,21 +281,6 @@ pub mod solution {
         h: i32,
         r: i32
     }
-
-    /// Formats the sum of two numbers as string.
-    #[pyfunction]
-    fn sum_as_string(a: usize, b: usize) -> PyResult<String> {
-        Ok((a + b).to_string())
-    }
-
-    /// A Python module implemented in Rust. The name of this function must match
-    /// the `lib.name` setting in the `Cargo.toml`, else Python will not be able to
-    /// import the module.
-    #[pymodule]
-    fn string_sum(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
-        m.add_function(wrap_pyfunction!(sum_as_string, m)?)?;
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -383,7 +294,7 @@ mod tests {
     use std::fs::File;
     use super::solution::*;
     use super::helpers::multi_index::{MULTI_INDEX_ZERO, MultiIndex};
-    use ndarray::{Array2, Array, s, array, Array4, stack, Array1};
+    use ndarray::{Array2, Array, s, array, Array4, stack};
     use itertools::Itertools;
 
     #[test]
@@ -400,31 +311,33 @@ mod tests {
 
     #[test]
     fn test_derivatives_and_integral() -> Result<(), Box<dyn Error>> {
-        // let sol = Solution::new(2);
-        // let t: Array1<Real> =  ndarray::Array::linspace(0., 15., 100);
-        // let h = t.mapv(f64::sin);
-        // let hs = sol.handle_h(t.view(), h.view());
-        // let mut hs_vec: Array2<Real> = Array2::zeros((h.len(), hs.len()));
-        // for (i, j) in (0..h.len() as i32).cartesian_product((-1)..(hs.len()-1) as i32) {
-        //     hs_vec[[i as usize, (j+1) as usize]] = hs.get(&j).unwrap()[i as usize];
-        // }
-        //
-        // // Write the array into the file.
-        // {
-        //     let file = File::create("data/test_derivatives_and_integral.csv")?;
-        //     let mut writer = WriterBuilder::new().has_headers(false).from_writer(file);
-        //     writer.serialize_array2(&hs_vec)?;
-        // }
+        let sol = Solution::new(2);
+        let t: Array2<Real> =  ndarray::Array::linspace(0., 15., 100)
+                .into_shape((100, 1)).unwrap();
+        let h = t.mapv(f64::sin);
+        let hs = sol.handle_h(t.view(), h.view());
+        let mut hs_vec: Array2<Real> = Array2::zeros((h.len(), hs.len()));
+        for (i, j) in (0..h.len() as i32).cartesian_product((-1)..(hs.len()-1) as i32) {
+            hs_vec[[i as usize, (j+1) as usize]] = hs.get(&j).unwrap().column(0)[i as usize];
+        }
+
+        // Write the array into the file.
+        {
+            let file = File::create("data/test_derivatives_and_integral.csv")?;
+            let mut writer = WriterBuilder::new().has_headers(false).from_writer(file);
+            writer.serialize_array2(&hs_vec)?;
+        }
         Ok(())
     }
 
     #[test]
     fn test() {
         let sol = Solution::new(2);
-        let x1: Array1<Real> = array![1., 1., 0.];
-        let x2: Array1<Real> = array![0., 1., 0.];
-        let x3: Array1<Real> = array![0., 0., 1.];
-        let t: Array1<Real> =  ndarray::Array::linspace(0., 10., 50);
+        let x1: Array2<Real> = ndarray::array![[1., 1., 0.]];
+        let x2: Array2<Real> = ndarray::array![[0., 1., 0.]];
+        let x3: Array2<Real> = ndarray::array![[0., 0., 1.]];
+        let t: Array2<Real> =  ndarray::Array::linspace(0., 10., 50)
+            .into_shape((50, 1)).unwrap();
         let h = t.mapv(f64::sin);
         let mut current_moment = Array4::zeros((3, 5, 5, 5));
         current_moment[[2, 0, 0, 0]] = 1.;
