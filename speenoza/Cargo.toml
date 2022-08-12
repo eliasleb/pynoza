@@ -22,7 +22,7 @@ csv = "1.1.6"
 itertools = "0.10.3"
 factorial = "0.2.1"
 pyo3 = "0.16.5"
-
+numpy = "0.16.2"
 
 [features]
 extension-module = ["pyo3/extension-module"]

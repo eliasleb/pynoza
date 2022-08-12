@@ -181,6 +181,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "numpy"
+version = "0.16.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "383ae168529a39fc97cbc1d9d4fa865377731a519bc27553ed96f50594de7c45"
+dependencies = [
+ "libc",
+ "ndarray",
+ "num-complex",
+ "num-traits",
+ "pyo3",
+]
+
+[[package]]
 name = "once_cell"
 version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -340,6 +353,7 @@ dependencies = [
  "itertools",
  "ndarray",
  "ndarray-csv",
+ "numpy",
  "pyo3",
 ]
 

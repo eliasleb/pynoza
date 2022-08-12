@@ -11,6 +11,7 @@ pub mod solution {
                   Dim, Ix, Array1, ArrayView1, ArrayViewMut1, Array3, s};
     use std::iter::FromIterator;
     use pyo3::prelude::*;
+    use numpy::{PyArray3, PyArray1, PyArray4};
 
 
     pub type Real = f64;
@@ -154,15 +155,23 @@ pub mod solution {
             let hs = self.handle_h(t, h);
             let (hs_integral, hs_derivative)
                 = self.repack_hs(hs);
+            let charge_moment = self.get_charge_moment(current_moment.view());
 
             let mut e_field = Array3::zeros((3, t.len(), x1.len()));
             for index in MultiIndexRange::new(MULTI_INDEX_ZERO, self.max_order) {
-                let cms = current_moment.slice(s![.., index.i, index.j, index.k]).clone();
+                let current_ms = current_moment.slice(s![.., index.i, index.j, index.k]).clone();
+                let charge_ms = charge_moment.slice(s![.., index.i, index.j, index.k]).clone();
 
-                e_field = e_field + self.get_single_term_multipole(index,
-                                                                   Array::from_iter(cms.iter().cloned()).view(),
-                                                                   t,&hs_derivative, x1, x2, x3, r.view());
+                e_field = e_field
+                    + self.get_single_term_multipole(index,
+                                   Array::from_iter(current_ms.iter().cloned()).view(),
+                                   t,&hs_derivative, x1, x2, x3, r.view())
+                    + self.get_single_term_multipole(index,
+                                                     Array::from_iter(charge_ms.iter().cloned()).view(),
+                                                     t,&hs_integral, x1, x2, x3, r.view());
+
             }
+
             e_field
         }
 
@@ -205,7 +214,7 @@ pub mod solution {
             let mut y = Array1::zeros(x.len());
             let mut sum: Real = 0.;
 
-            for (i, (yi, xi)) in y.iter_mut().zip(x.iter()).enumerate() {
+            for (yi, xi) in y.iter_mut().zip(x.iter()) {
                 *yi = sum;
                 sum += xi * dt;
             }
@@ -215,7 +224,7 @@ pub mod solution {
         fn radius(x1: ArrayView1<Real>, x2: ArrayView1<Real>, x3: ArrayView1<Real>) -> Array1<Real> {
             let mut r = Array1::zeros(x1.len());
             Zip::from(&mut r).and(&x1).and(&x2).and(&x3)
-                .apply(|r, &x1, &x2, &x3 | {
+                .for_each(|r, &x1, &x2, &x3 | {
                     *r = f64::sqrt(x1 * x1 + x2 * x2 + x3 * x3)
                 });
             r
@@ -362,12 +371,35 @@ pub mod solution {
         Ok((a + b).to_string())
     }
 
-    //// A Python module implemented in Rust. The name of this function must match
-    //// the `lib.name` setting in the `Cargo.toml`, else Python will not be able to
-    //// import the module.
+    fn convert(x: &PyArray1<Real>) -> ArrayView1<Real> {
+        unsafe { x.as_array() }
+    }
+
+    /// Computes the electric field.
+    #[pyfunction]
+    fn multipole_e_field<'a>(x1: &'a PyArray1<Real>, x2: &PyArray1<Real>, x3: &PyArray1<Real>,
+                         t: &PyArray1<Real>, h: &PyArray1<Real>, current_moment: &PyArray4<Real>)
+        -> PyResult<&'a PyArray3<Real>> {
+        let py = x1.py();
+        let max_order = (current_moment.shape()[1] - 1) as i32;
+        let sol = Solution::new(max_order);
+        let x1 = convert(x1);
+        let x2 = convert(x2);
+        let x3 = convert(x3);
+        let t = convert(t);
+        let h = convert(h);
+        let current_moment = unsafe { current_moment.as_array() };
+
+        let e_field = sol.compute_e_field(x1, x2, x3, t, h, current_moment);
+        let e_field = PyArray3::from_array(py, &e_field);
+
+        Ok(e_field)
+    }
+
+    /// A Python wrapper around the crate.
     #[pymodule]
-    fn speenoza(_py: Python, _module: &PyModule) -> PyResult<()> {
-        //m.add_function(wrap_pyfunction!(sum_as_string, m)?)?;
+    fn speenoza(_py: Python, module: &PyModule) -> PyResult<()> {
+        module.add_function(wrap_pyfunction!(multipole_e_field, module)?)?;
         Ok(())
     }
 }
