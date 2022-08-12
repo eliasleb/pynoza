@@ -7,10 +7,10 @@ pub mod solution {
     use std::collections::{HashMap, HashSet};
     use std::hash::Hash;
     use std::cmp::{Eq};
-    use ndarray::{Array, Array2, ArrayView2, ArrayViewMut2, ArrayView4, Array4, ArrayViewMut4, Zip,
-                  Dim, Ix, Array1, ArrayView1, ArrayViewMut1, Array3, s};
-    use std::iter::FromIterator;
+    use ndarray::{Array, ArrayView4, Array4, Zip,
+                  Array1, ArrayView1, Array3, s};
     use pyo3::prelude::*;
+    use pyo3::exceptions;
     use numpy::{PyArray3, PyArray1, PyArray4};
 
 
@@ -381,6 +381,19 @@ pub mod solution {
                          t: &PyArray1<Real>, h: &PyArray1<Real>, current_moment: &PyArray4<Real>)
         -> PyResult<&'a PyArray3<Real>> {
         let py = x1.py();
+        let len_x = x1.len();
+        if x2.len() != x1.len() || x3.len() != x1.len() || x2.len() != x3.len() {
+            let err: PyErr = PyErr::new::<exceptions::PyValueError, _>(
+                String::from("x1, x2 and x3 must have the same length"));
+            return Err(err)
+        }
+        if t.len() != h.len() {
+            let err: PyErr = PyErr::new::<exceptions::PyValueError, _>(
+                String::from("h, t must have the same length"));
+            return Err(err)
+        }
+
+
         let max_order = (current_moment.shape()[1] - 1) as i32;
         let sol = Solution::new(max_order);
         let x1 = convert(x1);
@@ -406,17 +419,9 @@ pub mod solution {
 
 #[cfg(test)]
 mod tests {
-    extern crate csv;
-    extern crate ndarray_csv;
-
-    use csv::{ReaderBuilder, WriterBuilder};
-    use ndarray_csv::{Array2Reader, Array2Writer};
-    use std::error::Error;
-    use std::fs::File;
     use super::solution::*;
     use super::helpers::multi_index::{MULTI_INDEX_ZERO, MultiIndex};
-    use ndarray::{Array2, Array, s, array, Array4, stack, Array1};
-    use itertools::Itertools;
+    use ndarray::{Array, array, Array4, Array1};
 
     #[test]
     fn test_auxiliary_function() {
@@ -431,26 +436,6 @@ mod tests {
     }
 
     #[test]
-    fn test_derivatives_and_integral() -> Result<(), Box<dyn Error>> {
-        // let sol = Solution::new(2);
-        // let t: Array1<Real> =  ndarray::Array::linspace(0., 15., 100);
-        // let h = t.mapv(f64::sin);
-        // let hs = sol.handle_h(t.view(), h.view());
-        // let mut hs_vec: Array2<Real> = Array2::zeros((h.len(), hs.len()));
-        // for (i, j) in (0..h.len() as i32).cartesian_product((-1)..(hs.len()-1) as i32) {
-        //     hs_vec[[i as usize, (j+1) as usize]] = hs.get(&j).unwrap()[i as usize];
-        // }
-        //
-        // // Write the array into the file.
-        // {
-        //     let file = File::create("data/test_derivatives_and_integral.csv")?;
-        //     let mut writer = WriterBuilder::new().has_headers(false).from_writer(file);
-        //     writer.serialize_array2(&hs_vec)?;
-        // }
-        Ok(())
-    }
-
-    #[test]
     fn test() {
         let sol = Solution::new(2);
         let x1: Array1<Real> = array![1., 1., 0.];
@@ -460,7 +445,7 @@ mod tests {
         let h = t.mapv(f64::sin);
         let mut current_moment = Array4::zeros((3, 5, 5, 5));
         current_moment[[2, 0, 0, 0]] = 1.;
-        let e_field = sol.compute_e_field(x1.view(), x2.view(), x3.view(),
+        let _e_field = sol.compute_e_field(x1.view(), x2.view(), x3.view(),
                                           t.view(), h.view(), current_moment.view());
 
     }

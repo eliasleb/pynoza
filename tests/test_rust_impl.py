@@ -1,3 +1,4 @@
+import pytest
 import speenoza
 import numpy as np
 import pynoza
@@ -15,6 +16,23 @@ def test_syntax():
     moment[2, 0, 0, 0] = 1.
     sol = speenoza.multipole_e_field(x1, x2, x3, t, h, moment)
 
+
+def test_inputs():
+    x1 = np.array([1, 0, ], dtype=float)
+    x2 = np.array([0, 0, 0, ], dtype=float)
+    x3 = np.array([0, 0, 0, ], dtype=float)
+    t = np.linspace(0, 10, 10, dtype=float)
+    h = np.sin(2 * np.pi * t)
+    moment = np.zeros((3, 1, 1, 1, ))
+    moment[2, 0, 0, 0] = 1.
+
+    with pytest.raises(ValueError):
+        speenoza.multipole_e_field(x1, x2, x3, t, h, moment)
+
+    x1 = np.array([1, 0, 0, ], dtype=float)
+    h = h[1:]
+    with pytest.raises(ValueError):
+        speenoza.multipole_e_field(x1, x2, x3, t, h, moment)
 
 
 if __name__ == "__main__":
