@@ -21,5 +21,11 @@ ndarray-csv = "0.5.1"
 csv = "1.1.6"
 itertools = "0.10.3"
 factorial = "0.2.1"
-pyo3 = { version = "0.16.5", features = ["extension-module"] }
+pyo3 = "0.16.5"
+
+
+[features]
+extension-module = ["pyo3/extension-module"]
+default = ["extension-module"]
+
 
