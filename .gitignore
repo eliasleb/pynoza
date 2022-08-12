@@ -5,7 +5,7 @@ src/pynoza/*.so
 src/pynoza/*.c
 env/
 rust/target/
-
+target/
 build/
 
 tests/data/order*
