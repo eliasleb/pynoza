@@ -2,17 +2,19 @@ pub mod helpers;
 
 
 pub mod solution {
+    extern crate rayon;
+
     use crate::helpers::multi_index::*;
     use std::ops::{Index, IndexMut};
     use std::collections::{HashMap, HashSet};
     use std::hash::Hash;
     use std::cmp::{Eq};
     use ndarray::{Array, ArrayView4, Array4, Zip,
-                  Array1, ArrayView1, Array3, s};
+                  Array1, ArrayView1, Array3};
     use pyo3::prelude::*;
     use pyo3::exceptions;
     use numpy::{PyArray3, PyArray1, PyArray4};
-
+    use rayon::prelude::*;
 
     pub type Real = f64;
 
@@ -43,7 +45,7 @@ pub mod solution {
         fn recurse(&mut self) {
             for order in 1..=self.max_order {
                 for index in MultiIndexRange::new(MULTI_INDEX_ZERO,
-                                                  (self.max_order as u32).try_into().unwrap())
+                                                  MultiIndexRange::stop(self.max_order))
                     .into_iter() {
                     if index.order() != order {
                         continue;
@@ -116,34 +118,6 @@ pub mod solution {
             stuff.join(" + ")
         }
 
-        // fn evaluate(&self, index: MultiIndex, t: ArrayView1<Real>, hs: HashMap<i32, Array1<Real>>,
-        //             x1: ArrayView1<Real>, x2: ArrayView1<Real>, x3: ArrayView1<Real>,
-        //             r: ArrayView1<Real>) -> Array2<Real> {
-        //     let mut ret: Array2<Real> = Array2::zeros((t.len(), x1.len()));
-        //     for (signature, coefficient,) in self.aux_fun.get(&index)
-        //         .unwrap().iter() {
-        //         for i_t in 0..t.len() {
-        //             for i_x in 0..x1.len() {
-        //                 ret[[i_t, i_x]] += hs.get(&signature.h).unwrap()[i_t] * coefficient
-        //                 * match signature.x1  {
-        //                     pow if pow > 0 => x1[i_x].powi(pow),
-        //                     _ => 1.
-        //                 } * match signature.x2  {
-        //                     pow if pow > 0 => x2[i_x].powi(pow),
-        //                     _ => 1.
-        //                 } * match signature.x3  {
-        //                     pow if pow > 0 => x3[i_x].powi(pow),
-        //                     _ => 1.
-        //                 } * match signature.r  {
-        //                     pow if pow > 0 => 1. / r[i_x].powi(pow),
-        //                     _ => 1.
-        //                 }
-        //             }
-        //         }
-        //     }
-        //     ret
-        // }
-
         pub fn compute_e_field(&self,
                                x1: ArrayView1<Real>,
                                x2: ArrayView1<Real>,
@@ -151,27 +125,40 @@ pub mod solution {
                                t: ArrayView1<Real>,
                                h: ArrayView1<Real>,
                                current_moment: ArrayView4<Real>) -> Array3<Real> {
+            let thresh = 1e-12;
+            let moment_zero: Array1<Real> = Array1::zeros(3);
             let r = Self::radius(x1, x2, x3);
             let hs = self.handle_h(t, h);
-            let (hs_integral, hs_derivative)
-                = self.repack_hs(hs);
+            let mut hs_combined = HashMap::new();
+            for order in 0..=self.max_order {
+                hs_combined.insert(
+                    order,
+                    hs.get(&(order - 1)).unwrap() + hs.get(&(order + 1)).unwrap());
+            }
             let charge_moment = self.get_charge_moment(current_moment.view());
 
             let mut e_field = Array3::zeros((3, t.len(), x1.len()));
-            for index in MultiIndexRange::new(MULTI_INDEX_ZERO, self.max_order) {
-                let current_ms = current_moment.slice(s![.., index.i, index.j, index.k]).clone();
-                let charge_ms = charge_moment.slice(s![.., index.i, index.j, index.k]).clone();
 
-                e_field = e_field
-                    + self.get_single_term_multipole(index,
-                                   Array::from_iter(current_ms.iter().cloned()).view(),
-                                   t,&hs_derivative, x1, x2, x3, r.view())
-                    + self.get_single_term_multipole(index,
-                                                     Array::from_iter(charge_ms.iter().cloned()).view(),
-                                                     t,&hs_integral, x1, x2, x3, r.view());
-
+            let e_field_elems: Vec<Array3<Real>> = MultiIndexRange::new(
+                MULTI_INDEX_ZERO,
+                MultiIndexRange::stop(self.max_order))
+                .into_iter()
+                .par_bridge().map(|index| {
+                let mut moment = Array1::zeros(3);
+                for dim in 0..moment.len() {
+                    moment[dim] = current_moment[[dim, index.i as usize, index.j as usize, index.k as usize]]
+                        + charge_moment[[dim, index.i as usize, index.j as usize, index.k as usize]];
+                }
+                if !moment_zero.abs_diff_eq(&moment, thresh) {
+                    self.get_single_term_multipole(
+                        index, moment.view(), t, &hs_combined, x1, x2, x3, r.view())
+                } else {
+                    Array3::zeros((3, t.len(), x1.len()))
+                }
+            }).collect();
+            for element in e_field_elems {
+                e_field = e_field + element;
             }
-
             e_field
         }
 
@@ -181,24 +168,24 @@ pub mod solution {
             let dt = t[1] - t[0];
             hs.insert(-1, Self::antiderivative(dt, h.view()));
             let mut derivative = Self::derivative(dt, h.view());
-            for order in 1..=self.max_order + 2 {
+            for order in 1..=(self.max_order + 2) {
                 hs.insert(order, derivative.clone());
                 derivative = Self::derivative(dt, derivative.view());
             }
             hs
         }
 
-        fn repack_hs(&self, hs: HashMap<i32, Array1<Real>>) -> (HashMap<i32, Array1<Real>>,
-                                                                HashMap<i32, Array1<Real>>) {
-            let mut hs_integral: HashMap<i32, Array1<Real>> = HashMap::new();
-            let mut hs_derivative: HashMap<i32, Array1<Real>> = HashMap::new();
-            for order in 0..self.max_order + 1 {
-                hs_integral.insert(order, hs.get(&(order - 1)).unwrap().clone());
-                hs_derivative.insert(order, hs.get(&(order + 1)).unwrap().clone());
-            }
-
-            (hs_integral, hs_derivative)
-        }
+        // fn repack_hs(&self, hs: HashMap<i32, Array1<Real>>) -> (HashMap<i32, Array1<Real>>,
+        //                                                         HashMap<i32, Array1<Real>>) {
+        //     let mut hs_integral: HashMap<i32, Array1<Real>> = HashMap::new();
+        //     let mut hs_derivative: HashMap<i32, Array1<Real>> = HashMap::new();
+        //     for order in 0..=(self.max_order + 1) {
+        //         hs_integral.insert(order, hs.get(&(order - 1)).unwrap().clone());
+        //         hs_derivative.insert(order, hs.get(&(order + 1)).unwrap().clone());
+        //     }
+        //
+        //     (hs_integral, hs_derivative)
+        // }
 
         fn derivative(dt: Real, x: ArrayView1<Real>) -> Array1<Real> {
             let mut y = Array1::zeros(x.len());
@@ -231,10 +218,10 @@ pub mod solution {
         }
 
         pub fn get_charge_moment(&self, current_moment: ArrayView4<Real>) -> Array4<Real> {
-            let dim = (self.max_order + 1) as usize;
+            let dim = usize::try_from(self.max_order + 1).unwrap();
             let mut charge_moment: Array4<Real> = Array::zeros((3, dim, dim, dim));
             for i in 0..3 {
-                for a in MultiIndexRange::new(MULTI_INDEX_ZERO, self.max_order) {
+                for a in MultiIndexRange::new(MULTI_INDEX_ZERO, MultiIndexRange::stop(self.max_order)) {
                     let (a1, a2, a3) = (a.i, a.j, a.k);
                     for j in 0..3 {
                         let mut b = a.clone();
@@ -284,7 +271,7 @@ pub mod solution {
                             } * match signature.r  {
                                 pow if pow > 0 => 1. / r[i_x].powi(pow),
                                 _ => 1.
-                            } * f64::powi(-1., index.order()) / (index.factorial() as f64)
+                            } * f64::powi(-1., index.order()) / (index.factorial().unwrap() as f64)
                                 * moment[dim];
                         }
                     }
@@ -365,12 +352,6 @@ pub mod solution {
         r: i32
     }
 
-    /// Formats the sum of two numbers as string.
-    #[pyfunction]
-    fn sum_as_string(a: usize, b: usize) -> PyResult<String> {
-        Ok((a + b).to_string())
-    }
-
     fn convert(x: &PyArray1<Real>) -> ArrayView1<Real> {
         unsafe { x.as_array() }
     }
@@ -381,7 +362,6 @@ pub mod solution {
                          t: &PyArray1<Real>, h: &PyArray1<Real>, current_moment: &PyArray4<Real>)
         -> PyResult<&'a PyArray3<Real>> {
         let py = x1.py();
-        let len_x = x1.len();
         if x2.len() != x1.len() || x3.len() != x1.len() || x2.len() != x3.len() {
             let err: PyErr = PyErr::new::<exceptions::PyValueError, _>(
                 String::from("x1, x2 and x3 must have the same length"));
@@ -409,7 +389,7 @@ pub mod solution {
         Ok(e_field)
     }
 
-    /// A Python wrapper around the crate.
+    /// A Python wrapper around the rust implementation.
     #[pymodule]
     fn speenoza(_py: Python, module: &PyModule) -> PyResult<()> {
         module.add_function(wrap_pyfunction!(multipole_e_field, module)?)?;

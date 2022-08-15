@@ -1,5 +1,6 @@
 pub mod multi_index {
     extern crate factorial;
+    extern crate rayon;
 
     use std::ops::{Add, Index, IndexMut, Neg, Sub};
     use std::hash::Hash;
@@ -11,6 +12,21 @@ pub mod multi_index {
         i: 0,
         j: 0,
         k: 0,
+    };
+    pub static MULTI_INDEX_EI: MultiIndex = MultiIndex {
+        i: 1,
+        j: 0,
+        k: 0,
+    };
+    pub static MULTI_INDEX_EJ: MultiIndex = MultiIndex {
+        i: 0,
+        j: 1,
+        k: 0,
+    };
+    pub static MULTI_INDEX_EK: MultiIndex = MultiIndex {
+        i: 0,
+        j: 0,
+        k: 1,
     };
 
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -83,10 +99,10 @@ pub mod multi_index {
         pub fn first_non_zero_dim(&self) -> Result<i32, &'static str> {
             for dim in 0..3 {
                 if self[dim] > 0 {
-                    return Result::Ok(dim)
+                    return Ok(dim)
                 }
             }
-            Result::Err("Multi-index has no zero dimension")
+            Err("Multi-index has no zero dimension")
         }
 
         pub fn order(&self) -> i32 {
@@ -102,8 +118,24 @@ pub mod multi_index {
             }
         }
 
-        pub fn factorial(&self) -> u32 {
-            (self.i as u32).factorial() * (self.j as u32).factorial() * (self.k as u32).factorial()
+        pub fn factorial(&self) -> Result<u64, String> {
+            match u64::try_from(self.i.abs()).unwrap().checked_factorial() {
+                Some(a) => match u64::try_from(self.j).unwrap().checked_factorial() {
+                    Some(b) => match u64::try_from(self.k).unwrap().checked_factorial() {
+                        Some(c) => Ok(a * b * c),
+                        None => Err(String::from("factorial overflows"))
+                    },
+                    None => Err(String::from("factorial overflows"))
+                },
+                None => Err(String::from("factorial overflows"))
+            }
+        }
+
+        pub fn from<'a, I: IntoIterator<Item=i32>>(is: I, js: I, ks: I) -> Vec<Self> {
+            is.into_iter().zip(js.into_iter()).zip(ks.into_iter())
+                .map( | ((i, j), k) | MultiIndex {
+                    i, j, k
+                } ).collect()
         }
     }
 
@@ -118,7 +150,8 @@ pub mod multi_index {
 
     pub struct MultiIndexIterator {
         index: MultiIndex,
-        max_order: i32,
+        stop: MultiIndex,
+        reached_stop: bool,
     }
 
     impl Iterator for MultiIndexIterator {
@@ -126,8 +159,15 @@ pub mod multi_index {
 
         fn next(&mut self) -> Option<Self::Item> {
             let next_index = match self {
-                MultiIndexIterator { index, max_order }
-                if index.order() > *max_order => return None,
+                MultiIndexIterator { index: _, stop: _, reached_stop}
+                    if *reached_stop => return None,
+                MultiIndexIterator { index, stop, ..}
+                    if index == stop => {
+                    self.reached_stop = true;
+                    return Some(MultiIndex {
+                        i: index.i, j: index.j, k: index.k
+                    })
+                },
                 MultiIndexIterator { index: MultiIndex { i: 0, j: 0, k }, .. } => Some(MultiIndex {
                     i: *k + 1,
                     j: 0,
@@ -155,16 +195,45 @@ pub mod multi_index {
         }
     }
 
+    #[derive(Copy, Clone)]
     pub struct MultiIndexRange {
         start: MultiIndex,
-        max_order: i32,
+        stop: MultiIndex,
     }
 
     impl MultiIndexRange {
-        pub fn new(start: MultiIndex, max_order: i32) -> MultiIndexRange {
+        pub fn new(start: MultiIndex, stop: MultiIndex) -> MultiIndexRange {
             MultiIndexRange {
                 start,
-                max_order
+                stop
+            }
+        }
+
+        pub fn stop(order: i32) -> MultiIndex {
+            MultiIndex {
+                i: 0,
+                j: 0,
+                k: order
+            }
+        }
+
+        pub fn splitter(range: Self) -> (Self, Option<Self>) {
+            if range.start.order() < range.stop.order() {
+                (MultiIndexRange {
+                    start: range.start,
+                    stop: MultiIndex {
+                        i: 0,
+                        j: 0,
+                        k: range.stop.order() - 1
+                    }
+                },
+                Some(MultiIndexRange {
+                    start: MultiIndex {
+                        i: range.stop.order(), j: 0, k: 0
+                    },
+                    stop: range.stop}))
+            } else {
+                (range, None)
             }
         }
     }
@@ -176,13 +245,14 @@ pub mod multi_index {
         fn into_iter(self) -> Self::IntoIter {
             MultiIndexIterator {
                 index: self.start,
-                max_order: self.max_order,
+                stop: self.stop,
+                reached_stop: false,
             }
         }
     }
 
     pub fn panic_on_wrong_index(index: i32) -> ! {
-        panic!("given index: {index} must be 0, 1 or 2")
+        panic!("given index: {} must be 0, 1 or 2", index)
     }
 
 }
@@ -190,6 +260,8 @@ pub mod multi_index {
 mod tests {
     use super::multi_index::*;
     use std::iter::*;
+    use rayon::prelude::*;
+    use std::collections::HashSet;
 
     #[test]
     fn add_multi_indices() {
@@ -200,7 +272,7 @@ mod tests {
 
     #[test]
     fn test_iteration() {
-        let indices: Vec<MultiIndex> = MultiIndexRange::new(MULTI_INDEX_ZERO, 1)
+        let indices: Vec<MultiIndex> = MultiIndexRange::new(MULTI_INDEX_ZERO, MultiIndexRange::stop(1))
             .into_iter().collect();
         let is = vec![0, 1, 0, 0];
         let js = vec![0, 0, 1, 0];
@@ -213,5 +285,41 @@ mod tests {
             indices,
             indices_true
         );
+    }
+
+    #[test]
+    fn test_iteration_same_order() {
+        let indices: Vec<MultiIndex> = MultiIndexRange::new(MultiIndex {
+            i: 2, j: 0, k: 0
+        }, MultiIndex{
+            i: 0, j: 2, k: 0
+        }).into_iter().collect();
+
+        let is = vec![2, 1, 0];
+        let js = vec![0, 1, 2];
+        let ks = vec![0, 0, 0];
+        let indices_true = MultiIndex::from(is, js, ks);
+        assert_eq!(
+            indices,
+            indices_true
+        );
+    }
+
+    #[test]
+    fn test_parallel_iteration() {
+        let is = vec![0, 1, 0, 0, 2, 1, 0, 1, 0, 0, ];
+        let js = vec![0, 0, 1, 0, 0, 1, 2, 0, 1, 0, ];
+        let ks = vec![0, 0, 0, 1, 0, 0, 0, 1, 1, 2, ];
+        let indices_true: HashSet<MultiIndex> = HashSet::from_iter(MultiIndex::from(is, js, ks).iter().cloned());
+        let indices: HashSet<MultiIndex> = MultiIndexRange::new(
+            MULTI_INDEX_ZERO,
+            MultiIndexRange::stop(2)
+        ).into_iter().par_bridge().collect();
+
+        assert_eq!(
+            indices_true,
+            indices
+        )
+
     }
 }
