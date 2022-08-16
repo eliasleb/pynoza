@@ -83,10 +83,11 @@ def postprocessing_mikheev(*args):
     x1, x2, x3 = data["x1"], data["x2"], data["x3"]
     x1, x2, x3 = np.array(x1), np.array(x2), np.array(x3)
 
-    n_added = 3
-    r = 8 * x2.max()
-    t = np.concatenate((t, np.linspace(t[-1], t[-1] + n_added * t[-1], n_added * t.size)))
-    h = np.concatenate((h, np.zeros(n_added * h.size)))
+
+    n_added = 0
+    r = 2 * x2.max()
+    #t = np.concatenate((t, np.linspace(t[-1], t[-1] + n_added * t[-1], int(n_added * t.size))))
+    #h = np.concatenate((h, np.zeros(t.size - h.size)))
     import synthetic
     synthetic.plot_directivity(sol, r, h, t)
 
@@ -131,12 +132,12 @@ def postprocessing(**kwargs):
 
         print(f"{center=}")
 
-    order = current_moment.shape[0] - 1
+    order = current_moment.shape[1] - 1
     sol = pynoza.Solution(max_order=order)
     sol.recurse()
     charge_moment = inverse_problem.get_charge_moment(current_moment)
-    current_moment_lambda = lambda a1, a2, a3: list(current_moment[a1, a2, a3, :])
-    charge_moment_lambda = lambda a1, a2, a3: list(charge_moment[a1, a2, a3, :])
+    current_moment_lambda = lambda a1, a2, a3: list(current_moment[:, a1, a2, a3])
+    charge_moment_lambda = lambda a1, a2, a3: list(charge_moment[:, a1, a2, a3])
     sol.set_moments(current_moment=current_moment_lambda, charge_moment=charge_moment_lambda)
 
     match kwargs["case"]:

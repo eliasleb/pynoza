@@ -134,7 +134,7 @@ pub mod solution {
             let dt = t[1] - t[0];
             let mut e_field = Array3::zeros((3, t.len(), x1.len()));
 
-            let e_field_elems: Vec<Array3<Real>> = MultiIndexRange::new(
+            let e_field_elems: Vec<Option<Array3<Real>>> = MultiIndexRange::new(
                 MULTI_INDEX_ZERO,
                 MultiIndexRange::stop(self.max_order))
                 .into_iter()
@@ -145,7 +145,7 @@ pub mod solution {
                         .slice(s!(.., index.i, index.j, index.k));
                     if !moment_zero.abs_diff_eq(&current_moment_slice, thresh) ||
                         !moment_zero.abs_diff_eq(&charge_moment_slice, thresh) {
-                        self.get_single_term_multipole(
+                        Some(self.get_single_term_multipole(
                             index,
                             current_moment_slice,
                             charge_moment_slice,
@@ -154,13 +154,16 @@ pub mod solution {
                             &hs_integral,
                             x1.view(), x2.view(),
                             x3.view(), r.view()
-                        )
+                        ))
                     } else {
-                        Array3::zeros((3, t.len(), x1.len()))
+                        None
                 }
             }).collect();
             for element in e_field_elems {
-                e_field = e_field + element;
+                match element {
+                    Some(e) => { e_field = e_field + e; }
+                    None => {}
+                }
             }
             - 1e-7 * e_field
         }
@@ -397,7 +400,8 @@ pub mod solution {
         let h = convert(h);
         let current_moment = unsafe { current_moment.as_array() };
 
-        let e_field = sol.compute_e_field(x1, x2, x3, t, h, current_moment);
+        let e_field = py.allow_threads(||
+            sol.compute_e_field(x1, x2, x3, t, h, current_moment));
         let e_field = PyArray3::from_array(py, &e_field);
 
         Ok(e_field)

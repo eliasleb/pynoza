@@ -48,14 +48,14 @@ def plot_simple_field():
     with pynoza.PlotAndWait():
         plt.plot(t, h)
     plt.clf()
-    dim = 4
+    dim = 3
     moment = np.zeros((3, dim, dim, dim, ))
     moment[2, 0, 0, 0] = 1.
     field1 = speenoza.multipole_e_field(x1, x2, x3, t, h, moment)
     current_moment = np.zeros((dim, dim, dim, 3))
     for i, j, k, dim in itertools.product(range(dim), range(dim), range(dim), range(3)):
         current_moment[i, j, k, dim] = moment[dim, i, j, k]
-    sol = pynoza.Solution(max_order=3, wave_speed=1)
+    sol = pynoza.Solution(max_order=dim - 1, wave_speed=1)
     sol.recurse()
     charge_moment = inverse_problem.get_charge_moment(current_moment)
     sol.set_moments(charge_moment=lambda a1, a2, a3: list(charge_moment[a1, a2, a3, :]),
@@ -69,7 +69,6 @@ def plot_simple_field():
     ddp = np.concatenate((np.diff(dp, axis=0) / dt, np.zeros((1, 1))))
     r = np.sqrt(x1**2 + x2**2 + x3**2).reshape((1, x1.size))
     field3 = -1 / 4 / np.pi * (p / r**2 + dp / r + ddp) * 1.4e-6 * 7.17 / 8.02
-
     with pynoza.PlotAndWait():
         plt.plot(p)
         plt.plot(dp)

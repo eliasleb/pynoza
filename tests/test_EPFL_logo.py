@@ -73,8 +73,11 @@ def c_r(a1, a2, a3, x1, x2, w, h):
     return int_r(x1, w, a1) * int_j(x2, h, a2)
 
 
-@pytest.mark.parametrize("test_case, order", [("logo", 8), ("disc", 24), ("logo_num", 8)])
-def test_solution(test_case, order, plot=False):
+@pytest.mark.parametrize("test_case, order, method", [
+    ("logo", 8, "python"),
+    ("disc", 24, "python"),
+    ("logo_num", 8, "python")])
+def test_solution(test_case, order, method, plot=False):
     """
     Test the pynoza :solution: class by comparing
     with either COMSOL simulation (case_="logo") or
@@ -190,7 +193,7 @@ def test_solution(test_case, order, plot=False):
     h_sym = (3*gamma_SI*sympy.sqrt(np.pi/2))**-.5\
         * sympy.exp(-((t_sym-3*gamma)/gamma)**2)*(4*((t_sym-3*gamma)/gamma)**2-2)
 
-    if num:
+    if num or method == "rust":
         h_sym = sympy.lambdify(t_sym, h_sym)(t)
 
     sol = pynoza.solution.Solution(max_order=order,
@@ -200,16 +203,38 @@ def test_solution(test_case, order, plot=False):
                     charge_moment=charge_moment)
     match case_:
         case "logo":
-            E = sol.compute_e_field(x1, x2, x3, t,
-                                    h_sym, t_sym,
-                                    verbose=False)
+            match method:
+                case "python":
+                    E = sol.compute_e_field(x1, x2, x3, t,
+                                            h_sym, t_sym,
+                                            verbose=False)
+                case "rust":
+                    import speenoza
+                    current_moment_array = np.zeros((3, order + 3, order + 3, order + 3))
+                    for dim, a1, a2, a3 in itertools.product(range(3), *(range(order + 3), ) * 3):
+                        current_moment_array[dim, a1, a2, a3] = current_moment(a1, a2, a3)[dim]
+                    _x1, _x2, _x3 = [], [], []
+                    for x, y, z in itertools.product(x1, x2, x3):
+                        _x1.append(x)
+                        _x2.append(y)
+                        _x3.append(z)
+                    x1, x2, x3 = np.array(_x1), np.array(_x2), np.array(_x3)
+                    E = speenoza.multipole_e_field(x1.astype("float64").flatten(),
+                                                   x2.astype("float64").flatten(),
+                                                   x3.astype("float64").flatten(),
+                                                   t.astype("float64").flatten(),
+                                                   h_sym.astype("float64").flatten(),
+                                                   current_moment_array.astype("float64")).swapaxes(1, 2)
         case "disc":
             E = sol.compute_e_field(x1, x2, x3, t,
                                     h_sym, t_sym,
                                     verbose=False,
                                     delayed=False)
-
-    E1 = E[0, :, :, :, :]
+    match method:
+        case "python":
+            E1 = E[0, :, :, :, :]
+        case "rust":
+            E1 = E[0, :, :].reshape((1, 1, x3.size, t.size))
 
     match case_:
         case "logo":
@@ -272,5 +297,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--order", metavar="order", type=int, required=True)
     parser.add_argument("--case", metavar="case", type=str, choices=["logo", "logo_num", "disc"], required=True)
+    parser.add_argument("--method", metavar="method", type=str, choices=["python", "rust"], required=True)
+
     args = parser.parse_args()
-    test_solution(args.case, args.order, plot=True)
+    test_solution(args.case, args.order, args.method, plot=True)

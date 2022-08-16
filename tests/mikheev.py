@@ -234,7 +234,7 @@ def mikheev(**kwargs):
               "estimate": estimate,
               "p": int(kwargs.get("norm"))}
 
-    shape_mom = (order + 3, order + 3, order + 3, 3)
+    shape_mom = (3, order + 3, order + 3, order + 3)
 
     def use_moment(a1, a2, a3):
         return a1 + a2 + a3 <= order and a2 % 2 == 1
@@ -247,14 +247,14 @@ def mikheev(**kwargs):
     def get_current_moment(moment_):
         current_moment_ = np.zeros(shape_mom)
         for i in range((order + 1) // 2):
-            current_moment_[0, 2 * i + 1, 0, 2] = moment_[i]
+            current_moment_[2, 0, 2 * i + 1, 0] = moment_[i]
         return current_moment_
         ind = 0
         for a1, a2, a3 in itertools.product(range(order + 1), repeat=3):
             if use_moment(a1, a2, a3):
                 # current_moment_[a1, a2, a3, 0] = moment_[ind]
                 # ind += 1
-                current_moment_[a1, a2, a3, 2] = moment_[ind]
+                current_moment_[2, a1, a2, a3] = moment_[ind]
                 ind += 1
             # if a1 + a2 + a3 <= order:
             #     current_moment_[a1, a2, a3, 1] = moment_[ind]

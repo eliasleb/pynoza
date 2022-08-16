@@ -190,7 +190,7 @@ def inverse_problem_hira(**kwargs):
               "max_global_tries": int(kwargs.get("max_global_tries", 1)),
               "compute_grid": False,
               "estimate": estimate}
-    shape_mom = (order + 2, order + 2, order + 2, 3)
+    shape_mom = (3, order + 2, order + 2, order + 2)
     dim_mom = 3 * sum([1 for i, j, k in
                        itertools.product(range(order + 1), range(order + 1), range(order + 1)) if i + j + k <= order])
 
@@ -199,7 +199,7 @@ def inverse_problem_hira(**kwargs):
         ind = 0
         for a1, a2, a3 in itertools.product(range(order + 1), range(order + 1), range(order + 1)):
             if a1 + a2 + a3 <= order:
-                current_moment_[a1, a2, a3, :] = moment[ind:ind + 3]
+                current_moment_[:, a1, a2, a3] = moment[ind:ind + 3]
                 ind += 3
         assert ind == moment.size
         return current_moment_

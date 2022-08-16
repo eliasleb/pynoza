@@ -6,6 +6,7 @@ import sympy
 import matplotlib.pyplot as plt
 import os
 from matplotlib import cm
+import speenoza
 
 
 def complement(*args):
@@ -32,32 +33,33 @@ def complement(*args):
 def get_charge_moment(current_moment):
     charge_moment = np.zeros(current_moment.shape)
     for ind, _ in np.ndenumerate(charge_moment):
-        a1, a2, a3, i = ind
+        i, a1, a2, a3 = ind
         a = (a1, a2, a3)
         for j in range(3):
             b = list(a)
             if i == j:
                 if a[j] >= 2:
                     b[j] = a[j] - 2
-                    charge_moment[a1, a2, a3, i] += a[j] * (a[j] - 1) \
-                        * current_moment[b[0], b[1], b[2], j]
+                    charge_moment[i, a1, a2, a3] += a[j] * (a[j] - 1) \
+                        * current_moment[j, b[0], b[1], b[2]]
             else:
                 b[i] -= 1
                 b[j] -= 1
                 if a[j] >= 1 and a[i] >= 1:
-                    charge_moment[a1, a2, a3, i] += a[j] * a[i] \
-                        * current_moment[b[0], b[1], b[2], j]
+                    charge_moment[i, a1, a2, a3] += a[j] * a[i] \
+                        * current_moment[j, b[0], b[1], b[2]]
     return -charge_moment
 
 
 def plot_moment(moment):
+    moment = moment.swapaxes(0, 1).swapaxes(1, 2).swapaxes(2, 3)
     fig = plt.figure()
     ax1 = fig.add_subplot(131, projection='3d')
     ax2 = fig.add_subplot(132, projection='3d')
     ax3 = fig.add_subplot(133, projection='3d')
     axes = [ax1, ax2, ax3]
 
-    order = moment.shape[0]
+    order = moment.shape[1]
     x1 = np.arange(order)
     x2 = np.arange(order)
     x3 = np.arange(order)
@@ -114,18 +116,30 @@ def inverse_problem(order, e_true, x1, x2, x3, t, t_sym, current_moment_callable
 
     def get_fields(current_moment, h_sym, t_sym, center):
 
-        c_mom = lambda a1, a2, a3: list(current_moment[a1, a2, a3])
+        #current_moment = current_moment.swapaxes(2, 3).swapaxes(1, 2).swapaxes(0, 1)
+        c_mom = lambda a1, a2, a3: list(current_moment[:, a1, a2, a3])
         charge_moment = get_charge_moment(current_moment)
-        r_mom = lambda a1, a2, a3: list(charge_moment[a1, a2, a3])
+        r_mom = lambda a1, a2, a3: list(charge_moment[:, a1, a2, a3])
 
         sol.set_moments(c_mom, r_mom)
         if find_center:
+            #return speenoza.multipole_e_field(x1.flatten() - center[0],
+            #                                  x2.flatten() - center[1],
+            #                                  x3.flatten() - center[2],
+            #                                  t.flatten(), h_sym.flatten(),
+            #                                  current_moment)
             return sol.compute_e_field(x1 - center[0],
                                        x2 - center[1],
                                        x3 - center[2],
                                        t,  h_sym, t_sym, compute_grid=compute_grid)
         else:
             return sol.compute_e_field(x1, x2, x3, t, h_sym, t_sym, compute_grid=compute_grid)
+            #return speenoza.multipole_e_field(x1.flatten(),
+            #                                  x2.flatten(),
+            #                                  x3.flatten(),
+            #                                  t.flatten(), h_sym.flatten(),
+            #                                  current_moment)
+
 
     center = np.zeros((3, ))
     current_moment = np.zeros((dim_moment, ))

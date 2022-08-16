@@ -4,20 +4,21 @@ import matplotlib.pyplot as plt
 import inverse_problem
 import scipy
 import scipy.interpolate
+import itertools
 
 
 def test_charge_moment_computation():
     # Moment of a dipole
     current_moment = np.zeros((3, 3, 3, 3))
-    current_moment[0, 0, 0, 2] = 1
+    current_moment[2, 0, 0, 0] = 1
     charge_moment = inverse_problem.get_charge_moment(current_moment)
     charge_moment_analytical = np.zeros((3, 3, 3, 3))
-    charge_moment_analytical[0, 0, 2, 2] = 2
+    charge_moment_analytical[2, 0, 0, 2] = 2
 
     for i in {0, 1}:
         a = [0, 0, 1]
         a[i] = 1
-        charge_moment_analytical[a[0], a[1], a[2], i] = 1
+        charge_moment_analytical[i, a[0], a[1], a[2]] = 1
     print(f"{charge_moment=}")
     print(f"{charge_moment_analytical=}")
     print(np.any(charge_moment != 0), np.any(charge_moment_analytical != 0))
@@ -39,9 +40,11 @@ def test_inverse_problem_simple():
     """
     Test the pynoza :solution: class by solving inverse problem on a dipole source
     """
-    x1 = np.array([-1, 1])
-    x2 = x1.copy()
-    x3 = x1.copy()
+    coords = [-1., 1.]
+    x1, x2, x3 = [], [], []
+    for x, y, z in itertools.product(*(coords, ) * 3):
+        x1.append(x), x2.append(y), x3.append(z)
+    x1, x2, x3 = np.array(x1), np.array(x2), np.array(x3)
 
     t = np.linspace(0, 20, 100)
     wavelength = 1
@@ -76,7 +79,7 @@ def test_inverse_problem_simple():
 
     def get_current_moment(moment):
         current_moment = np.zeros(shape_mom)
-        current_moment[0, 0, 0, :] = moment
+        current_moment[:, 0, 0, 0] = moment
         return current_moment
 
     e_true = direct_problem_simple(x1, x2, x3, t, h_true, order=order)
@@ -128,8 +131,8 @@ def direct_problem_simple(x1, x2, x3, t, h, order=2):
     sol = pynoza.solution.Solution(max_order=order)
     sol.recurse()
     sol.set_moments(charge_moment=charge_moment, current_moment=current_moment)
-    e = sol.compute_e_field(x1, x2, x3, t, h, None)
-    return e
+    e = sol.compute_e_field(x1, x2, x3, t, h, None, compute_grid=False)
+    return e.swapaxes(1, 2)
 
 
 if __name__ == "__main__":

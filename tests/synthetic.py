@@ -6,9 +6,9 @@ import inverse_problem
 
 
 def build_current_moment(order):
-    current_moment = np.zeros((order + 3, order + 3, order + 3, 3))
+    current_moment = np.zeros((3, order + 3, order + 3, order + 3))
     for i in range(order + 1):
-        current_moment[0, 0, i, 2] = (-1) ** i / (i + 1)
+        current_moment[2, 0, 0, i] = (-1) ** i / (i + 1)
     return current_moment
 
 
@@ -45,8 +45,8 @@ def synthetic_antenna():
     order = 11
     current_moment = build_current_moment(order)
     charge_moment = inverse_problem.get_charge_moment(current_moment)
-    current_moment_callable = lambda a1, a2, a3: list(current_moment[a1, a2, a3, :])
-    charge_moment_callable = lambda a1, a2, a3: list(charge_moment[a1, a2, a3, :])
+    current_moment_callable = lambda a1, a2, a3: list(current_moment[:, a1, a2, a3])
+    charge_moment_callable = lambda a1, a2, a3: list(charge_moment[:, a1, a2, a3])
 
     sol = pynoza.Solution(max_order=order + 2)
     sol.recurse()
