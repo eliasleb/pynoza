@@ -10,7 +10,7 @@ pub mod solution {
     use std::hash::Hash;
     use std::cmp::{Eq};
     use ndarray::{Array, ArrayView4, Array4, Zip,
-                  Array1, ArrayView1, Array3};
+                  Array1, ArrayView1, Array3, s};
     use pyo3::prelude::*;
     use pyo3::exceptions;
     use numpy::{PyArray3, PyArray1, PyArray4};
@@ -129,14 +129,9 @@ pub mod solution {
             let moment_zero: Array1<Real> = Array1::zeros(3);
             let r = Self::radius(x1, x2, x3);
             let hs = self.handle_h(t, h);
-            let mut hs_combined = HashMap::new();
-            for order in 0..=self.max_order {
-                hs_combined.insert(
-                    order,
-                    hs.get(&(order - 1)).unwrap() + hs.get(&(order + 1)).unwrap());
-            }
+            let (hs_integral, hs_derivative) = self.repack_hs(hs);
             let charge_moment = self.get_charge_moment(current_moment.view());
-
+            let dt = t[1] - t[0];
             let mut e_field = Array3::zeros((3, t.len(), x1.len()));
 
             let e_field_elems: Vec<Array3<Real>> = MultiIndexRange::new(
@@ -144,14 +139,22 @@ pub mod solution {
                 MultiIndexRange::stop(self.max_order))
                 .into_iter()
                 .par_bridge().map(|index| {
-                let mut moment = Array1::zeros(3);
-                for dim in 0..moment.len() {
-                    moment[dim] = current_moment[[dim, index.i as usize, index.j as usize, index.k as usize]]
-                        + charge_moment[[dim, index.i as usize, index.j as usize, index.k as usize]];
-                }
-                if !moment_zero.abs_diff_eq(&moment, thresh) {
+                let current_moment_slice = current_moment
+                    .slice(s!(.., index.i, index.j, index.k));
+                let charge_moment_slice = charge_moment
+                    .slice(s!(.., index.i, index.j, index.k));
+                if !moment_zero.abs_diff_eq(&current_moment_slice, thresh) ||
+                    !moment_zero.abs_diff_eq(&current_moment_slice, thresh) {
                     self.get_single_term_multipole(
-                        index, moment.view(), t, &hs_combined, x1, x2, x3, r.view())
+                        index,
+                        current_moment_slice,
+                        charge_moment_slice,
+                        t, dt,
+                        &hs_derivative,
+                        &hs_integral,
+                        x1.view(), x2.view(),
+                        x3.view(), r.view()
+                    )
                 } else {
                     Array3::zeros((3, t.len(), x1.len()))
                 }
@@ -159,8 +162,52 @@ pub mod solution {
             for element in e_field_elems {
                 e_field = e_field + element;
             }
-            e_field
+            - 1e-7 * e_field
         }
+
+        fn get_single_term_multipole(&self, index: MultiIndex,
+                                     current_moment: ArrayView1<Real>,
+                                     charge_moment: ArrayView1<Real>,
+                                     t: ArrayView1<Real>, dt: Real,
+                                     hs_derivative: &HashMap<i32, Array1<Real>>,
+                                     hs_integral: &HashMap<i32, Array1<Real>>,
+                                     x1: ArrayView1<Real>, x2: ArrayView1<Real>,
+                                     x3: ArrayView1<Real>, r: ArrayView1<Real>) -> Array3<Real> {
+            let mut ret = Array3::zeros((3, t.len(), x1.len()));
+            println!("{index:?} {current_moment:?} {charge_moment:?}");
+            for dim in 0..3 {
+                for (signature, coefficient,) in self.aux_fun.get(&index)
+                    .unwrap().iter() {
+                    for i_t in 0..t.len() {
+                        for i_x in 0..x1.len() {
+                            ret[[dim, i_t, i_x]] += {
+                                let i_t_delayed = match (i_t as i64) - (r[i_x] / dt) as i64 {
+                                    x if x >= 0 => x,
+                                    _ => 0
+                                } as usize;
+                                hs_derivative.get(&signature.h).unwrap()[i_t_delayed] * current_moment[dim]
+                                    + hs_integral.get(&signature.h).unwrap()[i_t_delayed] * charge_moment[dim]
+                            } * coefficient
+                                * match signature.x1  {
+                                pow if pow > 0 => x1[i_x].powi(pow),
+                                _ => 1.
+                            } * match signature.x2  {
+                                pow if pow > 0 => x2[i_x].powi(pow),
+                                _ => 1.
+                            } * match signature.x3  {
+                                pow if pow > 0 => x3[i_x].powi(pow),
+                                _ => 1.
+                            } * match signature.r  {
+                                pow if pow > 0 => 1. / r[i_x].powi(pow),
+                                _ => 1.
+                            } * f64::powi(-1., index.order()) / (index.factorial().unwrap() as f64);
+                        }
+                    }
+                }
+            }
+            ret
+        }
+
 
         pub fn handle_h(&self, t: ArrayView1<Real>, h: ArrayView1<Real>) -> HashMap<i32, Array1<Real>> {
             let mut hs: HashMap<i32, Array1<Real>> = HashMap::new();
@@ -175,17 +222,17 @@ pub mod solution {
             hs
         }
 
-        // fn repack_hs(&self, hs: HashMap<i32, Array1<Real>>) -> (HashMap<i32, Array1<Real>>,
-        //                                                         HashMap<i32, Array1<Real>>) {
-        //     let mut hs_integral: HashMap<i32, Array1<Real>> = HashMap::new();
-        //     let mut hs_derivative: HashMap<i32, Array1<Real>> = HashMap::new();
-        //     for order in 0..=(self.max_order + 1) {
-        //         hs_integral.insert(order, hs.get(&(order - 1)).unwrap().clone());
-        //         hs_derivative.insert(order, hs.get(&(order + 1)).unwrap().clone());
-        //     }
-        //
-        //     (hs_integral, hs_derivative)
-        // }
+        fn repack_hs(&self, hs: HashMap<i32, Array1<Real>>) -> (HashMap<i32, Array1<Real>>,
+                                                                HashMap<i32, Array1<Real>>) {
+            let mut hs_integral: HashMap<i32, Array1<Real>> = HashMap::new();
+            let mut hs_derivative: HashMap<i32, Array1<Real>> = HashMap::new();
+            for order in 0..=(self.max_order + 1) {
+                hs_integral.insert(order, hs.get(&(order - 1)).unwrap().clone());
+                hs_derivative.insert(order, hs.get(&(order + 1)).unwrap().clone());
+            }
+
+            (hs_integral, hs_derivative)
+        }
 
         fn derivative(dt: Real, x: ArrayView1<Real>) -> Array1<Real> {
             let mut y = Array1::zeros(x.len());
@@ -246,38 +293,6 @@ pub mod solution {
                 }
             }
             -charge_moment
-        }
-
-        fn get_single_term_multipole(&self, index: MultiIndex, moment: ArrayView1<Real>,
-                                     t: ArrayView1<Real>, hs: &HashMap<i32, Array1<Real>>,
-                                     x1: ArrayView1<Real>, x2: ArrayView1<Real>,
-                                     x3: ArrayView1<Real>, r: ArrayView1<Real>) -> Array3<Real> {
-            let mut ret = Array3::zeros((3, t.len(), x1.len()));
-            for dim in 0..3 {
-                for (signature, coefficient,) in self.aux_fun.get(&index)
-                    .unwrap().iter() {
-                    for i_t in 0..t.len() {
-                        for i_x in 0..x1.len() {
-                            ret[[dim, i_t, i_x]] += hs.get(&signature.h).unwrap()[i_t] * coefficient
-                                * match signature.x1  {
-                                pow if pow > 0 => x1[i_x].powi(pow),
-                                _ => 1.
-                            } * match signature.x2  {
-                                pow if pow > 0 => x2[i_x].powi(pow),
-                                _ => 1.
-                            } * match signature.x3  {
-                                pow if pow > 0 => x3[i_x].powi(pow),
-                                _ => 1.
-                            } * match signature.r  {
-                                pow if pow > 0 => 1. / r[i_x].powi(pow),
-                                _ => 1.
-                            } * f64::powi(-1., index.order()) / (index.factorial().unwrap() as f64)
-                                * moment[dim];
-                        }
-                    }
-                }
-            }
-            ret
         }
     }
 
