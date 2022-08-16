@@ -139,24 +139,24 @@ pub mod solution {
                 MultiIndexRange::stop(self.max_order))
                 .into_iter()
                 .par_bridge().map(|index| {
-                let current_moment_slice = current_moment
-                    .slice(s!(.., index.i, index.j, index.k));
-                let charge_moment_slice = charge_moment
-                    .slice(s!(.., index.i, index.j, index.k));
-                if !moment_zero.abs_diff_eq(&current_moment_slice, thresh) ||
-                    !moment_zero.abs_diff_eq(&current_moment_slice, thresh) {
-                    self.get_single_term_multipole(
-                        index,
-                        current_moment_slice,
-                        charge_moment_slice,
-                        t, dt,
-                        &hs_derivative,
-                        &hs_integral,
-                        x1.view(), x2.view(),
-                        x3.view(), r.view()
-                    )
-                } else {
-                    Array3::zeros((3, t.len(), x1.len()))
+                    let current_moment_slice = current_moment
+                        .slice(s!(.., index.i, index.j, index.k));
+                    let charge_moment_slice = charge_moment
+                        .slice(s!(.., index.i, index.j, index.k));
+                    if !moment_zero.abs_diff_eq(&current_moment_slice, thresh) ||
+                        !moment_zero.abs_diff_eq(&charge_moment_slice, thresh) {
+                        self.get_single_term_multipole(
+                            index,
+                            current_moment_slice,
+                            charge_moment_slice,
+                            t, dt,
+                            &hs_derivative,
+                            &hs_integral,
+                            x1.view(), x2.view(),
+                            x3.view(), r.view()
+                        )
+                    } else {
+                        Array3::zeros((3, t.len(), x1.len()))
                 }
             }).collect();
             for element in e_field_elems {
@@ -174,7 +174,6 @@ pub mod solution {
                                      x1: ArrayView1<Real>, x2: ArrayView1<Real>,
                                      x3: ArrayView1<Real>, r: ArrayView1<Real>) -> Array3<Real> {
             let mut ret = Array3::zeros((3, t.len(), x1.len()));
-            println!("{index:?} {current_moment:?} {charge_moment:?}");
             for dim in 0..3 {
                 for (signature, coefficient,) in self.aux_fun.get(&index)
                     .unwrap().iter() {
