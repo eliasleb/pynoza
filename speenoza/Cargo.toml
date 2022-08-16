@@ -16,7 +16,7 @@ crate-type = ["cdylib", "rlib"]
 # crate-type = ["cdylib"]
 
 [dependencies]
-ndarray = { version = "0.15.6", features = ["approx"] }
+ndarray = { version = "0.15.6", features = ["approx", "rayon"] }
 ndarray-csv = "0.5.1"
 csv = "1.1.6"
 itertools = "0.10.3"

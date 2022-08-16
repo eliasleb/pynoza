@@ -7,6 +7,7 @@ pub mod multi_index {
     use std::cmp::{Eq};
     use std::fmt::{Display, Formatter};
     use factorial::Factorial;
+    use std::f64::consts;
 
     pub static MULTI_INDEX_ZERO: MultiIndex = MultiIndex {
         i: 0,
@@ -118,16 +119,17 @@ pub mod multi_index {
             }
         }
 
-        pub fn factorial(&self) -> Result<u64, String> {
-            match u64::try_from(self.i.abs()).unwrap().checked_factorial() {
-                Some(a) => match u64::try_from(self.j).unwrap().checked_factorial() {
-                    Some(b) => match u64::try_from(self.k).unwrap().checked_factorial() {
-                        Some(c) => Ok(a * b * c),
-                        None => Err(String::from("factorial overflows"))
-                    },
-                    None => Err(String::from("factorial overflows"))
-                },
-                None => Err(String::from("factorial overflows"))
+        pub fn factorial(&self) -> f64 {
+            Self::factorial_or_stirling(self.i)
+                * Self::factorial_or_stirling(self.j)
+                * Self::factorial_or_stirling(self.k)
+        }
+
+        pub fn factorial_or_stirling(x: i32) -> f64 {
+            match (x.abs() as u32).checked_factorial() {
+                Some(x) => f64::from(x),
+                None => f64::sqrt(2. * consts::PI * f64::from(x))
+                    * (f64::from(x) / consts::E).powi(x)
             }
         }
 

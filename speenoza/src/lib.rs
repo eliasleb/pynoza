@@ -10,7 +10,8 @@ pub mod solution {
     use std::hash::Hash;
     use std::cmp::{Eq};
     use ndarray::{Array, ArrayView4, Array4, Zip,
-                  Array1, ArrayView1, Array3, s};
+                  Array1, ArrayView1, Array3};
+    use ndarray::prelude::*;
     use pyo3::prelude::*;
     use pyo3::exceptions;
     use numpy::{PyArray3, PyArray1, PyArray4};
@@ -132,40 +133,93 @@ pub mod solution {
             let (hs_integral, hs_derivative) = self.repack_hs(hs);
             let charge_moment = self.get_charge_moment(current_moment.view());
             let dt = t[1] - t[0];
-            let mut e_field = Array3::zeros((3, t.len(), x1.len()));
+            // // let mut e_field = Array3::zeros((3, t.len(), x1.len()));
+            // let zero: Array3<Real> = Array3::zeros((3, t.len(), x1.len()));
+            // let e_field: Array3<Real> = MultiIndexRange::new(
+            //     MULTI_INDEX_ZERO,
+            //     MultiIndexRange::stop(self.max_order))
+            //     .into_iter()
+            //     .map(|index| {
+            //         let current_moment_slice = current_moment
+            //             .slice(s!(.., index.i, index.j, index.k));
+            //         let charge_moment_slice = charge_moment
+            //             .slice(s!(.., index.i, index.j, index.k));
+            //         if !moment_zero.abs_diff_eq(&current_moment_slice, thresh) ||
+            //             !moment_zero.abs_diff_eq(&charge_moment_slice, thresh) {
+            //             Some(
+            //                 self.get_single_term_multipole(
+            //                     index,
+            //                     current_moment_slice,
+            //                     charge_moment_slice,
+            //                     t, dt,
+            //                     &hs_derivative,
+            //                     &hs_integral,
+            //                     x1.view(), x2.view(),
+            //                     x3.view(), r.view()
+            //                 )
+            //             )
+            //         } else {
+            //             None
+            //     }})
+            //     .reduce(|a, b| match (a, b) {
+            //         (Some(a), Some(b)) => Some(a + b),
+            //         (Some(a), None) => Some(a),
+            //         (None, Some(b)) => Some(b),
+            //         (None, None) => None
+            //     })
+            //     .unwrap()
+            //     .unwrap();
+            //
+            //
+            //
+            // - 1e-7 * e_field;
 
-            let e_field_elems: Vec<Option<Array3<Real>>> = MultiIndexRange::new(
-                MULTI_INDEX_ZERO,
-                MultiIndexRange::stop(self.max_order))
-                .into_iter()
-                .par_bridge().map(|index| {
-                    let current_moment_slice = current_moment
-                        .slice(s!(.., index.i, index.j, index.k));
-                    let charge_moment_slice = charge_moment
-                        .slice(s!(.., index.i, index.j, index.k));
-                    if !moment_zero.abs_diff_eq(&current_moment_slice, thresh) ||
-                        !moment_zero.abs_diff_eq(&charge_moment_slice, thresh) {
-                        Some(self.get_single_term_multipole(
-                            index,
-                            current_moment_slice,
-                            charge_moment_slice,
-                            t, dt,
-                            &hs_derivative,
-                            &hs_integral,
-                            x1.view(), x2.view(),
-                            x3.view(), r.view()
-                        ))
-                    } else {
-                        None
-                }
-            }).collect();
-            for element in e_field_elems {
-                match element {
-                    Some(e) => { e_field = e_field + e; }
-                    None => {}
-                }
-            }
-            - 1e-7 * e_field
+            let mut e_field = Array3::zeros((3, t.len(), x1.len()));
+            e_field
+                .indexed_iter_mut()
+                .par_bridge()
+                .for_each(
+                    |((dim, i_t, i_x), value)| *value = {
+                        self.aux_fun.iter()
+                            .filter(|(index, expression)| {
+                                current_moment[[dim, index.i as usize, index.j as usize, index.k as usize]].abs() > thresh
+                                ||  charge_moment[[dim, index.i as usize, index.j as usize, index.k as usize]].abs() > thresh
+                            } )
+                            .flat_map(
+                                |(index, expression)| {
+                                    expression.iter()
+                                        .map(
+                                            |(signature, coefficient)| {
+                                                    let i_t_delayed = match (i_t as i64) - (r[i_x] / dt) as i64 {
+                                                        x if x >= 0 => x,
+                                                        _ => 0
+                                                    } as usize;
+                                                    hs_derivative.get(&signature.h).unwrap()[i_t_delayed] *  current_moment[[dim, index.i as usize, index.j as usize, index.k as usize]]
+                                                        + hs_integral.get(&signature.h).unwrap()[i_t_delayed] *  charge_moment[[dim, index.i as usize, index.j as usize, index.k as usize]]
+                                                        * coefficient
+                                                        * match signature.x1 {
+                                                        pow if pow > 0 => x1[i_x].powi(pow),
+                                                        _ => 1.
+                                                    } * match signature.x2 {
+                                                        pow if pow > 0 => x2[i_x].powi(pow),
+                                                        _ => 1.
+                                                    } * match signature.x3 {
+                                                        pow if pow > 0 => x3[i_x].powi(pow),
+                                                        _ => 1.
+                                                    } * match signature.r {
+                                                        pow if pow > 0 => 1. / r[i_x].powi(pow),
+                                                        _ => 1.
+                                                    } * f64::powi(-1., index.order()) / index.factorial()
+                                                }
+                                    )
+                                }
+                            )
+                            .sum::<f64>()
+                    }
+                );
+
+
+            -1e7 * e_field
         }
 
         fn get_single_term_multipole(&self, index: MultiIndex,
@@ -176,13 +230,15 @@ pub mod solution {
                                      hs_integral: &HashMap<i32, Array1<Real>>,
                                      x1: ArrayView1<Real>, x2: ArrayView1<Real>,
                                      x3: ArrayView1<Real>, r: ArrayView1<Real>) -> Array3<Real> {
-            let mut ret = Array3::zeros((3, t.len(), x1.len()));
-            for dim in 0..3 {
-                for (signature, coefficient,) in self.aux_fun.get(&index)
-                    .unwrap().iter() {
-                    for i_t in 0..t.len() {
-                        for i_x in 0..x1.len() {
-                            ret[[dim, i_t, i_x]] += {
+            let mut value = Array3::zeros((3, t.len(), x1.len()));
+            value.indexed_iter_mut()
+                .for_each(|((dim, i_t, i_x), value)| *value = {
+                        self.aux_fun
+                            .get(&index)
+                            .unwrap()
+                            .iter()
+                            //.flat_map(|dict| dict.iter())
+                            .map(|(signature, coefficient)| {
                                 let i_t_delayed = match (i_t as i64) - (r[i_x] / dt) as i64 {
                                     x if x >= 0 => x,
                                     _ => 0
@@ -190,26 +246,23 @@ pub mod solution {
                                 hs_derivative.get(&signature.h).unwrap()[i_t_delayed] * current_moment[dim]
                                     + hs_integral.get(&signature.h).unwrap()[i_t_delayed] * charge_moment[dim]
                             } * coefficient
-                                * match signature.x1  {
+                                * match signature.x1 {
                                 pow if pow > 0 => x1[i_x].powi(pow),
                                 _ => 1.
-                            } * match signature.x2  {
+                            } * match signature.x2 {
                                 pow if pow > 0 => x2[i_x].powi(pow),
                                 _ => 1.
-                            } * match signature.x3  {
+                            } * match signature.x3 {
                                 pow if pow > 0 => x3[i_x].powi(pow),
                                 _ => 1.
-                            } * match signature.r  {
+                            } * match signature.r {
                                 pow if pow > 0 => 1. / r[i_x].powi(pow),
                                 _ => 1.
-                            } * f64::powi(-1., index.order()) / (index.factorial().unwrap() as f64);
-                        }
-                    }
-                }
-            }
-            ret
+                            } * f64::powi(-1., index.order()) / index.factorial())
+                            .sum::<f64>()
+                });
+            value
         }
-
 
         pub fn handle_h(&self, t: ArrayView1<Real>, h: ArrayView1<Real>) -> HashMap<i32, Array1<Real>> {
             let mut hs: HashMap<i32, Array1<Real>> = HashMap::new();
@@ -400,8 +453,7 @@ pub mod solution {
         let h = convert(h);
         let current_moment = unsafe { current_moment.as_array() };
 
-        let e_field = py.allow_threads(||
-            sol.compute_e_field(x1, x2, x3, t, h, current_moment));
+        let e_field = sol.compute_e_field(x1, x2, x3, t, h, current_moment);
         let e_field = PyArray3::from_array(py, &e_field);
 
         Ok(e_field)
@@ -461,6 +513,28 @@ mod tests {
         charge_moment_true[[1, 0, 1, 1]] = -1.;
         charge_moment_true[[2, 0, 0, 2]] = -2.;
         assert_eq!(charge_moment_true, charge_moment);
+    }
+
+    #[test]
+    fn test_dipole_field() {
+        let x1: Array1<Real> = Array1::from(vec![1., -1., 1., -1., 1., -1., 1., -1.]);
+        let x2: Array1<Real> = Array1::from(vec![1., 1., -1., -1., 1., 1., -1., -1.]);
+        let x3: Array1<Real> = Array1::from(vec![1., 1., 1., 1., -1., -1., -1., -1.]);
+
+        let t: Array1<Real> = Array1::linspace(0f64, 10f64, 500);
+        let t0 = 3.;
+        let gamma = 1.;
+        let h = t.mapv(|t|
+            f64::exp(- f64::powi((t - t0) / gamma, 2))
+            * (4. * f64::powi((t - t0) / gamma, 2) - 2.)
+        );
+        let mut current_moment: Array4<Real> = Array4::zeros((3, 3, 3, 3));
+        current_moment[[2, 0, 0, 0]] = 1.;
+        let sol = Solution::new(2);
+        let _e_field = sol.compute_e_field(
+            x1.view(), x2.view(), x3.view(), t.view(), h.view(),
+            current_moment.view());
+
     }
 
 }
