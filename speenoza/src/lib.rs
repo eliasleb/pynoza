@@ -11,7 +11,6 @@ pub mod solution {
     use std::cmp::{Eq};
     use ndarray::{Array, ArrayView4, Array4, Zip,
                   Array1, ArrayView1, Array3};
-    use ndarray::prelude::*;
     use pyo3::prelude::*;
     use pyo3::exceptions;
     use numpy::{PyArray3, PyArray1, PyArray4};
@@ -45,62 +44,63 @@ pub mod solution {
 
         fn recurse(&mut self) {
             for order in 1..=self.max_order {
-                for index in MultiIndexRange::new(MULTI_INDEX_ZERO,
-                                                  MultiIndexRange::stop(self.max_order))
+                let mut temp = HashMap::new();
+                for index in MultiIndexRange::new(
+                    MultiIndex { i: order, j: 0, k: 0 },
+                    MultiIndexRange::stop(order))
                     .into_iter() {
-                    if index.order() != order {
-                        continue;
-                    }
                     let mut known_index = index.clone();
                     known_index[index.first_non_zero_dim().unwrap().try_into().unwrap()] -= 1;
-                    self.increase_order(known_index, index);
+                    self.increase_order(&mut temp, known_index, index);
                 }
+                self.aux_fun.extend(temp);
             }
         }
 
-        fn increase_order(&mut self, known: MultiIndex, new: MultiIndex) {
+        fn increase_order(&self, temp: &mut HashMap<MultiIndex, HashMap<Signature, Real>>,
+                          known: MultiIndex, new: MultiIndex) {
             let known_dim = (new - known).first_non_zero_dim().unwrap();
-            let known_aux_fun = self.aux_fun.clone();
-            let known_aux_fun = known_aux_fun.get(&known).unwrap();
-            for (signature, coefficient) in known_aux_fun.iter() {
+            let known_aux_fun = self.aux_fun.get(&known).unwrap();
+            known_aux_fun
+                .iter()
+                .for_each(|(signature, coefficient)| {
+                    // We need to apply the recursion formula to this term.
 
-                // We need to apply the recursion formula to this term.
+                    // This adds three new terms; two for the space-derivative, and one for the
+                    // time-derivative
 
-                // This adds three new terms; two for the space-derivative, and one for the
-                // time-derivative
+                    // First term
+                    let exponent_x_i = signature[known_dim];
+                    if exponent_x_i > 0 {
+                        let mut identity_first_term = signature.clone();
+                        identity_first_term[known_dim] -= 1; // differentiation
+                        *temp.entry(new)
+                            .or_insert(HashMap::new())
+                            .entry(identity_first_term)
+                            .or_insert(0.) += *coefficient * (exponent_x_i as Real);
+                    }
 
-                // First term
-                let exponent_x_i = signature[known_dim];
-                if exponent_x_i > 0 {
-                    let mut identity_first_term = signature.clone();
-                    identity_first_term[known_dim] -= 1; // differentiation
-                    *self.aux_fun.entry(new)
+                    // Second term
+                    let exponent_r = signature.r;
+                    let mut identity_second_term = signature.clone();
+                    identity_second_term[known_dim] += 1; // numerator
+                    identity_second_term.r += 2; // denominator
+                    *temp.entry(new)
                         .or_insert(HashMap::new())
-                        .entry(identity_first_term)
-                        .or_insert(0.) += *coefficient * (exponent_x_i as Real);
+                        .entry(identity_second_term)
+                        .or_insert(0.) -= *coefficient * (exponent_r as Real);
+
+                    // Third term (time-derivative)
+                    let mut identity_third_term = signature.clone();
+                    identity_third_term[known_dim] += 1; // numerator
+                    identity_third_term.h += 1; // time-derivative
+                    identity_third_term.r += 1; // denominator
+                    *temp.entry(new)
+                        .or_insert(HashMap::new())
+                        .entry(identity_third_term)
+                        .or_insert(0.) -= *coefficient;
                 }
-
-                // Second term
-                let exponent_r = signature.r;
-                let mut identity_second_term = signature.clone();
-                identity_second_term[known_dim] += 1; // numerator
-                identity_second_term.r += 2; // denominator
-                *self.aux_fun.entry(new)
-                    .or_insert(HashMap::new())
-                    .entry(identity_second_term)
-                    .or_insert(0.) -= *coefficient * (exponent_r as Real);
-
-                // Third term (time-derivative)
-                let mut identity_third_term = signature.clone();
-                identity_third_term[known_dim] += 1; // numerator
-                identity_third_term.h += 1; // time-derivative
-                identity_third_term.r += 1; // denominator
-                *self.aux_fun.entry(new)
-                    .or_insert(HashMap::new())
-                    .entry(identity_third_term)
-                    .or_insert(0.) -= *coefficient;
-
-            }
+                );
         }
 
         pub fn get_human_readable_aux_fun(&self, index: &MultiIndex) -> String {
@@ -127,52 +127,11 @@ pub mod solution {
                                h: ArrayView1<Real>,
                                current_moment: ArrayView4<Real>) -> Array3<Real> {
             let thresh = 1e-12;
-            let moment_zero: Array1<Real> = Array1::zeros(3);
             let r = Self::radius(x1, x2, x3);
             let hs = self.handle_h(t, h);
             let (hs_integral, hs_derivative) = self.repack_hs(hs);
             let charge_moment = self.get_charge_moment(current_moment.view());
             let dt = t[1] - t[0];
-            // // let mut e_field = Array3::zeros((3, t.len(), x1.len()));
-            // let zero: Array3<Real> = Array3::zeros((3, t.len(), x1.len()));
-            // let e_field: Array3<Real> = MultiIndexRange::new(
-            //     MULTI_INDEX_ZERO,
-            //     MultiIndexRange::stop(self.max_order))
-            //     .into_iter()
-            //     .map(|index| {
-            //         let current_moment_slice = current_moment
-            //             .slice(s!(.., index.i, index.j, index.k));
-            //         let charge_moment_slice = charge_moment
-            //             .slice(s!(.., index.i, index.j, index.k));
-            //         if !moment_zero.abs_diff_eq(&current_moment_slice, thresh) ||
-            //             !moment_zero.abs_diff_eq(&charge_moment_slice, thresh) {
-            //             Some(
-            //                 self.get_single_term_multipole(
-            //                     index,
-            //                     current_moment_slice,
-            //                     charge_moment_slice,
-            //                     t, dt,
-            //                     &hs_derivative,
-            //                     &hs_integral,
-            //                     x1.view(), x2.view(),
-            //                     x3.view(), r.view()
-            //                 )
-            //             )
-            //         } else {
-            //             None
-            //     }})
-            //     .reduce(|a, b| match (a, b) {
-            //         (Some(a), Some(b)) => Some(a + b),
-            //         (Some(a), None) => Some(a),
-            //         (None, Some(b)) => Some(b),
-            //         (None, None) => None
-            //     })
-            //     .unwrap()
-            //     .unwrap();
-            //
-            //
-            //
-            // - 1e-7 * e_field;
 
             let mut e_field = Array3::zeros((3, t.len(), x1.len()));
             e_field
@@ -181,7 +140,7 @@ pub mod solution {
                 .for_each(
                     |((dim, i_t, i_x), value)| *value = {
                         self.aux_fun.iter()
-                            .filter(|(index, expression)| {
+                            .filter(|(index, _)| {
                                 current_moment[[dim, index.i as usize, index.j as usize, index.k as usize]].abs() > thresh
                                 ||  charge_moment[[dim, index.i as usize, index.j as usize, index.k as usize]].abs() > thresh
                             } )
@@ -209,7 +168,7 @@ pub mod solution {
                                                     } * match signature.r {
                                                         pow if pow > 0 => 1. / r[i_x].powi(pow),
                                                         _ => 1.
-                                                    } * f64::powi(-1., index.order()) / index.factorial()
+                                                    } * -1e-7 * f64::powi(-1., index.order()) / index.factorial()
                                                 }
                                     )
                                 }
@@ -217,52 +176,9 @@ pub mod solution {
                             .sum::<f64>()
                     }
                 );
-
-
-            -1e7 * e_field
+            e_field
         }
 
-        fn get_single_term_multipole(&self, index: MultiIndex,
-                                     current_moment: ArrayView1<Real>,
-                                     charge_moment: ArrayView1<Real>,
-                                     t: ArrayView1<Real>, dt: Real,
-                                     hs_derivative: &HashMap<i32, Array1<Real>>,
-                                     hs_integral: &HashMap<i32, Array1<Real>>,
-                                     x1: ArrayView1<Real>, x2: ArrayView1<Real>,
-                                     x3: ArrayView1<Real>, r: ArrayView1<Real>) -> Array3<Real> {
-            let mut value = Array3::zeros((3, t.len(), x1.len()));
-            value.indexed_iter_mut()
-                .for_each(|((dim, i_t, i_x), value)| *value = {
-                        self.aux_fun
-                            .get(&index)
-                            .unwrap()
-                            .iter()
-                            //.flat_map(|dict| dict.iter())
-                            .map(|(signature, coefficient)| {
-                                let i_t_delayed = match (i_t as i64) - (r[i_x] / dt) as i64 {
-                                    x if x >= 0 => x,
-                                    _ => 0
-                                } as usize;
-                                hs_derivative.get(&signature.h).unwrap()[i_t_delayed] * current_moment[dim]
-                                    + hs_integral.get(&signature.h).unwrap()[i_t_delayed] * charge_moment[dim]
-                            } * coefficient
-                                * match signature.x1 {
-                                pow if pow > 0 => x1[i_x].powi(pow),
-                                _ => 1.
-                            } * match signature.x2 {
-                                pow if pow > 0 => x2[i_x].powi(pow),
-                                _ => 1.
-                            } * match signature.x3 {
-                                pow if pow > 0 => x3[i_x].powi(pow),
-                                _ => 1.
-                            } * match signature.r {
-                                pow if pow > 0 => 1. / r[i_x].powi(pow),
-                                _ => 1.
-                            } * f64::powi(-1., index.order()) / index.factorial())
-                            .sum::<f64>()
-                });
-            value
-        }
 
         pub fn handle_h(&self, t: ArrayView1<Real>, h: ArrayView1<Real>) -> HashMap<i32, Array1<Real>> {
             let mut hs: HashMap<i32, Array1<Real>> = HashMap::new();
