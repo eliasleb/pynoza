@@ -43,5 +43,5 @@ setuptools.setup(
                           compiler_directives={'language_level': "3"}),
     cmdclass={
         'build_ext': build_ext,
-    }
+    },
 )

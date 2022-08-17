@@ -82,7 +82,7 @@ def test_inverse_problem_simple():
         current_moment[:, 0, 0, 0] = moment
         return current_moment
 
-    e_true = direct_problem_simple(x1, x2, x3, t, h_true, order=order)
+    e_true = direct_problem_simple(x1, x2, x3, t, h_true, order=order).swapaxes(1, 2)
     current_moment, h, center, e_opt = inverse_problem.inverse_problem(order, e_true, x1, x2, x3, t, dim_mom,
                                                                        get_current_moment, dim_mom, **kwargs)
     assert np.sum((e_true - e_opt)**2)/np.sum(e_opt**2) < 1e-2

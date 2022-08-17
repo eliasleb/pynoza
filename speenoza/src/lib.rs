@@ -2,8 +2,6 @@ pub mod helpers;
 
 
 pub mod solution {
-    extern crate rayon;
-
     use crate::helpers::multi_index::*;
     use std::ops::{Index, IndexMut};
     use std::collections::{HashMap, HashSet};
@@ -24,6 +22,7 @@ pub mod solution {
     }
 
     impl Solution {
+
         pub fn new(max_order: i32) -> Solution {
             let mut aux_fun= HashMap::new();
             aux_fun.insert(
@@ -149,27 +148,32 @@ pub mod solution {
                                     expression.iter()
                                         .map(
                                             |(signature, coefficient)| {
-                                                    let i_t_delayed = match (i_t as i64) - (r[i_x] / dt) as i64 {
-                                                        x if x >= 0 => x,
-                                                        _ => 0
-                                                    } as usize;
-                                                    hs_derivative.get(&signature.h).unwrap()[i_t_delayed] *  current_moment[[dim, index.i as usize, index.j as usize, index.k as usize]]
-                                                        + hs_integral.get(&signature.h).unwrap()[i_t_delayed] *  charge_moment[[dim, index.i as usize, index.j as usize, index.k as usize]]
-                                                        * coefficient
-                                                        * match signature.x1 {
-                                                        pow if pow > 0 => x1[i_x].powi(pow),
-                                                        _ => 1.
-                                                    } * match signature.x2 {
-                                                        pow if pow > 0 => x2[i_x].powi(pow),
-                                                        _ => 1.
-                                                    } * match signature.x3 {
-                                                        pow if pow > 0 => x3[i_x].powi(pow),
-                                                        _ => 1.
-                                                    } * match signature.r {
-                                                        pow if pow > 0 => 1. / r[i_x].powi(pow),
-                                                        _ => 1.
-                                                    } * -1e-7 * f64::powi(-1., index.order()) / index.factorial()
-                                                }
+                                            let i_t_delayed = match (i_t as i64) - (r[i_x] / dt) as i64 {
+                                                x if x >= 0 => x,
+                                                _ => 0
+                                            } as usize;
+                                            (hs_derivative.get(&signature.h)
+                                                .unwrap()[i_t_delayed]
+                                                * current_moment[[dim, index.i as usize, index.j as usize, index.k as usize]]
+                                                + hs_integral.get(&signature.h)
+                                                .unwrap()[i_t_delayed]
+                                                * charge_moment[[dim, index.i as usize, index.j as usize, index.k as usize]])
+                                                * coefficient
+                                                * match signature.x1 {
+                                                pow if pow > 0 => x1[i_x].powi(pow),
+                                                _ => 1.
+                                            } * match signature.x2 {
+                                                pow if pow > 0 => x2[i_x].powi(pow),
+                                                _ => 1.
+                                            } * match signature.x3 {
+                                                pow if pow > 0 => x3[i_x].powi(pow),
+                                                _ => 1.
+                                            } * match signature.r {
+                                                pow if pow > 0 => 1. / r[i_x].powi(pow),
+                                                _ => 1.
+                                            } * f64::powi(-1., index.order()) / index.factorial()
+                                                * -1e-7
+                                        }
                                     )
                                 }
                             )
@@ -207,10 +211,14 @@ pub mod solution {
 
         fn derivative(dt: Real, x: ArrayView1<Real>) -> Array1<Real> {
             let mut y = Array1::zeros(x.len());
+
             for (index, yi) in y.iter_mut().enumerate() {
-                if index > 0 {
-                    *yi = (x[index] - x[index - 1]) / dt;
-                }
+                match index {
+                    index if index >= 1 && index < x.len() - 1 => { *yi = (x[index + 1] - x[index - 1]) / 2. / dt },
+                    0 => { *yi = (x[1] - x[0]) / dt },
+                    index if index == x.len() -1 => { *yi = (x[index] - x[index - 1]) / dt },
+                    _ => {}
+                };
             }
             y
         }
@@ -266,7 +274,6 @@ pub mod solution {
             -charge_moment
         }
     }
-
 
     impl Signature {
         fn to_string(&self) -> String {
@@ -342,6 +349,52 @@ pub mod solution {
         unsafe { x.as_array() }
     }
 
+    #[pyclass]
+    struct Speenoza {
+        solution: Box<Solution>,
+    }
+
+    #[pymethods]
+    impl Speenoza {
+        #[new]
+        fn new(max_order: i32) -> Self {
+            let solution = Box::new(Solution::new(max_order));
+            Speenoza {
+                solution
+            }
+        }
+
+        fn compute_e_field<'a>(&self, x1: &'a PyArray1<Real>, x2: &PyArray1<Real>, x3: &PyArray1<Real>,
+                                 t: &PyArray1<Real>, h: &PyArray1<Real>, current_moment: &PyArray4<Real>)
+                                 -> PyResult<&'a PyArray3<Real>> {
+            let py = x1.py();
+            if x2.len() != x1.len() || x3.len() != x1.len() || x2.len() != x3.len() {
+                let err: PyErr = PyErr::new::<exceptions::PyValueError, _>(
+                    String::from("x1, x2 and x3 must have the same length"));
+                return Err(err)
+            }
+            if t.len() != h.len() {
+                let err: PyErr = PyErr::new::<exceptions::PyValueError, _>(
+                    String::from("h, t must have the same length"));
+                return Err(err)
+            }
+
+            let x1 = convert(x1);
+            let x2 = convert(x2);
+            let x3 = convert(x3);
+            let t = convert(t);
+            let h = convert(h);
+            let current_moment = unsafe { current_moment.as_array() };
+
+            let e_field = self.solution.compute_e_field(x1, x2, x3, t, h, current_moment);
+            let e_field = PyArray3::from_array(py, &e_field);
+
+            Ok(e_field)
+        }
+
+    }
+
+
     /// Computes the electric field.
     #[pyfunction]
     fn multipole_e_field<'a>(x1: &'a PyArray1<Real>, x2: &PyArray1<Real>, x3: &PyArray1<Real>,
@@ -375,10 +428,12 @@ pub mod solution {
         Ok(e_field)
     }
 
+
     /// A Python wrapper around the rust implementation.
     #[pymodule]
     fn speenoza(_py: Python, module: &PyModule) -> PyResult<()> {
         module.add_function(wrap_pyfunction!(multipole_e_field, module)?)?;
+        module.add_class::<Speenoza>()?;
         Ok(())
     }
 }
