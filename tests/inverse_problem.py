@@ -2,11 +2,13 @@ import pynoza
 import numpy as np
 import scipy.optimize
 import scipy.interpolate
-import sympy
 import matplotlib.pyplot as plt
 import os
 from matplotlib import cm
 import speenoza
+
+
+METHOD = "rust"
 
 
 def complement(*args):
@@ -116,7 +118,7 @@ def get_fields(sol, find_center, t, x1, x2, x3, current_moment, h_sym, t_sym, ce
                                            current_moment).swapaxes(1, 2)
 
 
-def inverse_problem(order, e_true, x1, x2, x3, t, t_sym, current_moment_callable, dim_moment, **kwargs):
+def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callable, dim_moment, **kwargs):
 
     print(f"{kwargs=}")
 
@@ -130,7 +132,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, t_sym, current_moment_callable
     get_h_num = kwargs.pop("h_num", lambda h, t: h)
     find_center = kwargs.pop("find_center", True)
     max_global_tries = kwargs.pop("max_global_tries", 10)
-    compute_grid = kwargs.pop("compute_grid", True)
+    _compute_grid = kwargs.pop("compute_grid", True)
     estimate = kwargs.pop("estimate", None)
     p = kwargs.pop("p", 2)
 
@@ -138,14 +140,13 @@ def inverse_problem(order, e_true, x1, x2, x3, t, t_sym, current_moment_callable
         raise ValueError(f"Unknown keyword arguments: {kwargs}")
 
     dt = np.max(np.diff(t))
-    method = "rust"
-    if method == "python":
+
+    if METHOD == "python":
         sol = pynoza.Solution(max_order=order,
                               wave_speed=1, )
         sol.recurse()
     else:
         sol = speenoza.Speenoza(order)
-
 
     center = np.zeros((3, ))
     current_moment = np.zeros((dim_moment, ))
@@ -153,20 +154,19 @@ def inverse_problem(order, e_true, x1, x2, x3, t, t_sym, current_moment_callable
     h = np.zeros((n_points, ))
 
     if find_center:
-        def ravel_params(current_moments, h, center):
-            return np.concatenate((np.ravel(current_moments), np.ravel(h), np.ravel(center)))
+        def ravel_params(current_moments, h_, center_):
+            return np.concatenate((np.ravel(current_moments), np.ravel(h_), np.ravel(center_)))
 
         def unravel_params(params):
             return params[:dim_moment], params[dim_moment:-3], params[-3:]
     else:
-        def ravel_params(current_moments, h, *args):
-            return np.concatenate((np.ravel(current_moments), np.ravel(h)))
+        def ravel_params(current_moments, h_, *_):
+            return np.concatenate((np.ravel(current_moments), np.ravel(h_)))
 
         def unravel_params(params):
             return params[:dim_moment], params[dim_moment:], None
 
     x0 = ravel_params(current_moment, h, center)
-    t_sym = sympy.Symbol("t", real=True)
 
     n_calls = 0
     e_opt = None
@@ -176,12 +176,11 @@ def inverse_problem(order, e_true, x1, x2, x3, t, t_sym, current_moment_callable
 
         n_calls += 1
 
-        current_moment, h, center = unravel_params(x)
-        h = get_h_num(h, t)
-        current_moment = current_moment_callable(current_moment)
-        e_opt = get_fields(sol, find_center, t, x1, x2, x3, current_moment, h, None, center, method=method)
+        current_moment_, h_, center_ = unravel_params(x)
+        h_ = get_h_num(h_, t)
+        current_moment_ = current_moment_callable(current_moment_)
+        e_opt = get_fields(sol, find_center, t, x1, x2, x3, current_moment_, h_, None, center_, method=METHOD)
 
-        error = 0
         normal = 0
 
         errors_comp = []
@@ -197,9 +196,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, t_sym, current_moment_callable
             if plot:
                 plt.clf()
                 max_true = np.max(np.abs(e_true))
-                max_opt = np.max(np.abs(e_opt))
-                colors = ["r", "b", "g"]
-                with pynoza.PlotAndWait(wait_for_enter_keypress=False) as paw:
+                with pynoza.PlotAndWait(wait_for_enter_keypress=False):
                     for i in range(3):
                         plt.subplot(2, 3, i + 1)
                         plt.plot(t, e_true[i].reshape(-1, t.size).T, f"b--")
@@ -210,10 +207,13 @@ def inverse_problem(order, e_true, x1, x2, x3, t, t_sym, current_moment_callable
                         plt.plot(t, e_opt[i].reshape(-1, t.size).T*scale, f"k-")
                         plt.plot(t, e_opt[i].reshape(-1, t.size).T*scale, f"k-")
                         plt.ylim((-1.1 * max_true, 1.1 * max_true))
-                    max_h = np.max(np.abs(h))
+                    max_h = np.max(np.abs(h_))
+                    plt.subplot(2, 3, 5)
                     if max_h > 0:
-                        plt.subplot(2, 3, 5)
-                        plt.plot(t, h / max_h * max_true, "k-.")
+                        plt.plot(t, h_ / max_h * max_true, "k-.")
+                    if find_center:
+                        plt.subplot(2, 3, 2)
+                        plt.title(f"center = ({center_[0]:+.03f}, {center_[1]:+.03f} {center_[2]:+.03f})")
 
             os.system("clear")
             print(f"{'#'*np.clip(int(error*50), 0, 50)}{error:.3f}, {n_calls=}, {errors_comp/normal=}", end='\r')

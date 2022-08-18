@@ -140,15 +140,18 @@ pub mod solution {
                     |((dim, i_t, i_x), value)| *value = {
                         self.aux_fun.iter()
                             .filter(|(index, _)| {
-                                current_moment[[dim, index.i as usize, index.j as usize, index.k as usize]].abs() > thresh
-                                ||  charge_moment[[dim, index.i as usize, index.j as usize, index.k as usize]].abs() > thresh
+                                current_moment[[dim, index.i as usize, index.j as usize,
+                                    index.k as usize]].abs() > thresh
+                                ||  charge_moment[[dim, index.i as usize, index.j as usize,
+                                    index.k as usize]].abs() > thresh
                             } )
                             .flat_map(
                                 |(index, expression)| {
                                     expression.iter()
                                         .map(
                                             |(signature, coefficient)| {
-                                                let i_t_delayed = (i_t as i64) - ((r[i_x] / dt) as i64);
+                                                let i_t_delayed = (i_t as i64) -
+                                                    ((r[i_x] / dt) as i64);
                                                 coefficient
                                                 * match signature.x1 {
                                                     pow if pow > 0 => x1[i_x].powi(pow),
@@ -164,12 +167,15 @@ pub mod solution {
                                                     _ => 1.
                                                 } * if index.order() % 2 == 0 { 1. } else { -1. }
                                                     / index.factorial() * -1e-7 * match i_t_delayed {
-                                                    i_t if i_t >= 0 => hs_derivative.get(&signature.h)
+                                                    i_t if i_t >= 0 =>
+                                                        hs_derivative.get(&signature.h)
                                                         .unwrap()[i_t as usize]
-                                                        * current_moment[[dim, index.i as usize, index.j as usize, index.k as usize]]
+                                                        * current_moment[[dim, index.i as usize,
+                                                            index.j as usize, index.k as usize]]
                                                         + hs_integral.get(&signature.h)
                                                         .unwrap()[i_t as usize]
-                                                        * charge_moment[[dim, index.i as usize, index.j as usize, index.k as usize]],
+                                                        * charge_moment[[dim, index.i as usize,
+                                                            index.j as usize, index.k as usize]],
                                                     _ => 0.,
                                                 }
                                         }
@@ -261,16 +267,18 @@ pub mod solution {
             let dim = (self.max_order + 1) as usize;
             let mut charge_moment: Array4<Real> = Array::zeros((3, dim, dim, dim));
             for i in 0..3 {
-                for a in MultiIndexRange::new(MULTI_INDEX_ZERO, MultiIndexRange::stop(self.max_order)) {
+                for a in MultiIndexRange::new(MULTI_INDEX_ZERO,
+                                              MultiIndexRange::stop(self.max_order)) {
                     let (a1, a2, a3) = (a.i, a.j, a.k);
                     for j in 0..3 {
                         let mut b = a.clone();
                         if i == j {
                             if a[j] >= 2 {
                                 b[j] = a[j] - 2;
-                                charge_moment[[i as usize, a1 as usize, a2 as usize, a3 as usize]] +=
-                                    f64::from(a[j] * (a[j] - 1)) * current_moment[[j as usize,
-                                        b[0] as usize, b[1] as usize, b[2] as usize]];
+                                charge_moment[[i as usize, a1 as usize, a2 as usize, a3 as usize]]
+                                    += f64::from(a[j] * (a[j] - 1))
+                                    * current_moment[[j as usize, b[0] as usize, b[1] as usize,
+                                    b[2] as usize]];
                             }
                         }
                         else {
@@ -435,7 +443,6 @@ pub mod solution {
                 String::from("h, t must have the same length"));
             return Err(err)
         }
-
 
         let max_order = (current_moment.shape()[1] - 1) as i32;
         let sol = Solution::new(max_order);
