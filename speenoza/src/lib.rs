@@ -118,14 +118,14 @@ pub mod solution {
             stuff.join(" + ")
         }
 
-        pub fn compute_e_field(&self,
+        pub fn par_compute_e_field(&self,
                                x1: ArrayView1<Real>,
                                x2: ArrayView1<Real>,
                                x3: ArrayView1<Real>,
                                t: ArrayView1<Real>,
                                h: ArrayView1<Real>,
                                current_moment: ArrayView4<Real>) -> Array3<Real> {
-            let thresh = 1e-12;
+            let thresh = 1e-14;
             let r = Self::radius(x1, x2, x3);
             let hs = self.handle_h(t, h);
             let (hs_integral, hs_derivative) = self.repack_hs(hs);
@@ -148,31 +148,30 @@ pub mod solution {
                                     expression.iter()
                                         .map(
                                             |(signature, coefficient)| {
-                                            let i_t_delayed = match (i_t as i64) - (r[i_x] / dt) as i64 {
-                                                x if x >= 0 => x,
-                                                _ => 0
-                                            } as usize;
-                                            (hs_derivative.get(&signature.h)
-                                                .unwrap()[i_t_delayed]
-                                                * current_moment[[dim, index.i as usize, index.j as usize, index.k as usize]]
-                                                + hs_integral.get(&signature.h)
-                                                .unwrap()[i_t_delayed]
-                                                * charge_moment[[dim, index.i as usize, index.j as usize, index.k as usize]])
-                                                * coefficient
+                                                let i_t_delayed = (i_t as i64) - ((r[i_x] / dt) as i64);
+                                                coefficient
                                                 * match signature.x1 {
-                                                pow if pow > 0 => x1[i_x].powi(pow),
-                                                _ => 1.
-                                            } * match signature.x2 {
-                                                pow if pow > 0 => x2[i_x].powi(pow),
-                                                _ => 1.
-                                            } * match signature.x3 {
-                                                pow if pow > 0 => x3[i_x].powi(pow),
-                                                _ => 1.
-                                            } * match signature.r {
-                                                pow if pow > 0 => 1. / r[i_x].powi(pow),
-                                                _ => 1.
-                                            } * f64::powi(-1., index.order()) / index.factorial()
-                                                * -1e-7
+                                                    pow if pow > 0 => x1[i_x].powi(pow),
+                                                    _ => 1.
+                                                } * match signature.x2 {
+                                                    pow if pow > 0 => x2[i_x].powi(pow),
+                                                    _ => 1.
+                                                } * match signature.x3 {
+                                                    pow if pow > 0 => x3[i_x].powi(pow),
+                                                    _ => 1.
+                                                } * match signature.r {
+                                                    pow if pow > 0 => 1. / r[i_x].powi(pow),
+                                                    _ => 1.
+                                                } * if index.order() % 2 == 0 { 1. } else { -1. }
+                                                    / index.factorial() * -1e-7 * match i_t_delayed {
+                                                    i_t if i_t >= 0 => hs_derivative.get(&signature.h)
+                                                        .unwrap()[i_t as usize]
+                                                        * current_moment[[dim, index.i as usize, index.j as usize, index.k as usize]]
+                                                        + hs_integral.get(&signature.h)
+                                                        .unwrap()[i_t as usize]
+                                                        * charge_moment[[dim, index.i as usize, index.j as usize, index.k as usize]],
+                                                    _ => 0.,
+                                                }
                                         }
                                     )
                                 }
@@ -209,17 +208,32 @@ pub mod solution {
             (hs_integral, hs_derivative)
         }
 
-        fn derivative(dt: Real, x: ArrayView1<Real>) -> Array1<Real> {
+        pub fn derivative(dt: Real, x: ArrayView1<Real>) -> Array1<Real> {
             let mut y = Array1::zeros(x.len());
-
             for (index, yi) in y.iter_mut().enumerate() {
                 match index {
-                    index if index >= 1 && index < x.len() - 1 => { *yi = (x[index + 1] - x[index - 1]) / 2. / dt },
                     0 => { *yi = (x[1] - x[0]) / dt },
-                    index if index == x.len() -1 => { *yi = (x[index] - x[index - 1]) / dt },
-                    _ => {}
-                };
+                    n if n == x.len() - 1 => { *yi = (x[n] - x[n - 1]) / dt }
+                    n => { *yi = (x[n + 1] - x[n - 1]) / 2. / dt }
+                }
             }
+            // for (index, yi) in y.iter_mut().enumerate() {
+            //         match index {
+            //             0..=3 => { *yi = (-49./20.*x[index] + 6.*x[index+1] - 15./2.*x[index+2]
+            //                 + 20./3.*x[index+3] - 15./4.*x[index+4] + 6./5.*x[index+5]
+            //                 - 1./6.*x[index+6]) / dt },
+            //             index if 4 <= index && index < x.len() - 4 => {
+            //                 *yi = (1./280.*x[index-4] - 4./105.*x[index-3] + 1./5.*x[index-2]
+            //                     - 4./5.*x[index-1] + 4./5.*x[index+1] - 1./5.*x[index+2]
+            //                     + 4./105.*x[index+3] - 1./280.*x[index+4]) / dt
+            //             },
+            //             index=> {
+            //                 *yi = (-1./3.*x[index-3] + 3./2.*x[index-2] - 3.*x[index-1] +
+            //                     11./6.*x[index]) / dt
+            //             }
+            //         };
+            //     }
+
             y
         }
 
@@ -244,7 +258,7 @@ pub mod solution {
         }
 
         pub fn get_charge_moment(&self, current_moment: ArrayView4<Real>) -> Array4<Real> {
-            let dim = usize::try_from(self.max_order + 1).unwrap();
+            let dim = (self.max_order + 1) as usize;
             let mut charge_moment: Array4<Real> = Array::zeros((3, dim, dim, dim));
             for i in 0..3 {
                 for a in MultiIndexRange::new(MULTI_INDEX_ZERO, MultiIndexRange::stop(self.max_order)) {
@@ -254,10 +268,10 @@ pub mod solution {
                         if i == j {
                             if a[j] >= 2 {
                                 b[j] = a[j] - 2;
+                                charge_moment[[i as usize, a1 as usize, a2 as usize, a3 as usize]] +=
+                                    f64::from(a[j] * (a[j] - 1)) * current_moment[[j as usize,
+                                        b[0] as usize, b[1] as usize, b[2] as usize]];
                             }
-                            charge_moment[[i as usize, a1 as usize, a2 as usize, a3 as usize]] +=
-                                f64::from(a[j] * (a[j] - 1)) * current_moment[[j as usize,
-                                    b[0] as usize, b[1] as usize, b[2] as usize]];
                         }
                         else {
                             b[i] -= 1;
@@ -364,7 +378,7 @@ pub mod solution {
             }
         }
 
-        fn compute_e_field<'a>(&self, x1: &'a PyArray1<Real>, x2: &PyArray1<Real>, x3: &PyArray1<Real>,
+        fn par_compute_e_field<'a>(&self, x1: &'a PyArray1<Real>, x2: &PyArray1<Real>, x3: &PyArray1<Real>,
                                  t: &PyArray1<Real>, h: &PyArray1<Real>, current_moment: &PyArray4<Real>)
                                  -> PyResult<&'a PyArray3<Real>> {
             let py = x1.py();
@@ -379,6 +393,16 @@ pub mod solution {
                 return Err(err)
             }
 
+            if current_moment.shape() != [3usize, (self.solution.max_order + 1) as usize,
+                (self.solution.max_order + 1) as usize, (self.solution.max_order + 1) as usize] {
+                return Err(PyErr::new::<exceptions::PyValueError, _>(
+                    String::from(format!("the shape of current_moment must be (3, dim, dim, dim), \
+                    where dim = max_order + 1 (got {:?}, dim should be {})",
+                    current_moment.shape(),
+                    self.solution.max_order + 1))
+                ))
+            }
+
             let x1 = convert(x1);
             let x2 = convert(x2);
             let x3 = convert(x3);
@@ -386,7 +410,7 @@ pub mod solution {
             let h = convert(h);
             let current_moment = unsafe { current_moment.as_array() };
 
-            let e_field = self.solution.compute_e_field(x1, x2, x3, t, h, current_moment);
+            let e_field = self.solution.par_compute_e_field(x1, x2, x3, t, h, current_moment);
             let e_field = PyArray3::from_array(py, &e_field);
 
             Ok(e_field)
@@ -422,7 +446,7 @@ pub mod solution {
         let h = convert(h);
         let current_moment = unsafe { current_moment.as_array() };
 
-        let e_field = sol.compute_e_field(x1, x2, x3, t, h, current_moment);
+        let e_field = sol.par_compute_e_field(x1, x2, x3, t, h, current_moment);
         let e_field = PyArray3::from_array(py, &e_field);
 
         Ok(e_field)
@@ -466,7 +490,7 @@ mod tests {
         let h = t.mapv(f64::sin);
         let mut current_moment = Array4::zeros((3, 5, 5, 5));
         current_moment[[2, 0, 0, 0]] = 1.;
-        let _e_field = sol.compute_e_field(x1.view(), x2.view(), x3.view(),
+        let _e_field = sol.par_compute_e_field(x1.view(), x2.view(), x3.view(),
                                           t.view(), h.view(), current_moment.view());
 
     }
@@ -502,10 +526,50 @@ mod tests {
         let mut current_moment: Array4<Real> = Array4::zeros((3, 3, 3, 3));
         current_moment[[2, 0, 0, 0]] = 1.;
         let sol = Solution::new(2);
-        let _e_field = sol.compute_e_field(
+        let _e_field = sol.par_compute_e_field(
             x1.view(), x2.view(), x3.view(), t.view(), h.view(),
             current_moment.view());
 
     }
 
+    #[test]
+    fn plot_derivatives() {
+        use plotters::prelude::*;
+        use plotters::data;
+
+        let t = Array1::linspace(0., 6., 500);
+        let dt = t[1] - t[0];
+        let t0 = 3.;
+        let h = t.mapv(|ti|
+            f64::exp(-(ti-t0)*(ti-t0)) * (4. * (ti-t0)*(ti-t0) - 2.));
+        let mut derivatives: Vec<Array1<f64>> = Vec::new();
+        derivatives.push(h.clone());
+        let max_order = 2;
+        for order in 1..=max_order {
+            derivatives.push(Solution::derivative(dt, derivatives.get(order - 1).unwrap().view()));
+        }
+
+        let root_area = BitMapBackend::new("data/time_series.png", (600, 400))
+            .into_drawing_area();
+        root_area.fill(&WHITE).unwrap();
+
+        let mut ctx = ChartBuilder::on(&root_area)
+            .set_label_area_size(LabelAreaPosition::Left, 40)
+            .set_label_area_size(LabelAreaPosition::Bottom, 40)
+            // .caption("Scatter Demo", ("sans-serif", 40))
+            .build_cartesian_2d(data::fitting_range(t.iter()),
+                                data::fitting_range(derivatives
+                                    .get(max_order)
+                                    .unwrap()
+                                    .iter()))
+            .unwrap();
+
+        ctx.configure_mesh().draw().unwrap();
+        derivatives.iter()
+            .for_each(|d| {
+                ctx.draw_series(
+                    LineSeries::new(t.iter().zip(d).map(|(t, d)| (*t, *d) ), &BLACK)
+                ).unwrap();
+            });
+    }
 }

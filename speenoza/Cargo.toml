@@ -25,6 +25,7 @@ pyo3 = "0.16.5"
 numpy = "0.16.2"
 rayon = "1.5.3"
 finitediff = { version = "0.1.4", features = ["ndarray"] }
+plotters = "0.3.2"
 
 [features]
 extension-module = ["pyo3/extension-module"]

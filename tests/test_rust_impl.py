@@ -41,7 +41,7 @@ def test_rust_vs_python_simple_case():
     x1 = np.linspace(.5, 10, 6)
     x2 = np.zeros((x1.size, ), dtype=float)
     x3 = np.zeros((x1.size, ), dtype=float)
-    t = np.linspace(0, 20, 1000)
+    t = np.linspace(0, 20, 2_000)
     t0 = 3
     gamma = 1
     h = np.exp(-((t - t0)/gamma)**2) * (4 * ((t - t0)/gamma)**2 - 2)
@@ -70,7 +70,7 @@ def plot_simple_field():
     with pynoza.PlotAndWait():
         plt.plot(t, h)
     plt.clf()
-    dim = 20
+    dim = 3
     moment = np.zeros((3, dim, dim, dim, ))
     for i in range(dim - 2):
         moment[2, 0, i, 0] = (-1.)**i / (i + 1)**1

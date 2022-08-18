@@ -87,6 +87,35 @@ def plot_moment(moment):
         plt.title(text + " component")
 
 
+def get_fields(sol, find_center, t, x1, x2, x3, current_moment, h_sym, t_sym, center, method="python"):
+    if method == "python":
+        c_mom = lambda a1, a2, a3: list(current_moment[:, a1, a2, a3])
+        charge_moment = get_charge_moment(current_moment)
+        r_mom = lambda a1, a2, a3: list(charge_moment[:, a1, a2, a3])
+        sol.set_moments(c_mom, r_mom)
+    if find_center:
+        if method == "python":
+            return sol.compute_e_field(x1 - center[0],
+                                       x2 - center[1],
+                                       x3 - center[2],
+                                       t, h_sym, t_sym, compute_grid=False)
+        else:
+            return sol.par_compute_e_field((x1 - center[0]).flatten(),
+                                           (x2 - center[1]).flatten(),
+                                           (x3 - center[2]).flatten(),
+                                           t.flatten(), h_sym.flatten(),
+                                           current_moment).swapaxes(1, 2)
+    else:
+        if method == "python":
+            return sol.compute_e_field(x1, x2, x3, t, h_sym, t_sym, compute_grid=False)
+        else:
+            return sol.par_compute_e_field(x1.flatten(),
+                                           x2.flatten(),
+                                           x3.flatten(),
+                                           t.flatten(), h_sym.flatten(),
+                                           current_moment).swapaxes(1, 2)
+
+
 def inverse_problem(order, e_true, x1, x2, x3, t, t_sym, current_moment_callable, dim_moment, **kwargs):
 
     print(f"{kwargs=}")
@@ -109,37 +138,13 @@ def inverse_problem(order, e_true, x1, x2, x3, t, t_sym, current_moment_callable
         raise ValueError(f"Unknown keyword arguments: {kwargs}")
 
     dt = np.max(np.diff(t))
-
-    #sol = pynoza.Solution(max_order=order,
-    #                      wave_speed=1, )
-    #sol.recurse()
-    sol = speenoza.Speenoza(order)
-
-    def get_fields(current_moment, h_sym, t_sym, center):
-
-        # current_moment = current_moment.swapaxes(2, 3).swapaxes(1, 2).swapaxes(0, 1)
-        # c_mom = lambda a1, a2, a3: list(current_moment[:, a1, a2, a3])
-        # charge_moment = get_charge_moment(current_moment)
-        # r_mom = lambda a1, a2, a3: list(charge_moment[:, a1, a2, a3])
-        # sol.set_moments(c_mom, r_mom)
-
-        if find_center:
-            return sol.compute_e_field(x1.flatten() - center[0],
-                                       x2.flatten() - center[1],
-                                       x3.flatten() - center[2],
-                                       t.flatten(), h_sym.flatten(),
-                                       current_moment).swapaxes(1, 2)
-            # return sol.compute_e_field(x1.flatten() - center[0],
-            #                            x2 - center[1],
-            #                            x3 - center[2],
-            #                            t,  h_sym, t_sym, compute_grid=compute_grid)
-        else:
-            #return sol.compute_e_field(x1, x2, x3, t, h_sym, t_sym, compute_grid=compute_grid)
-            return sol.compute_e_field(x1.flatten(),
-                                       x2.flatten(),
-                                       x3.flatten(),
-                                       t.flatten(), h_sym.flatten(),
-                                       current_moment).swapaxes(1, 2)
+    method = "rust"
+    if method == "python":
+        sol = pynoza.Solution(max_order=order,
+                              wave_speed=1, )
+        sol.recurse()
+    else:
+        sol = speenoza.Speenoza(order)
 
 
     center = np.zeros((3, ))
@@ -174,7 +179,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, t_sym, current_moment_callable
         current_moment, h, center = unravel_params(x)
         h = get_h_num(h, t)
         current_moment = current_moment_callable(current_moment)
-        e_opt = get_fields(current_moment, h, None, center)
+        e_opt = get_fields(sol, find_center, t, x1, x2, x3, current_moment, h, None, center, method=method)
 
         error = 0
         normal = 0
