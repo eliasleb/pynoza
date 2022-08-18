@@ -102,19 +102,19 @@ def get_fields(sol, find_center, t, x1, x2, x3, current_moment, h_sym, t_sym, ce
                                        x3 - center[2],
                                        t, h_sym, t_sym, compute_grid=False)
         else:
-            return sol.par_compute_e_field((x1 - center[0]).flatten(),
-                                           (x2 - center[1]).flatten(),
-                                           (x3 - center[2]).flatten(),
-                                           t.flatten(), h_sym.flatten(),
+            return sol.par_compute_e_field((x1 - center[0]).reshape(-1),
+                                           (x2 - center[1]).reshape(-1),
+                                           (x3 - center[2]).reshape(-1),
+                                           t.reshape(-1), h_sym.reshape(-1),
                                            current_moment).swapaxes(1, 2)
     else:
         if method == "python":
             return sol.compute_e_field(x1, x2, x3, t, h_sym, t_sym, compute_grid=False)
         else:
-            return sol.par_compute_e_field(x1.flatten(),
-                                           x2.flatten(),
-                                           x3.flatten(),
-                                           t.flatten(), h_sym.flatten(),
+            return sol.par_compute_e_field(x1.reshape(-1),
+                                           x2.reshape(-1),
+                                           x3.reshape(-1),
+                                           t.reshape(-1), h_sym.reshape(-1),
                                            current_moment).swapaxes(1, 2)
 
 
@@ -150,7 +150,6 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
 
     center = np.zeros((3, ))
     current_moment = np.zeros((dim_moment, ))
-
     h = np.zeros((n_points, ))
 
     if find_center:
@@ -227,7 +226,6 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
 
     np.random.seed(0)
     print(f"There are {x0.size} degrees of freedom.")
-
     for i_try in range(max_global_tries):
         print("Try", i_try)
         if estimate is None:
