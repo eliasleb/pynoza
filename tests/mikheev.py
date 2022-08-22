@@ -132,7 +132,7 @@ def mikheev(**kwargs):
 
     assert len(x1) == len(x2) and len(x2) == len(x3)
 
-    t = np.linspace(0, 3.5, 100)
+    t = np.linspace(0, 3.5, 400)
 
     def compare_on_axis():
         nonlocal t
@@ -242,13 +242,13 @@ def mikheev(**kwargs):
     dim_mom = 1 * sum(1 for i, j, k in itertools.product(range(order + 1), repeat=3) if use_moment(i, j, k))
     #    + sum(1 for i, j, k in itertools.product(range(order + 1), repeat=3) if i + j + k <= order)
     #          + sum(1 for i, j, k in itertools.product(range(order + 1), repeat=3) if use_moment(i, j, k, 1))
-    # dim_mom = (order + 1) // 2
+    dim_mom = (order + 1) // 2
 
     def get_current_moment(moment_):
         current_moment_ = np.zeros(shape_mom)
-        # for i in range((order + 1) // 2):
-        #     current_moment_[2, 0, 2 * i + 1, 0] = moment_[i]
-        # return current_moment_
+        for i in range((order + 1) // 2):
+            current_moment_[2, 0, 2 * i + 1, 0] = moment_[i]
+        return current_moment_
         ind = 0
         for a1, a2, a3 in itertools.product(range(order + 1), repeat=3):
             if use_moment(a1, a2, a3):

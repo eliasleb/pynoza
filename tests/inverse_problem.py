@@ -8,7 +8,7 @@ from matplotlib import cm
 import speenoza
 
 
-METHOD = "rust"
+METHOD = "python"
 
 
 def complement(*args):
@@ -89,30 +89,40 @@ def plot_moment(moment):
         plt.title(text + " component")
 
 
-def get_fields(sol, find_center, t, x1, x2, x3, current_moment, h_sym, t_sym, center, method="python"):
+def get_fields(sol_python, sol_rust, find_center, t, x1, x2, x3, current_moment, h_sym, t_sym, center, method="python"):
     if method == "python":
-        c_mom = lambda a1, a2, a3: list(current_moment[:, a1, a2, a3])
-        charge_moment = get_charge_moment(current_moment)
-        r_mom = lambda a1, a2, a3: list(charge_moment[:, a1, a2, a3])
-        sol.set_moments(c_mom, r_mom)
+        pass
+    c_mom = lambda a1, a2, a3: list(current_moment[:, a1, a2, a3])
+    charge_moment = get_charge_moment(current_moment)
+    r_mom = lambda a1, a2, a3: list(charge_moment[:, a1, a2, a3])
+    sol_python.set_moments(c_mom, r_mom)
     if find_center:
         if method == "python":
-            return sol.compute_e_field(x1 - center[0],
-                                       x2 - center[1],
-                                       x3 - center[2],
-                                       t, h_sym, t_sym, compute_grid=False)
-        else:
-            return sol.par_compute_e_field((x1 - center[0]).reshape(-1),
+            pass
+        #e_python = sol_python.compute_e_field(x1 - center[0],
+        #                               x2 - center[1],
+        #                               x3 - center[2],
+        #                               t, h_sym, t_sym, compute_grid=False)
+        #else:
+        e_rust = sol_rust.par_compute_e_field((x1 - center[0]).reshape(-1),
                                            (x2 - center[1]).reshape(-1),
                                            (x3 - center[2]).reshape(-1),
                                            t.reshape(-1), h_sym.reshape(-1),
                                            current_moment).swapaxes(1, 2)
+        # f = plt.figure()
+        # with pynoza.PlotAndWait(new_figure=False, wait_for_enter_keypress=False):
+        #     plt.plot(t, e_python[2, :, :].T, "--")
+        #     plt.plot(t, e_rust[2, :, :].T)
+#
+        # plt.close(f)
+
+        return e_rust
     else:
         if method == "python":
-            return sol.compute_e_field(x1, x2, x3, t, h_sym, t_sym, compute_grid=False)
+            return sol_python.compute_e_field(x1, x2, x3, t, h_sym, t_sym, compute_grid=False)
         else:
-            return sol.par_compute_e_field(x1.reshape(-1),
-                                           x2.reshape(-1),
+            return sol_rust.par_compute_e_field(x1.reshape(-1),
+                                           (x2 + 0.4).reshape(-1),
                                            x3.reshape(-1),
                                            t.reshape(-1), h_sym.reshape(-1),
                                            current_moment).swapaxes(1, 2)
@@ -141,12 +151,12 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
 
     dt = np.max(np.diff(t))
 
-    if METHOD == "python":
-        sol = pynoza.Solution(max_order=order,
-                              wave_speed=1, )
-        sol.recurse()
-    else:
-        sol = speenoza.Speenoza(order)
+    #if METHOD == "python":
+    sol_python = pynoza.Solution(max_order=order,
+                          wave_speed=1, )
+    sol_python.recurse()
+   # else:
+    sol_rust = speenoza.Speenoza(order)
 
     center = np.zeros((3, ))
     current_moment = np.zeros((dim_moment, ))
@@ -178,7 +188,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
         current_moment_, h_, center_ = unravel_params(x)
         h_ = get_h_num(h_, t)
         current_moment_ = current_moment_callable(current_moment_)
-        e_opt = get_fields(sol, find_center, t, x1, x2, x3, current_moment_, h_, None, center_, method=METHOD)
+        e_opt = get_fields(sol_python, sol_rust, find_center, t, x1, x2, x3, current_moment_, h_, None, center_, method=METHOD)
 
         normal = 0
 

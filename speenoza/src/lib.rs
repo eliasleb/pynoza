@@ -218,8 +218,8 @@ pub mod solution {
             let mut y = Array1::zeros(x.len());
             for (index, yi) in y.iter_mut().enumerate() {
                 match index {
-                    0 => { *yi = (x[1] - x[0]) / dt },
-                    n if n == x.len() - 1 => { *yi = (x[n] - x[n - 1]) / dt }
+                    0 => { *yi = (x[2] - x[0]) / 2. / dt },
+                    n if n == x.len() - 1 => { *yi = (x[n] - x[n - 2]) / 2. / dt }
                     n => { *yi = (x[n + 1] - x[n - 1]) / 2. / dt }
                 }
             }
