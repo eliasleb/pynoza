@@ -6,7 +6,7 @@ import os
 from setuptools.command.build_ext import build_ext as build_ext_orig
 
 
-class build_ext(build_ext_orig):
+class BuildExt(build_ext_orig):
 
     def run(self):
         os.system("cd speenoza; maturin develop --release; cd ..;")
@@ -42,6 +42,6 @@ setuptools.setup(
     ext_modules=cythonize("src/pynoza/solution.py",
                           compiler_directives={'language_level': "3"}),
     cmdclass={
-        'build_ext': build_ext,
+        'build_ext': BuildExt,
     },
 )
