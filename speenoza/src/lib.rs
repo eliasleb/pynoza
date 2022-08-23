@@ -48,8 +48,8 @@ pub mod solution {
                     MultiIndex { i: order, j: 0, k: 0 },
                     MultiIndexRange::stop(order))
                     .into_iter() {
-                    let mut known_index = index.clone();
-                    known_index[index.first_non_zero_dim().unwrap().try_into().unwrap()] -= 1;
+                    let mut known_index = index;
+                    known_index[index.first_non_zero_dim().unwrap()] -= 1;
                     self.increase_order(&mut temp, known_index, index);
                 }
                 self.aux_fun.extend(temp);
@@ -71,31 +71,31 @@ pub mod solution {
                     // First term
                     let exponent_x_i = signature[known_dim];
                     if exponent_x_i > 0 {
-                        let mut identity_first_term = signature.clone();
+                        let mut identity_first_term = *signature;
                         identity_first_term[known_dim] -= 1; // differentiation
                         *temp.entry(new)
-                            .or_insert(HashMap::new())
+                            .or_insert_with(HashMap::new)
                             .entry(identity_first_term)
                             .or_insert(0.) += *coefficient * (exponent_x_i as Real);
                     }
 
                     // Second term
                     let exponent_r = signature.r;
-                    let mut identity_second_term = signature.clone();
+                    let mut identity_second_term = *signature;
                     identity_second_term[known_dim] += 1; // numerator
                     identity_second_term.r += 2; // denominator
                     *temp.entry(new)
-                        .or_insert(HashMap::new())
+                        .or_insert_with(HashMap::new)
                         .entry(identity_second_term)
                         .or_insert(0.) -= *coefficient * (exponent_r as Real);
 
                     // Third term (time-derivative)
-                    let mut identity_third_term = signature.clone();
+                    let mut identity_third_term = *signature;
                     identity_third_term[known_dim] += 1; // numerator
                     identity_third_term.h += 1; // time-derivative
                     identity_third_term.r += 1; // denominator
                     *temp.entry(new)
-                        .or_insert(HashMap::new())
+                        .or_insert_with(HashMap::new)
                         .entry(identity_third_term)
                         .or_insert(0.) -= *coefficient;
                 }
@@ -108,11 +108,11 @@ pub mod solution {
 
         fn term_to_string(term: &HashMap<Signature, Real>, fun_name: String) -> String {
             let stuff: Vec<String> = term.iter().map(| (signature, coefficient) |
-                String::from(format!(
+                format!(
                     "({}) * {}",
                     coefficient,
                     signature.to_string(fun_name.clone())
-                ))
+                )
             ).collect();
 
             stuff.join(" + ")
@@ -127,6 +127,11 @@ pub mod solution {
                                current_moment: ArrayView4<Real>) -> Array3<Real> {
             let thresh = 1e-14;
             let r = Self::radius(x1, x2, x3);
+            assert!(
+                r
+                    .iter()
+                    .all(|ri| ri.abs() > thresh)
+            );
             let hs = self.handle_h(t, h);
             let (hs_integral, hs_derivative) = self.repack_hs(hs);
             let charge_moment = self.get_charge_moment(current_moment.view());
@@ -198,11 +203,11 @@ pub mod solution {
                             let current = current_moment[[dim, index.i as usize, index.j as usize, index.k as usize]];
                             let charge = charge_moment[[dim, index.i as usize, index.j as usize, index.k as usize]];
                             let mut element = if current.abs() > thresh || charge.abs() > thresh {
-                                String::from(format!(
+                                format!(
                                     "+ {} / {} * ",
                                     if index.order() % 2 == 0 { 1 } else { -1 },
                                     index.factorial()
-                                ))
+                                )
                             } else {
                                 String::new()
                             };
@@ -226,9 +231,9 @@ pub mod solution {
                         })
                         .fold(
                             String::new(),
-                                |a, b| String::from(format!(
+                                |a, b| format!(
                                     "{}{}", a, b
-                                ))
+                                )
                         )
                 })
                 .collect::<Vec<String>>()
@@ -300,7 +305,7 @@ pub mod solution {
                                               MultiIndexRange::stop(self.max_order)) {
                     let (a1, a2, a3) = (a.i, a.j, a.k);
                     for j in 0..3 {
-                        let mut b = a.clone();
+                        let mut b = a;
                         if i == j {
                             if a[j] >= 2 {
                                 b[j] = a[j] - 2;
@@ -327,15 +332,15 @@ pub mod solution {
     }
 
     impl Signature {
-        fn to_string(&self, fun_name: String) -> String {
-            String::from(format!(
+        fn to_string(self, fun_name: String) -> String {
+            format!(
                 "{} {} {} {} / {}",
                 monomial_to_string("x", self.x1),
                 monomial_to_string("y", self.x2),
                 monomial_to_string("z", self.x3),
                 derivative_to_string(&fun_name, self.h),
                 monomial_to_string("r", self.r)
-            ))
+            )
         }
     }
 
@@ -366,23 +371,23 @@ pub mod solution {
         match power {
             0 => String::from(""),
             1 => String::from(var_name),
-            _ => String::from(format!("{var_name}^{power}"))
+            _ => format!("{var_name}^{power}")
         }
     }
 
     fn derivative_to_string(fun_name: &str, order: i32) -> String {
         match order {
             0 => String::from(fun_name),
-            1 => String::from(format!("{fun_name}'",)),
-            2 => String::from(format!("{fun_name}''",)),
-            3 => String::from(format!("{fun_name}'''",)),
-            _ => String::from(format!("{fun_name}^({order})"))
+            1 => format!("{fun_name}'",),
+            2 => format!("{fun_name}''",),
+            3 => format!("{fun_name}'''",),
+            _ => format!("{fun_name}^({order})")
         }
     }
 
     pub fn check_equality(expr1: &str, expr2: &str) -> bool {
-        let lhs: HashSet<&str> = expr1.split("+").map(| x | x.trim() ).collect();
-        let rhs: HashSet<&str> = expr2.split("+").map(| x | x.trim() ).collect();
+        let lhs: HashSet<&str> = expr1.split('+').map(| x | x.trim() ).collect();
+        let rhs: HashSet<&str> = expr2.split('+').map(| x | x.trim() ).collect();
 
         lhs == rhs
     }
@@ -433,10 +438,10 @@ pub mod solution {
             if current_moment.shape() != [3usize, (self.solution.max_order + 1) as usize,
                 (self.solution.max_order + 1) as usize, (self.solution.max_order + 1) as usize] {
                 return Err(PyErr::new::<exceptions::PyValueError, _>(
-                    String::from(format!("the shape of current_moment must be (3, dim, dim, dim), \
+                    format!("the shape of current_moment must be (3, dim, dim, dim), \
                     where dim = max_order + 1 (got {:?}, dim should be {})",
                     current_moment.shape(),
-                    self.solution.max_order + 1))
+                    self.solution.max_order + 1)
                 ))
             }
 
@@ -586,7 +591,7 @@ mod tests {
         let h = t.mapv(|ti|
             f64::exp(-(ti-t0)*(ti-t0)) * (4. * (ti-t0)*(ti-t0) - 2.));
         let mut derivatives: Vec<Array1<f64>> = Vec::new();
-        derivatives.push(h.clone());
+        derivatives.push(h);
         let max_order = 2;
         for order in 1..=max_order {
             derivatives.push(Solution::derivative(dt, derivatives.get(order - 1).unwrap().view()));
