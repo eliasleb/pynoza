@@ -102,16 +102,16 @@ pub mod solution {
                 );
         }
 
-        pub fn get_human_readable_aux_fun(&self, index: &MultiIndex) -> String {
-            Self::term_to_string(self.aux_fun.get(index).unwrap())
+        pub fn get_human_readable_aux_fun(&self, index: &MultiIndex, fun_name: String) -> String {
+            Self::term_to_string(self.aux_fun.get(index).unwrap(), fun_name)
         }
 
-        fn term_to_string(term: &HashMap<Signature, Real>) -> String {
+        fn term_to_string(term: &HashMap<Signature, Real>, fun_name: String) -> String {
             let stuff: Vec<String> = term.iter().map(| (signature, coefficient) |
                 String::from(format!(
                     "({}) * {}",
                     coefficient,
-                    signature.to_string()
+                    signature.to_string(fun_name.clone())
                 ))
             ).collect();
 
@@ -153,20 +153,12 @@ pub mod solution {
                                                 let i_t_delayed = (i_t as i64) -
                                                     ((r[i_x] / dt) as i64);
                                                 coefficient
-                                                * match signature.x1 {
-                                                    pow if pow > 0 => x1[i_x].powi(pow),
-                                                    _ => 1.
-                                                } * match signature.x2 {
-                                                    pow if pow > 0 => x2[i_x].powi(pow),
-                                                    _ => 1.
-                                                } * match signature.x3 {
-                                                    pow if pow > 0 => x3[i_x].powi(pow),
-                                                    _ => 1.
-                                                } * match signature.r {
-                                                    pow if pow > 0 => 1. / r[i_x].powi(pow),
-                                                    _ => 1.
-                                                } * if index.order() % 2 == 0 { 1. } else { -1. }
-                                                    / index.factorial() * -1e-7 * match i_t_delayed {
+                                                * x1[i_x].powi(signature.x1)
+                                                * x2[i_x].powi(signature.x2)
+                                                * x3[i_x].powi(signature.x3)
+                                                / r[i_x].powi(signature.r)
+                                                * if index.order() % 2 == 0 { 1. } else { -1. }
+                                                / index.factorial() * -1e-7 * match i_t_delayed {
                                                     i_t if i_t >= 0 =>
                                                         hs_derivative.get(&signature.h)
                                                         .unwrap()[i_t as usize]
@@ -177,7 +169,7 @@ pub mod solution {
                                                         * charge_moment[[dim, index.i as usize,
                                                             index.j as usize, index.k as usize]],
                                                     _ => 0.,
-                                                }
+                                            }
                                         }
                                     )
                                 }
@@ -186,6 +178,60 @@ pub mod solution {
                     }
                 );
             e_field
+        }
+
+
+        pub fn compute_electric_field_analytical(&self, current_moment: ArrayView4<Real>)
+            -> Vec<String> {
+            let thresh = 1e-18;
+
+            let charge_moment = self.get_charge_moment(current_moment.view());
+            (0..3)
+                .into_iter()
+                .map(|dim| {
+                    MultiIndexRange::new(
+                        MULTI_INDEX_ZERO,
+                        MultiIndexRange::stop(self.max_order)
+                    )
+                        .into_iter()
+                        .map(|index| {
+                            let current = current_moment[[dim, index.i as usize, index.j as usize, index.k as usize]];
+                            let charge = charge_moment[[dim, index.i as usize, index.j as usize, index.k as usize]];
+                            let mut element = if current.abs() > thresh || charge.abs() > thresh {
+                                String::from(format!(
+                                    "+ {} / {} * ",
+                                    if index.order() % 2 == 0 { 1 } else { -1 },
+                                    index.factorial()
+                                ))
+                            } else {
+                                String::new()
+                            };
+
+                            if current.abs() > thresh {
+                                element.push_str(&format!(
+                                    "{} * {}",
+                                    current,
+                                    self.get_human_readable_aux_fun(&index, String::from("h''"))
+                                )[..]);
+                            }
+                            if charge.abs() > thresh {
+                                element.push_str(&format!(
+                                    "{} * {}",
+                                    charge,
+                                    self.get_human_readable_aux_fun(&index, String::from("h"))
+                                )[..]);
+                            }
+
+                            element
+                        })
+                        .fold(
+                            String::new(),
+                                |a, b| String::from(format!(
+                                    "{}{}", a, b
+                                ))
+                        )
+                })
+                .collect::<Vec<String>>()
         }
 
 
@@ -223,23 +269,6 @@ pub mod solution {
                     n => { *yi = (x[n + 1] - x[n - 1]) / 2. / dt }
                 }
             }
-            // for (index, yi) in y.iter_mut().enumerate() {
-            //         match index {
-            //             0..=3 => { *yi = (-49./20.*x[index] + 6.*x[index+1] - 15./2.*x[index+2]
-            //                 + 20./3.*x[index+3] - 15./4.*x[index+4] + 6./5.*x[index+5]
-            //                 - 1./6.*x[index+6]) / dt },
-            //             index if 4 <= index && index < x.len() - 4 => {
-            //                 *yi = (1./280.*x[index-4] - 4./105.*x[index-3] + 1./5.*x[index-2]
-            //                     - 4./5.*x[index-1] + 4./5.*x[index+1] - 1./5.*x[index+2]
-            //                     + 4./105.*x[index+3] - 1./280.*x[index+4]) / dt
-            //             },
-            //             index=> {
-            //                 *yi = (-1./3.*x[index-3] + 3./2.*x[index-2] - 3.*x[index-1] +
-            //                     11./6.*x[index]) / dt
-            //             }
-            //         };
-            //     }
-
             y
         }
 
@@ -298,13 +327,13 @@ pub mod solution {
     }
 
     impl Signature {
-        fn to_string(&self) -> String {
+        fn to_string(&self, fun_name: String) -> String {
             String::from(format!(
-                "{}{}{} {} / {}",
+                "{} {} {} {} / {}",
                 monomial_to_string("x", self.x1),
                 monomial_to_string("y", self.x2),
                 monomial_to_string("z", self.x3),
-                derivative_to_string("h", self.h),
+                derivative_to_string(&fun_name, self.h),
                 monomial_to_string("r", self.r)
             ))
         }
@@ -477,14 +506,20 @@ mod tests {
 
     #[test]
     fn test_auxiliary_function() {
-        let sol = Solution::new(1);
+        let sol = Solution::new(2);
         assert!(check_equality(
-            &sol.get_human_readable_aux_fun(&MULTI_INDEX_ZERO),
-            &String::from("(1) *  h / r")));
+            &sol.get_human_readable_aux_fun(&MULTI_INDEX_ZERO, String::from("h")),
+            &String::from("(1) *    h / r")));
         assert!(check_equality(
-            &sol.get_human_readable_aux_fun(&MultiIndex { i: 1, j: 0, k: 0 }),
-            &String::from("(-1) * x h / r^3 + (-1) * x h' / r^2")
+            &sol.get_human_readable_aux_fun(&MultiIndex { i: 1, j: 0, k: 0 },
+            String::from("h")),
+            &String::from("(-1) * x   h' / r^2 + (-1) * x   h / r^3")
         ));
+        assert!(check_equality(
+            &sol.get_human_readable_aux_fun(&MultiIndex { i: 2, j: 0, k: 0 },
+                                            String::from("h")),
+            &String::from("(3) * x^2   h' / r^4 + (3) * x^2   h / r^5 + (-1) \
+            *    h' / r^2 + (1) * x^2   h'' / r^3 + (-1) *    h / r^3")));
     }
 
     #[test]
@@ -498,7 +533,8 @@ mod tests {
         let mut current_moment = Array4::zeros((3, 5, 5, 5));
         current_moment[[2, 0, 0, 0]] = 1.;
         let _e_field = sol.par_compute_e_field(x1.view(), x2.view(), x3.view(),
-                                          t.view(), h.view(), current_moment.view());
+                                               t.view(), h.view(),
+                                               current_moment.view());
 
     }
 
@@ -578,5 +614,14 @@ mod tests {
                     LineSeries::new(t.iter().zip(d).map(|(t, d)| (*t, *d) ), &BLACK)
                 ).unwrap();
             });
+    }
+
+    #[test]
+    fn test_human_readable_field() {
+        let sol = Solution::new(2);
+        let mut current_moment: Array4<Real> = Array4::zeros((3, 3, 3, 3));
+        current_moment[[2, 0, 0, 0]] = 1.;
+        let _e_field = sol.compute_electric_field_analytical(current_moment.view());
+        println!("({}) ex + ({}) ey + ({}) ez", _e_field[0], _e_field[1], _e_field[2]);
     }
 }
