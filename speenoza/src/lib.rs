@@ -209,14 +209,14 @@ pub mod solution {
 
                             if current.abs() > thresh {
                                 element.push_str(&format!(
-                                    "{} * {}",
+                                    "{} * ({})",
                                     current,
                                     self.get_human_readable_aux_fun(&index, String::from("h''"))
                                 )[..]);
                             }
                             if charge.abs() > thresh {
                                 element.push_str(&format!(
-                                    "{} * {}",
+                                    "{} * ({})",
                                     charge,
                                     self.get_human_readable_aux_fun(&index, String::from("h"))
                                 )[..]);
@@ -622,6 +622,5 @@ mod tests {
         let mut current_moment: Array4<Real> = Array4::zeros((3, 3, 3, 3));
         current_moment[[2, 0, 0, 0]] = 1.;
         let _e_field = sol.compute_electric_field_analytical(current_moment.view());
-        println!("({}) ex + ({}) ey + ({}) ez", _e_field[0], _e_field[1], _e_field[2]);
     }
 }
