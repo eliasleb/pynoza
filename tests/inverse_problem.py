@@ -8,7 +8,7 @@ from matplotlib import cm
 import speenoza
 
 
-METHOD = "python"
+METHOD = "rust"
 
 
 def complement(*args):
@@ -122,10 +122,10 @@ def get_fields(sol_python, sol_rust, find_center, t, x1, x2, x3, current_moment,
             return sol_python.compute_e_field(x1, x2, x3, t, h_sym, t_sym, compute_grid=False)
         else:
             return sol_rust.par_compute_e_field(x1.reshape(-1),
-                                           (x2 + 0.4).reshape(-1),
-                                           x3.reshape(-1),
-                                           t.reshape(-1), h_sym.reshape(-1),
-                                           current_moment).swapaxes(1, 2)
+                                                x2.reshape(-1),
+                                                x3.reshape(-1),
+                                                t.reshape(-1), h_sym.reshape(-1),
+                                                current_moment).swapaxes(1, 2)
 
 
 def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callable, dim_moment, **kwargs):
