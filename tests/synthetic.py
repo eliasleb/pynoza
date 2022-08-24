@@ -12,9 +12,9 @@ def build_current_moment(order):
     return current_moment
 
 
-def plot_directivity(solution, r, h, t):
+def plot_directivity(solution, r, h, t, phi_min=0, phi_max=2*np.pi):
     theta = np.linspace(0, np.pi, 30)
-    phi = np.linspace(0, 2 * np.pi, 60)
+    phi = np.linspace(phi_min, phi_max, 60)
     coords_directivity = [[], [], []]
     for theta_i, phi_i in itertools.product(theta, phi):
         coords_directivity[0].append(r * np.sin(theta_i) * np.cos(phi_i))
