@@ -118,6 +118,35 @@ pub mod solution {
             stuff.join(" + ")
         }
 
+        /// Computes the electric field in time-domain.
+        ///
+        /// # Arguments
+        ///
+        /// * `x1`: Positions of the first coordinate
+        /// * `x2`: Positions of the second coordinate
+        /// * `x3`: Positions of the third coordinate
+        /// * `t`: Times at which the solution (and many numerical derivatives) are evaluated at
+        /// * `h`: Shape of the current excitation
+        /// * `current_moment`: Current moment array
+        ///
+        /// returns: ArrayBase<OwnedRepr<f64>, Dim<[usize; 3]>>
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use ndarray::prelude::*;
+        /// use crate::speenoza::solution;
+        /// let x1 = Array1::from(vec![1., 2., 3., ]);
+        /// let x2 = Array1::zeros(3);
+        /// let x3 = x2.clone();
+        /// let t = Array1::linspace(0., 10., 500);
+        /// let h = t.mapv(|ti| f64::sin(ti));
+        /// let sol = solution::Solution::new(2);
+        /// let mut current_moment = Array4::zeros((3, 3, 3, 3));
+        /// current_moment[[2, 0, 0, 0]] = 1.;
+        /// sol.par_compute_e_field(x1.view(), x2.view(), x3.view(), t.view(), h.view(),
+        ///     current_moment.view());
+        /// ```
         pub fn par_compute_e_field(&self,
                                x1: ArrayView1<Real>,
                                x2: ArrayView1<Real>,
