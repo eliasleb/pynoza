@@ -8,7 +8,7 @@ from matplotlib import cm
 import speenoza
 
 
-METHOD = "rust"
+METHOD = "python"
 
 
 def complement(*args):
@@ -99,22 +99,21 @@ def get_fields(sol_python, sol_rust, find_center, t, x1, x2, x3, current_moment,
     if find_center:
         if method == "python":
             pass
-        #e_python = sol_python.compute_e_field(x1 - center[0],
-        #                               x2 - center[1],
-        #                               x3 - center[2],
-        #                               t, h_sym, t_sym, compute_grid=False)
+            e_python = sol_python.compute_e_field(x1 - center[0],
+                                                  x2 - center[1],
+                                                  x3 - center[2],
+                                                  t, h_sym, t_sym, compute_grid=False)
+            return e_python
         #else:
         e_rust = sol_rust.par_compute_e_field((x1 - center[0]).reshape(-1),
-                                           (x2 - center[1]).reshape(-1),
-                                           (x3 - center[2]).reshape(-1),
-                                           t.reshape(-1), h_sym.reshape(-1),
-                                           current_moment).swapaxes(1, 2)
-        # f = plt.figure()
+                                              (x2 - center[1]).reshape(-1),
+                                              (x3 - center[2]).reshape(-1),
+                                              t.reshape(-1), h_sym.reshape(-1),
+                                              current_moment).swapaxes(1, 2)
         # with pynoza.PlotAndWait(new_figure=False, wait_for_enter_keypress=False):
         #     plt.plot(t, e_python[2, :, :].T, "--")
         #     plt.plot(t, e_rust[2, :, :].T)
-#
-        # plt.close(f)
+        # plt.clf()
 
         return e_rust
     else:
@@ -188,7 +187,8 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
         current_moment_, h_, center_ = unravel_params(x)
         h_ = get_h_num(h_, t)
         current_moment_ = current_moment_callable(current_moment_)
-        e_opt = get_fields(sol_python, sol_rust, find_center, t, x1, x2, x3, current_moment_, h_, None, center_, method=METHOD)
+        e_opt = get_fields(sol_python, sol_rust, find_center, t, x1, x2, x3, current_moment_, h_, None, center_,
+                           method=METHOD)
 
         normal = 0
 
