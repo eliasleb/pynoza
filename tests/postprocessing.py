@@ -10,6 +10,12 @@ import pynoza
 import scipy.interpolate
 import HIRA
 import scipy.special
+import matplotlib
+
+# Say, "the default sans-serif font is COMIC SANS"
+matplotlib.rcParams['font.sans-serif'] = "Times"
+# Then, "ALWAYS use sans-serif fonts"
+matplotlib.rcParams['font.family'] = "Times"
 
 
 def predicted_excitation(x1, y1, x2):
@@ -73,6 +79,26 @@ def postprocessing_mikheev(*args):
     current_moment, t, h, h_true, center, sol, order, filename = args
     sol.compute_e_field(np.array([1, ]), np.array([1, ]), np.array([1, ]), np.linspace(0, 1, 100),
                         np.zeros((100, )), None, compute_grid=False, compute_txt=True)
+    t0 = 3
+    gamma = 1
+    term = ((t - t0) / gamma)**2
+    h_true = np.exp(-term) * (4 * term - 2)
+
+    with pynoza.PlotAndWait():
+        cwidth = 5
+        plt.figure(figsize=(cwidth, cwidth * .6))
+        max_h = np.max(np.abs(h))
+        max_h_true = np.max(np.abs(h_true))
+        plt.plot(t, h / max_h, "k")
+        plt.plot(t, h_true / max_h_true, "r--")
+
+        plt.xlabel("Time (s c$_0$)")
+        plt.ylabel("Amplitude (1)")
+        plt.xlim((0, 7))
+
+        plt.legend(("Equivalent time-\ndependent excitation", "Lumped port voltage"),
+                   loc="lower right")
+        plt.tight_layout()
 
     print(to_mathematica(sol.get_e_field_text()))
     if center is None:
@@ -89,7 +115,32 @@ def postprocessing_mikheev(*args):
     #t = np.concatenate((t, np.linspace(t[-1], t[-1] + n_added * t[-1], int(n_added * t.size))))
     #h = np.concatenate((h, np.zeros(t.size - h.size)))
     import synthetic
-    synthetic.plot_directivity(sol, r, h, t)
+    synthetic.plot_directivity(sol, r, h_true, t, phi_min=3.2, phi_max=6.1)
+
+    print(f"{current_moment[2, 0, 1, 0] / current_moment[1, 0, 0, 1]=}")
+
+    with pynoza.PlotAndWait():
+        plt.figure(figsize=(cwidth, cwidth * .7))
+        ax = plt.gca()
+        # 0 => opt-result-Wed\ Aug\ 24\ 14:57:23\ 2022.csv_params.pickle
+        # 1 => opt-result-Wed\ Aug\ 24\ 14:48:51\ 2022.csv_params.pickle
+        # 2 => opt-result-Wed\ Aug\ 24\ 14:51:32\ 2022.csv_params.pickle
+        # 3 => opt-result-Wed\ Aug\ 24\ 12:35:02\ 2022.csv_params.pickle
+        orders = [0, 1, 2, 3]
+        errors = [0.7571677158280244, 0.1530102107821843, 0.14109499525016725, 0.1004297861797407]
+        dof = [19, 23, 31, 45]
+        plt.plot(orders, np.array(errors) * 100, "k-d")
+        plt.xticks(orders, [str(order_i) for order_i in orders])
+        plt.xlabel("Maximum current moment order")
+        plt.ylabel("Residual error (%)")
+
+        ax2 = ax.twinx()
+        ax2.plot(orders, dof, "r-s")
+        ax2.tick_params(axis='y', colors='red')
+        ax2.set_ylabel("Degrees of freedom", color="red")
+
+        plt.tight_layout()
+
 
 def postprocessing(**kwargs):
 
@@ -99,6 +150,8 @@ def postprocessing(**kwargs):
     current_moment, h, center, e_true, e_opt = pickle.load(open(kwargs.get("filename"), "rb"))
     e_true = np.array(e_true)
     inverse_problem.plot_moment(current_moment)
+
+    print(f"The order is {current_moment.shape[1] - 1}")
 
     print(f"L2 Error: {np.sum((e_true - e_opt)**2) / np.sum(e_true**2)}")
 
