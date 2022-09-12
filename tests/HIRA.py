@@ -127,6 +127,18 @@ def inverse_problem_hira(**kwargs):
     ez = ez[indices_obs, :]
 
     r = np.sqrt(x1 ** 2 + x2 ** 2 + x3 ** 2)
+    t_max = t.max()
+
+    def force_decay(e, t_delay):
+        cut = 0.5 * t_max
+        return e * ((t_delay <= cut) + (t_delay > cut) * np.exp(-((t_delay - cut) / gamma) ** 2))
+
+    td = t.reshape(1, t.size) - r.reshape(r.size, 1)
+
+    ex = force_decay(ex, td)
+    ey = force_decay(ey, td)
+    ez = force_decay(ez, td)
+
 
     print(f"{ex.shape=}")
 

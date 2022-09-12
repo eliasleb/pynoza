@@ -1,3 +1,18 @@
+# Copyright (C) 2022  Elias Le Boudec
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU Affero General Public License as published
+#    by the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU Affero General Public License for more details.
+#
+#    You should have received a copy of the GNU Affero General Public License
+#    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import itertools
 import pickle
 
@@ -76,9 +91,36 @@ def postprocessing_globalem(*args):
 
 
 def postprocessing_mikheev(*args):
+    current_moment, t, h, h_true, center, sol, order, filename = args
 
     with pynoza.PlotAndWait():
-        pass
+        r_obs = [1, 1.5]
+        theta_obs = np.linspace(0, np.pi, 5)
+        phi_obs = np.linspace(np.pi, 2 * np.pi, 8)
+        ax = plt.figure().add_subplot(projection='3d')
+        for ri in r_obs:
+            x_obs, y_obs, z_obs = [], [], []
+            for theta_i, phi_i in itertools.product(theta_obs, phi_obs):
+                x_obs.append(ri * np.sin(theta_i) * np.cos(phi_i))
+                y_obs.append(ri * np.sin(theta_i) * np.sin(phi_i))
+                z_obs.append(ri * np.cos(theta_i))
+                if ri == r_obs[0]:
+                    ax.scatter(x_obs, y_obs, z_obs, marker="*", c="red")
+                else:
+                    ax.scatter(x_obs, y_obs, z_obs, marker="d", c="k")
+
+        ax.set_xlabel("x")
+        ax.set_ylabel("y")
+        ax.set_zlabel("z")
+        r_max = np.max(r_obs)
+        ax.set_xlim(-r_max, r_max)
+        ax.set_ylim(-r_max, r_max)
+        ax.set_zlim(-r_max, r_max)
+        ax.view_init(elev=22, azim=-60)
+
+        plt.tight_layout()
+
+
 
     n = 8
     l = 1
@@ -107,7 +149,6 @@ def postprocessing_mikheev(*args):
         {np.sum(V * X**index[0] * Y**index[1] * Z**index[2]):.1f}, \
         {np.sum(W * X**index[0] * Y**index[1] * Z**index[2]):.1f}")
 
-    current_moment, t, h, h_true, center, sol, order, filename = args
     sol.compute_e_field(np.array([1, ]), np.array([1, ]), np.array([1, ]), np.linspace(0, 1, 100),
                         np.zeros((100, )), None, compute_grid=False, compute_txt=True)
     t0 = 3
@@ -158,13 +199,14 @@ def postprocessing_mikheev(*args):
         # 2 => opt-result-Wed\ Aug\ 24\ 14:51:32\ 2022.csv_params.pickle
         # 3 => opt-result-Wed\ Aug\ 24\ 12:35:02\ 2022.csv_params.pickle
         orders = [2, 3, 4, 5]
-        errors = [0.7571677158280244, 0.1530102107821843, 0.14109499525016725, 0.1004297861797407]
+        errors = [0.756, 0.151, 0.140, 0.1004297861797407]
         dof = [19, 23, 31, 45]
         centers = [
-            [0.00183357, -0.11269165, -0.48079278],
-            [3.72103568e-04, 1.99508382e-01, -7.50123477e-05],
-            [-0.00083548, 0.20989134, 0.22602652],
-            [-0.00066851, 0.21604073, 0.00059933]
+            [-0.00050089, -0.11762098, -0.48088337],
+            [1.42365544e-04, 1.92644617e-01, 4.37729759e-04],
+            [0.00034381,  0.20340903, -0.22510711],
+            [-0.00021556,  0.21152769,  0.00137421],
+            [-0.12295806, 0.22205782, 0.09210685],
         ]
         plt.plot(orders, np.array(errors) * 100, "k-d")
         plt.xticks(orders, [str(order_i) for order_i in orders])
