@@ -186,7 +186,7 @@ def inverse_problem_hira(**kwargs):
               "plot": kwargs.get("plot").lower() == "true",
               "scale": float(kwargs.get("scale", 1e4)),
               "h_num": get_h_num,
-              "find_center": bool(kwargs.get("find_center", True)),
+              "find_center": kwargs.get("find_center", "true").lower() == "true",
               "max_global_tries": int(kwargs.get("max_global_tries", 1)),
               "compute_grid": False,
               "estimate": estimate}
