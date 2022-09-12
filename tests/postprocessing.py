@@ -76,6 +76,37 @@ def postprocessing_globalem(*args):
 
 
 def postprocessing_mikheev(*args):
+
+    with pynoza.PlotAndWait():
+        pass
+
+    n = 8
+    l = 1
+    X, Y, Z = np.meshgrid(np.linspace(-l, l, n),
+                          np.linspace(-l, l, n),
+                          np.linspace(-l, l, n),)
+    mask = (np.sqrt(X**2 + Y**2 + Z**2) < 1) * (Y < 0)
+    U, V, W = 0, Z, -1.65 * Y
+    with pynoza.PlotAndWait():
+        ax = plt.figure().add_subplot(projection='3d')
+
+        ax.quiver(X, Y, Z, U * mask, V * mask, W * mask, length=0.25, color="k")
+
+        ax.set_xlim((-l, l))
+        ax.set_ylim((-l, l))
+        ax.set_zlim((-l, l))
+
+        ax.set_xlabel("x")
+        ax.set_ylabel("y")
+        ax.set_zlabel("z")
+
+        plt.tight_layout()
+
+    for index in ((0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 1)):
+        print(f"{index=}, {np.sum(U * X**index[0] * Y**index[1] * Z**index[2]):.1f}, \
+        {np.sum(V * X**index[0] * Y**index[1] * Z**index[2]):.1f}, \
+        {np.sum(W * X**index[0] * Y**index[1] * Z**index[2]):.1f}")
+
     current_moment, t, h, h_true, center, sol, order, filename = args
     sol.compute_e_field(np.array([1, ]), np.array([1, ]), np.array([1, ]), np.linspace(0, 1, 100),
                         np.zeros((100, )), None, compute_grid=False, compute_txt=True)
@@ -94,7 +125,7 @@ def postprocessing_mikheev(*args):
 
         plt.xlabel("Time (s c$_0$)")
         plt.ylabel("Amplitude (1)")
-        plt.xlim((0, 7))
+        #plt.xlim((0, 7))
 
         plt.legend(("Equivalent time-\ndependent excitation", "Lumped port voltage"),
                    loc="lower right")
@@ -126,18 +157,25 @@ def postprocessing_mikheev(*args):
         # 1 => opt-result-Wed\ Aug\ 24\ 14:48:51\ 2022.csv_params.pickle
         # 2 => opt-result-Wed\ Aug\ 24\ 14:51:32\ 2022.csv_params.pickle
         # 3 => opt-result-Wed\ Aug\ 24\ 12:35:02\ 2022.csv_params.pickle
-        orders = [0, 1, 2, 3]
+        orders = [2, 3, 4, 5]
         errors = [0.7571677158280244, 0.1530102107821843, 0.14109499525016725, 0.1004297861797407]
         dof = [19, 23, 31, 45]
+        centers = [
+            [0.00183357, -0.11269165, -0.48079278],
+            [3.72103568e-04, 1.99508382e-01, -7.50123477e-05],
+            [-0.00083548, 0.20989134, 0.22602652],
+            [-0.00066851, 0.21604073, 0.00059933]
+        ]
         plt.plot(orders, np.array(errors) * 100, "k-d")
         plt.xticks(orders, [str(order_i) for order_i in orders])
-        plt.xlabel("Maximum current moment order")
+        plt.xlabel("Truncation order")
         plt.ylabel("Residual error (%)")
 
         ax2 = ax.twinx()
-        ax2.plot(orders, dof, "r-s")
+        ax2.plot(orders, dof, "r-")
+        ax2.scatter(orders, dof, c="red", marker="*", s=100)
         ax2.tick_params(axis='y', colors='red')
-        ax2.set_ylabel("Degrees of freedom", color="red")
+        ax2.set_ylabel("Degrees of freedom", color="red", )
 
         plt.tight_layout()
 
