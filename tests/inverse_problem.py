@@ -190,13 +190,13 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
         e_opt = get_fields(sol_python, sol_rust, find_center, t, x1, x2, x3, current_moment_, h_, None, center_,
                            method=METHOD)
 
-        normal = 0
+        total_energy = 0
 
-        errors_comp = []
+        component_wise_error = []
         for c1, c2 in zip(e_true, e_opt):
-            errors_comp.append(np.sum(np.abs(c1 - c2 * scale)**p))
-            normal += np.sum(np.abs(c1)**p)
-        error = np.sum(errors_comp) / normal
+            component_wise_error.append(np.sum(np.abs(c1 - c2 * scale)**p))
+            total_energy += np.sum(np.abs(c1) ** p)
+        error = np.sum(component_wise_error) / total_energy
 
         if coeff_derivative > 0:
             error += coeff_derivative*np.sum(np.diff(h)**2)/np.sum(h**2)*dt
@@ -225,7 +225,8 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
                         plt.title(f"center = ({center_[0]:+.03f}, {center_[1]:+.03f} {center_[2]:+.03f})")
 
             os.system("clear")
-            print(f"{'#'*np.clip(int(error*50), 0, 50)}{error:.3f}, {n_calls=}, {errors_comp/normal=}", end='\r')
+            print(f"{'#'*np.clip(int(error*50), 0, 50)}{error:.3f}, {n_calls=}, {component_wise_error/total_energy=}",
+                  end='\r')
 
         return error
 
