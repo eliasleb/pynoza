@@ -127,39 +127,12 @@ def inverse_problem_hira(**kwargs):
     ez = ez[indices_obs, :]
 
     r = np.sqrt(x1 ** 2 + x2 ** 2 + x3 ** 2)
-    t_max = t.max()
-
-    def force_decay(e, t_delay):
-        cut = 0.5 * t_max
-        return e * ((t_delay <= cut) + (t_delay > cut) * np.exp(-((t_delay - cut) / gamma) ** 2))
-
-    td = t.reshape(1, t.size) - r.reshape(r.size, 1)
-
-    ex = force_decay(ex, td)
-    ey = force_decay(ey, td)
-    ez = force_decay(ez, td)
 
     print(f"{ex.shape=}")
 
     e_true = [ex, ey, ez]
 
-    energy = np.sum(ex ** 2 + ey ** 2 + ez ** 2, axis=1)
-    energy_max = energy.max(initial=0)
-
     assert np.all(r > 0)
-    if kwargs.get("plot").lower() == "true":
-        plt.ion()
-        plt.figure()
-        plt.plot(r, energy / energy_max, '.')
-        r_min = r.min()
-        plt.plot(r, 1 / (r / r_min) ** 1, '.')
-        plt.plot(r, 1 / (r / r_min) ** 2, '.')
-        plt.plot(r, 1 / (r / r_min) ** 3, '.')
-
-        plt.legend(("data", "1/_r", "1/_r^2", "1/_r^3"))
-
-        plt.show()
-        input("[Enter] to continue...")
 
     tail = int(kwargs["n_tail"])
 
