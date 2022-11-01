@@ -122,12 +122,12 @@ def main(filename, n_tail, tol, n_points, verbose_every, plot, scale, order, ):
     match answer:
         case ("y" | "Y"):
             res = pd.DataFrame(data={"x1": x1.squeeze(), "x2": x2.squeeze(), "x3": x3.squeeze()}
-                                     | {f"ex_opt@t={t[i]}": e_opt[0, :, i] for i in range(ex.shape[1])}
-                                     | {f"ey_opt@t={t[i]}": e_opt[1, :, i] for i in range(ey.shape[1])}
-                                     | {f"ez_opt@t={t[i]}": e_opt[2, :, i] for i in range(ez.shape[1])}
-                                     | {f"ex_true@t={t[i]}": ex[:, i] for i in range(ex.shape[1])}
-                                     | {f"ey_true@t={t[i]}": ey[:, i] for i in range(ey.shape[1])}
-                                     | {f"ez_true@t={t[i]}": ez[:, i] for i in range(ez.shape[1])})
+                                     | {f"ex_opt@t={t[i]}": e_opt[0, :, i] for i in range(ex_sim.shape[1])}
+                                     | {f"ey_opt@t={t[i]}": e_opt[1, :, i] for i in range(ey_sim.shape[1])}
+                                     | {f"ez_opt@t={t[i]}": e_opt[2, :, i] for i in range(ez_sim.shape[1])}
+                                     | {f"ex_true@t={t[i]}": ex_sim[:, i] for i in range(ex_sim.shape[1])}
+                                     | {f"ey_true@t={t[i]}": ey_sim[:, i] for i in range(ey_sim.shape[1])}
+                                     | {f"ez_true@t={t[i]}": ez_sim[:, i] for i in range(ez_sim.shape[1])})
             filename = f"../../../git_ignore/GLOBALEM/opt-result-{time.asctime()}.csv"
             res.to_csv(path_or_buf=filename)
             with open(filename + "_params.pickle", 'wb') as handle:
