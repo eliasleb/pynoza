@@ -1,5 +1,6 @@
 # pynoza
 ![Python package badge](https://github.com/eliasleb/pynoza/actions/workflows/master.yml/badge.svg)
+![doc badge](https://readthedocs.org/projects/pynoza/badge/?version=latest)
 
 Python implementation of time-domain solutions of Maxwell's equations using the cartesian multipole expansion. In homogeneous and isotropic media, these solutions can be computed thanks to an explicit knowledge of the Green’s function.
 
