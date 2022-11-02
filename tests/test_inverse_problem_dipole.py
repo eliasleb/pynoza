@@ -103,26 +103,26 @@ def test_inverse_problem_simple():
                                                                        get_current_moment, dim_mom, **kwargs)
     assert np.sum((e_true - e_opt)**2)/np.sum(e_opt**2) < 1e-2
 
-    if __name__ == "__main__":
-
-        plt.ion()
-        print(f"{center=}")
-
-        inverse_problem.plot_moment(current_moment)
-        inverse_problem.plot_moment(inverse_problem.get_charge_moment(current_moment))
-
-        plt.figure()
-        h -= h[0]
-        plt.plot(t, h/np.max(np.abs(h)))
-        h_max = np.max(np.abs(h_true))
-        plt.plot(t, h_true/h_max, "--")
-        plt.xlabel("Time (relative)")
-        plt.ylabel("Amplitude (normalized)")
-        plt.legend(["Inverse problem", "True solution"])
-        plt.title("Current vs time")
-        plt.pause(0.1)
-        plt.show()
-        input("Press Enter to continue...")
+    # if __name__ == "__main__":
+    #
+    #     plt.ion()
+    #     print(f"{center=}")
+    #
+    #     inverse_problem.plot_moment(current_moment)
+    #     inverse_problem.plot_moment(inverse_problem.get_charge_moment(current_moment))
+    #
+    #     plt.figure()
+    #     h -= h[0]
+    #     plt.plot(t, h/np.max(np.abs(h)))
+    #     h_max = np.max(np.abs(h_true))
+    #     plt.plot(t, h_true/h_max, "--")
+    #     plt.xlabel("Time (relative)")
+    #     plt.ylabel("Amplitude (normalized)")
+    #     plt.legend(["Inverse problem", "True solution"])
+    #     plt.title("Current vs time")
+    #     plt.pause(0.1)
+    #     plt.show()
+    #     input("Press Enter to continue...")
 
 
 def direct_problem_simple(x1, x2, x3, t, h, order=2):
