@@ -52,3 +52,6 @@ meetings
 .~lock*
 *.mph
 *.mph.lock
+
+docs/build/
+docs/source/_*
