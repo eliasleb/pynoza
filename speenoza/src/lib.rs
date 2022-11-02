@@ -200,28 +200,32 @@ pub mod solution {
                                     expression.iter()
                                         .map(
                                             |(signature, coefficient)| {
-                                                let i_t_delayed = (i_t as i64) -
-                                                    ((r[i_x] / dt) as i64);
+                                                let i_t_delayed = (i_t as Real) - r[i_x] / dt;
                                                 coefficient
                                                 * x1[i_x].powi(signature.x1)
                                                 * x2[i_x].powi(signature.x2)
                                                 * x3[i_x].powi(signature.x3)
                                                 / r[i_x].powi(signature.r)
                                                 * if index.order() % 2 == 0 { 1. } else { -1. }
-                                                / index.factorial() * -1e-7 * match i_t_delayed {
-                                                    i_t if i_t >= 0 =>
+                                                / index.factorial() * -1e-7 * {
+                                                    Self::linear_interpolation(
                                                         hs_derivative.get(&signature.h)
-                                                        .unwrap()[i_t as usize]
-                                                        * current_moment[[dim, index.i as usize,
-                                                            index.j as usize, index.k as usize]]
-                                                        + hs_integral.get(&signature.h)
-                                                        .unwrap()[i_t as usize]
-                                                        * charge_moment[[dim, index.i as usize,
-                                                            index.j as usize, index.k as usize]],
-                                                    _ => 0.,
+                                                            .unwrap().view(),
+                                                        i_t_delayed,
+                                                        Some(0.)
+                                                    ) * current_moment[[dim, index.i as usize,
+                                                    index.j as usize, index.k as usize]]
+                                                    + Self::linear_interpolation(
+                                                        hs_integral.get(&signature.h)
+                                                            .unwrap().view(),
+                                                        i_t_delayed,
+                                                        Some(0.)
+                                                    )
+                                                    * charge_moment[[dim, index.i as usize,
+                                                    index.j as usize, index.k as usize]]
+                                                }
                                             }
-                                        }
-                                    )
+                                        )
                                 }
                             )
                             .sum::<f64>()
@@ -230,6 +234,17 @@ pub mod solution {
             e_field
         }
 
+        fn linear_interpolation(x: ArrayView1<Real>,
+                                linear_index: Real,
+                                extrapolation_value: Option<Real>) -> Real {
+            if linear_index < 0. || linear_index >= (x.len() as Real) - 1. {
+                extrapolation_value.unwrap_or(0.)
+            } else {
+                let previous_index = linear_index.floor() as usize;
+                let ratio = linear_index - (previous_index as Real);
+                x[previous_index] * (1. - ratio) + x[previous_index + 1] * ratio
+            }
+        }
 
         pub fn compute_electric_field_analytical(&self, current_moment: ArrayView4<Real>)
             -> Vec<String> {
@@ -314,8 +329,8 @@ pub mod solution {
             let mut y = Array1::zeros(x.len());
             for (index, yi) in y.iter_mut().enumerate() {
                 match index {
-                    0 => { *yi = (x[2] - x[0]) / 2. / dt },
-                    n if n == x.len() - 1 => { *yi = (x[n] - x[n - 2]) / 2. / dt }
+                    0 => { *yi = (x[1] - x[0]) / dt },
+                    n if n == x.len() - 1 => { *yi = (x[n] - x[n - 1]) / dt }
                     n => { *yi = (x[n + 1] - x[n - 1]) / 2. / dt }
                 }
             }
@@ -468,39 +483,7 @@ pub mod solution {
         fn par_compute_e_field<'a>(&self, x1: &'a PyArray1<Real>, x2: &PyArray1<Real>, x3: &PyArray1<Real>,
                                  t: &PyArray1<Real>, h: &PyArray1<Real>, current_moment: &PyArray4<Real>)
                                  -> PyResult<&'a PyArray3<Real>> {
-            let py = x1.py();
-            if x2.len() != x1.len() || x3.len() != x1.len() || x2.len() != x3.len() {
-                let err: PyErr = PyErr::new::<exceptions::PyValueError, _>(
-                    String::from("x1, x2 and x3 must have the same length"));
-                return Err(err)
-            }
-            if t.len() != h.len() {
-                let err: PyErr = PyErr::new::<exceptions::PyValueError, _>(
-                    String::from("h, t must have the same length"));
-                return Err(err)
-            }
-
-            if current_moment.shape() != [3usize, (self.solution.max_order + 1) as usize,
-                (self.solution.max_order + 1) as usize, (self.solution.max_order + 1) as usize] {
-                return Err(PyErr::new::<exceptions::PyValueError, _>(
-                    format!("the shape of current_moment must be (3, dim, dim, dim), \
-                    where dim = max_order + 1 (got {:?}, dim should be {})",
-                    current_moment.shape(),
-                    self.solution.max_order + 1)
-                ))
-            }
-
-            let x1 = convert(x1);
-            let x2 = convert(x2);
-            let x3 = convert(x3);
-            let t = convert(t);
-            let h = convert(h);
-            let current_moment = unsafe { current_moment.as_array() };
-
-            let e_field = self.solution.par_compute_e_field(x1, x2, x3, t, h, current_moment);
-            let e_field = PyArray3::from_array(py, &e_field);
-
-            Ok(e_field)
+            _multipole_e_field(x1, x2, x3, t, h, current_moment, &self.solution)
         }
 
     }
@@ -511,6 +494,15 @@ pub mod solution {
     fn multipole_e_field<'a>(x1: &'a PyArray1<Real>, x2: &PyArray1<Real>, x3: &PyArray1<Real>,
                          t: &PyArray1<Real>, h: &PyArray1<Real>, current_moment: &PyArray4<Real>)
         -> PyResult<&'a PyArray3<Real>> {
+        let max_order = (current_moment.shape()[1] - 1) as i32;
+        let sol = Solution::new(max_order);
+        _multipole_e_field(x1, x2, x3, t, h, current_moment, &sol)
+    }
+
+    fn _multipole_e_field<'a>(x1: &'a PyArray1<Real>, x2: &PyArray1<Real>, x3: &PyArray1<Real>,
+                             t: &PyArray1<Real>, h: &PyArray1<Real>, current_moment: &PyArray4<Real>,
+                             sol: &Solution)
+                             -> PyResult<&'a PyArray3<Real>> {
         let py = x1.py();
         if x2.len() != x1.len() || x3.len() != x1.len() || x2.len() != x3.len() {
             let err: PyErr = PyErr::new::<exceptions::PyValueError, _>(
@@ -523,21 +515,17 @@ pub mod solution {
             return Err(err)
         }
 
-        let max_order = (current_moment.shape()[1] - 1) as i32;
-        let sol = Solution::new(max_order);
         let x1 = convert(x1);
         let x2 = convert(x2);
         let x3 = convert(x3);
         let t = convert(t);
         let h = convert(h);
         let current_moment = unsafe { current_moment.as_array() };
-
         let e_field = sol.par_compute_e_field(x1, x2, x3, t, h, current_moment);
         let e_field = PyArray3::from_array(py, &e_field);
 
         Ok(e_field)
     }
-
 
     /// A Python wrapper around the rust implementation.
     #[pymodule]
