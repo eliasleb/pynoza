@@ -7,7 +7,7 @@ Currently, only the electric field computation is supported, and the current den
 ## Installation
 To install, clone the repository using `git clone https://c4science.ch/source/pynoza.git`.
 
-Then, from the root `pynoza` folder, run `pip install -r requirements.txt .`.
+Then, from the root `pynoza` folder, run `pip install .`.
 
 ## Tutorial
 
