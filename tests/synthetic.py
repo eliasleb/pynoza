@@ -60,7 +60,7 @@ def plot_directivity(solution, r, h, t, phi_min=0, phi_max=2*np.pi):
 def synthetic_antenna():
     order = 11
     current_moment = build_current_moment(order)
-    charge_moment = inverse_problem.get_charge_moment(current_moment)
+    charge_moment = pynoza.get_charge_moment(current_moment)
     current_moment_callable = lambda a1, a2, a3: list(current_moment[:, a1, a2, a3])
     charge_moment_callable = lambda a1, a2, a3: list(charge_moment[:, a1, a2, a3])
 

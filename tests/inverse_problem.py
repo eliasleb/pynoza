@@ -32,27 +32,6 @@ def complement(*args):
             return 0
 
 
-def get_charge_moment(current_moment):
-    charge_moment = np.zeros(current_moment.shape)
-    for ind, _ in np.ndenumerate(charge_moment):
-        i, a1, a2, a3 = ind
-        a = (a1, a2, a3)
-        for j in range(3):
-            b = list(a)
-            if i == j:
-                if a[j] >= 2:
-                    b[j] = a[j] - 2
-                    charge_moment[i, a1, a2, a3] += a[j] * (a[j] - 1) \
-                        * current_moment[j, b[0], b[1], b[2]]
-            else:
-                b[i] -= 1
-                b[j] -= 1
-                if a[j] >= 1 and a[i] >= 1:
-                    charge_moment[i, a1, a2, a3] += a[j] * a[i] \
-                        * current_moment[j, b[0], b[1], b[2]]
-    return -charge_moment
-
-
 def plot_moment(moment):
     moment = moment.swapaxes(0, 1).swapaxes(1, 2).swapaxes(2, 3)
     fig = plt.figure()
@@ -93,7 +72,7 @@ def get_fields(sol_python, sol_rust, find_center, t, x1, x2, x3, current_moment,
     if method == "python":
         pass
     c_mom = lambda a1, a2, a3: list(current_moment[:, a1, a2, a3])
-    charge_moment = get_charge_moment(current_moment)
+    charge_moment = pynoza.get_charge_moment(current_moment)
     r_mom = lambda a1, a2, a3: list(charge_moment[:, a1, a2, a3])
     sol_python.set_moments(c_mom, r_mom)
     if find_center:

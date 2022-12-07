@@ -268,7 +268,7 @@ def postprocessing(**kwargs):
     order = current_moment.shape[1] - 1
     sol = pynoza.Solution(max_order=order)
     sol.recurse()
-    charge_moment = inverse_problem.get_charge_moment(current_moment)
+    charge_moment = pynoza.get_charge_moment(current_moment)
     current_moment_lambda = lambda a1, a2, a3: list(current_moment[:, a1, a2, a3])
     charge_moment_lambda = lambda a1, a2, a3: list(charge_moment[:, a1, a2, a3])
     sol.set_moments(current_moment=current_moment_lambda, charge_moment=charge_moment_lambda)

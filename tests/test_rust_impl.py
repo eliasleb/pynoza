@@ -66,7 +66,7 @@ def test_rust_vs_python_simple_case():
     field1 = speenoza.multipole_e_field(x1, x2, x3, t, h, moment)
     sol = pynoza.Solution(max_order=dim - 1, wave_speed=1)
     sol.recurse()
-    charge_moment = inverse_problem.get_charge_moment(moment)
+    charge_moment = pynoza.get_charge_moment(moment)
     sol.set_moments(charge_moment=lambda a1, a2, a3: list(charge_moment[:, a1, a2, a3]),
                     current_moment=lambda a1, a2, a3: list(moment[:, a1, a2, a3]))
     field2 = sol.compute_e_field(x1, x2, x3, t, h, None, delayed=True, compute_grid=False)
@@ -94,7 +94,7 @@ def plot_simple_field():
     print("done")
     sol = pynoza.Solution(max_order=dim - 1, wave_speed=1)
     sol.recurse()
-    charge_moment = inverse_problem.get_charge_moment(moment)
+    charge_moment = pynoza.get_charge_moment(moment)
     sol.set_moments(charge_moment=lambda a1, a2, a3: list(charge_moment[:, a1, a2, a3]),
                     current_moment=lambda a1, a2, a3: list(moment[:, a1, a2, a3]))
     print("Python sol...")

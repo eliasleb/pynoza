@@ -50,7 +50,7 @@ def plot_directivity(alpha, fig, subplot, axis):
 
     current_moment_array = np.zeros((3, order + 3, order + 3, order + 3))
     current_moment_array[axis, alpha[0], alpha[1], alpha[2]] = 1
-    charge_moment_array = inverse_problem.get_charge_moment(current_moment_array)
+    charge_moment_array = pynoza.get_charge_moment(current_moment_array)
 
     current_moment = lambda a1, a2, a3: list(current_moment_array[:, a1, a2, a3])
     charge_moment = lambda a1, a2, a3: list(charge_moment_array[:, a1, a2, a3])
