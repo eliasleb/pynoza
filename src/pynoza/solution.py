@@ -17,6 +17,12 @@ import cython
 
 
 class Interpolator(scipy.interpolate.interp1d):
+    """
+    A 1D interpolator that extrapolates with zeros.
+
+    :param args: See scipy.interpolate.interp1d
+    :param kwargs: scipy.interpolate.interp1d
+    """
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.__doc__ = scipy.interpolate.interp1d.__doc__
@@ -42,8 +48,9 @@ R: int = 4
 
 @cython.cclass
 class Solution:
-    """A class to compute solutions of Maxwell's equations, based on"""
-    """time-domain multipole moments."""
+    """
+    A class to compute solutions of Maxwell's equations, based on time-domain multipole moments.
+    """
     max_order: int
     c: float
     _shape: tuple
@@ -63,14 +70,12 @@ class Solution:
     dy: ndarray
     e_field_text: str
 
-    def __init__(self,
-                 max_order: int = 0,
-                 wave_speed: int = 1) -> None:
-        """Initialize the solution class.
+    def __init__(self, max_order: int = 0, wave_speed: int = 1) -> None:
+        """
+        Initialize the solution class.
         
-        Keyword arguments:
-        max_order -- the maximum order to which multipole moments will be computed (default 0)
-        wave_speed -- Wave speed `c` used to compute the retarded time t-r/c, in natural units (default 1)
+        :param max_order: The maximum order to which multipole moments will be computed (default 0)
+        :param wave_speed: The Wave speed `c` used to compute the retarded time t-r/c, in natural units (default 1)
         """""
         if not isinstance(max_order, int):
             raise ValueError(":max_order: must be of integer type")
@@ -103,11 +108,11 @@ class Solution:
         self.dy = np.array([0, ])
 
     def _increase_order(self, known_index, index) -> None:
-        """Private method to compute the auxiliary function.
-        
-        Positional arguments:
-        known_index -- multi-index at which the auxiliary function has already been computed
-        index -- multi-index to compute the auxiliary function"""
+        """
+        Method to compute the auxiliary function.
+
+        :param known_index: multi-index at which the auxiliary function has already been computed
+        :param index: multi-index to compute the auxiliary function"""
         known_dim: int = np.where(np.array(known_index) - np.array(index))[0][0]
         for signature in self._aux_func[known_index]:
             coefficient: float = self._aux_func[known_index][signature]
@@ -148,8 +153,7 @@ class Solution:
     def recurse(self, verbose: bool = False) -> None:
         """Compute the auxiliary function up to the max order.
         
-        Keyword arguments:
-        verbose -- whether to print the computed multi-index (default True)"""
+        :param verbose: whether to print the computed multi-index (default False)"""
         self.ran_recurse = True
         for order in range(1, self.max_order + 1):
             for ind, _ in np.ndenumerate(zeros(self._shape)):
@@ -171,16 +175,16 @@ class Solution:
                   x3: ndarray,
                   r: ndarray,
                   hs):
-        """Evaluate the auxiliary function.
-        
-        Positional arguments:
-        ind -- multi-index of the auxiliary function
-        X1 -- evaluated first coordinate (aka x)
-        X2 -- evaluated second coordinate (aka y)
-        X3 -- evaluated third coordinate (aka z)
-        R -- equal to X1**2+X2**2+X3**2. Passed to avoid computing it repeatedly.
-        Hs -- dictionary of the derivatives of the time-dependent excitation function.
-              Must be in the form {order:derivative of order} for order=-1..max_order+2
+        """
+        Evaluate the auxiliary function.
+
+        :param ind: multi-index of the auxiliary function
+        :param x1: evaluated first coordinate (aka x)
+        :param x2: evaluated second coordinate (aka y)
+        :param x3: evaluated third coordinate (aka z)
+        :param r: equal to X1**2+X2**2+X3**2. Passed to avoid computing it repeatedly.
+        :param hs: dictionary of the derivatives of the time-dependent excitation function. Must be in the form
+        {order:derivative of order} for order=-1..max_order+2
         """
         self.y = zeros(x1.shape)
         for signature in self._aux_func[ind]:
@@ -199,12 +203,13 @@ class Solution:
     def _evaluate_txt(self,
                       ind,
                       h: str) -> str:
-        """Evaluate the auxiliary function as a symbolic expression
+        """
+        Evaluate the auxiliary function as a symbolic expression
 
-            param ind: multi-index to evaluate at
-            param h: name of the function
-            return: a string describing the auxiliary function
-            """
+        :param ind: multi-index to evaluate at
+        :param h: name of the function
+        :return: a string describing the auxiliary function
+        """
         y: str = "("
         for signature in self._aux_func[ind]:
             dy = "+("
@@ -223,11 +228,11 @@ class Solution:
     def set_moments(self,
                     current_moment=lambda a1, a2, a3: [0, 0, 0],
                     charge_moment=lambda a1, a2, a3: [0, 0, 0],) -> None:
-        """Set the current and charge moment functions.
-        
-        Keyword arguments:
-        current_moment -- a callable returning the current moment for a given multi-index a1,a2,a3
-        charge_moment -- a callable returning the charge moment for a given multi-index a1,a2,a3"""
+        """
+        Set the current and charge moment functions.
+
+        :param current_moment: a callable returning the current moment for a given multi-index a1, a2, a3
+        :param charge_moment: a callable returning the charge moment for a given multi-index a1, a2, a3"""
 
         if not callable(current_moment) or not callable(charge_moment):
             raise ValueError(":current_moment: and :charge_moment: must be callable")
@@ -255,21 +260,30 @@ class Solution:
                         delayed=True,
                         compute_grid=True,
                         compute_txt=False):
-        """Compute the electric field from the moments.
-        
-        Positional arguments:
-        x1,x2,x3 -- arrays of the spatial coordinates to evaluate the e_field-field at (aka x,y,z)
-        t -- array of the time coordinates to evaluate the e_field-field at
-        h_sym -- symbolic time-dependent (t_sym) function describing the shape of the current
-                 *or* a dictionary of numpy arrays of the same shape as t, each array containing the
-                  values of the nth order derivative of the time-dependent function. The keys of the
-                  dictionary must be the integers in the range -1..max_order+2.
-        t_sym -- symbolic variable representing time, used in h_sym
-        
-        Keyword arguments:
-        verbose -- whether to display the progress (default False)
-        delayed -- whether to evaluate the field at the retarded time t-r/c (default True)"""
+        """
+        Compute the electric field from the moments. The method `recurse()` and `set_moments(...)` must be run before.
 
+        :param x1: array of the spatial coordinates to evaluate the e_field-field at (aka x)
+        :param x2: array of the spatial coordinates to evaluate the e_field-field at (aka y)
+        :param x3: array of the spatial coordinates to evaluate the e_field-field at (aka z)
+        :param t: array of the time coordinates to evaluate the e_field-field at
+        :param h_sym: time-dependent excitation
+        :param t_sym: symbolic variable representing time, used in h_sym
+        :param verbose: whether to display the progress (default False)
+        :param delayed: whether to evaluate the field at the retarded time t-r/c (default True)
+        :param compute_grid: whether to compute all combinations of coordinates
+        :param compute_txt: whether to compute a text representation of the solution or not
+
+        :raises RuntimeError: when any of `recurse` or `set_moments` have not been run.
+        :raises ValueError: when `h_sym` does not look like what is described below
+
+        :rtype: a np.ndarray with the electric field, whose shape is `(3, x1.size, t.size)`
+
+        The time-dependent excitation `h_sym` can either be a symbolic time-dependent (t_sym) function describing the
+        shape of the current *or* a dictionary of numpy arrays of the same shape as t, each array containing the values
+        of the nth order derivative of the time-dependent function. The keys of the dictionary must be the integers in
+        the range -1..max_order+2.
+        """
         if not self.ran_recurse or not self.ran_set_moments:
             raise RuntimeError("You must first run the `recurse' and `set_moments' methods.")
 
@@ -432,13 +446,32 @@ class Solution:
 
 
 def fact(a) -> numbers.Number:
+    """
+    Compute the factorial of a multi-index
+    
+    :param a: the multi-index (an iterable) 
+    :return: the factorial of a (i.e., a1!a2!...)
+    """
     res: numbers.Number = 1
     for i in a:
         res *= np.math.factorial(i)
     return res
 
 
-def set_extremities(x, ratio, dim=0, val=0):
+def set_extremities(x: np.ndarray, ratio: float, dim: int = 0, val: float = 0) -> np.ndarray:
+    """
+    Set the extremities of an array to a constant value
+    
+    :param x: array whose extremities will be set
+    :param ratio: proportion of values to set, 0 <= ratio <= 1
+    :param dim: the dimension along which the value is set
+    :param val: the value to set
+
+    :raises ValueError: when the ratio is not between 0 and 1
+    :rtype: np.ndarray
+    """
+    if ratio < 0 or ratio > 1:
+        raise ValueError(f"Expected a ratio between 0 and 1, got {ratio}")
 
     portion = np.linspace(0, 1, x.shape[dim])
     start = np.where(portion > ratio/2)[0][0]

@@ -10,8 +10,6 @@ pynoza
    :maxdepth: 2
    :caption: Contents:
 
-
-
 .. automodule:: pynoza.solution
    :members:
    :undoc-members:
