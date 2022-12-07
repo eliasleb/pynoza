@@ -15,13 +15,20 @@ Then, from the root `pynoza` folder, run `pip install .`.
 
 The Python `>= 3.10` script `tests/test_EPFL_logo.py` shows some examples. A Jupyter notebook is also provided. The general procedure is the following:
 
-1. Given the current density $\mathbf{J}(t,\mathbf{x})$, compute the charge density $\rho$, given by $\frac{\partial\rho(t,\mathbf{x})}{\partial t}=-\nabla\cdot\mathbf{J}(t,\mathbf{x})$.
+1. Compute the electric time-domain current moments 
+   $C_\mathbf{\alpha}^{J_i}(t)=h^{'}(t)\iiint\mathbf{x}^\alpha \frac{\partial j_i(t,\mathbf{x})}{\partial t}d^3\mathbf{x}$ 
+   Define a corresponding Python function that returns the space-dependence, whose signature must be 
+   `moment(ind: tuple[int, int, int]) -> list[Number, Number, Number]`. For a given multi-index `(a1, a2, a3)`, the 
+   function must return `moment(a1, a2, a3) = [j1, j2, j3]` where `ji` is  
+   $\iiint\mathbf{x}^\alpha \frac{\partial j_i(t,\mathbf{x})}{\partial t}d^3\mathbf{x}$ 
 
-2. Compute the electric time-domain current moments $C_\mathbf{\alpha}^{J_i}(t)=h^{'}(t)\iiint\mathbf{x}^\alpha \frac{\partial j_i(t,\mathbf{x})}{\partial t}d^3\mathbf{x}$ and the electric time-domain charge moment $C_\mathbf{\alpha}^{\rho_i}(t)=\partial^{-1}h(t)\iiint\mathbf{x}^\alpha \frac{\partial \rho(\mathbf{x})}{\partial x_i}d^3\mathbf{x}$. Define two corresponding Python functions that return the space-dependence, whose signature must be `moment(ind: tuple[int, int, int]) -> list[Number, Number, Number]`. The time-dependence is kept separate, see later.
+   The charge moments can be computed automatically by calling the function `pynoza.get_charge_moment`.
+   
+   The time-dependence is kept separate, see later.
 
-3. pynoza works in natural units, as does meep (see https://meep.readthedocs.io/en/latest/Introduction/#units-in-meep).
+2. pynoza works in natural units, as does meep (see https://meep.readthedocs.io/en/latest/Introduction/#units-in-meep).
 
-4. Define numpy arrays for the coordinates of interest $x_1,x_2,x_3,t$, for example 
+3. Define numpy arrays for the coordinates of interest $x_1,x_2,x_3,t$, for example 
 
    ```python
    x1 = np.array([0, ])
@@ -30,15 +37,31 @@ The Python `>= 3.10` script `tests/test_EPFL_logo.py` shows some examples. A Jup
    t = np.linspace(-T, T, 100)
    ```
 
-5. Define a symbolic function for the time-dependence, for example
+4. Define a function for the time-dependence, for example a sympy symbolic expression
 
    ```python
    t_sym = sympy.Symbol("t", real=True)
    h_sym = sympy.cos(2*sympy.pi*f*t_sym)
    ```
+   
+   or an array
 
-6. Create a `pynoza.Solution` object with the given medium light speed (in natural units) and given multipole expansion order.
+   ````python
+   t = np.linspace(0, T, dt)
+   h = np.cos(2 * np.pi * f * t)
+   ````
+ 
+   In the latter case, it is up you to ensure that the sampling time `dt` is small enough to compute the highest order 
+   derivative. We use `np.gradient` to compute the derivative, see the relevant numpy documentation.
 
-7. Run the `recurse` method to initialize the Green’s function approximation (this gets slower for high orders), and the `set_moments` method to pass the current and charge moments that you computed above.
+5. Create a `pynoza.Solution` object with the given medium light speed (in natural units) and given multipole expansion order.
 
-8.  Run the `compute_e_field` method to compute the electric field from the Green’s functions approximation and the charge and current moments. Under the hood, this method will integrate and differentiate the time-dependent function `h_sym` to the needed order.
+6. Run the `recurse` method to initialize the Green’s function approximation (this gets slower for high orders), 
+   and the `set_moments` method to pass the current and charge moments that you computed above.
+
+7. Run the `compute_e_field` method to compute the electric field from the Green’s functions approximation and the 
+   charge and current moments. Under the hood, this method will integrate and differentiate the time-dependent function 
+   to the needed order.
+
+### Complete example
+See `tests/simple_example.py`
