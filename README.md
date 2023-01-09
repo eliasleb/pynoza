@@ -16,7 +16,7 @@ Then, from the root `pynoza` folder, run `pip install .`.
 The Python `>= 3.10` script `tests/test_EPFL_logo.py` shows some examples. A Jupyter notebook is also provided. The general procedure is the following:
 
 1. Compute the electric time-domain current moments 
-   $C_\mathbf{\alpha}^{J_i}(t)=h^{'}(t)\iiint\mathbf{x}^\alpha \frac{\partial j_i(t,\mathbf{x})}{\partial t}d^3\mathbf{x}$.
+   $C_\mathbf{\alpha}^{J_i}(t)=h^{'}(t)\iiint\mathbf{x}^\alpha j_i(\mathbf{x}) d^3\mathbf{x}$.
    Define a corresponding Python function that returns the space-dependence, whose signature must be 
    `moment(ind: tuple[int, int, int]) -> list[Number, Number, Number]`. For a given multi-index `(a1, a2, a3)`, the 
    function must return `moment(a1, a2, a3) = [j1, j2, j3]` where `ji` is  
