@@ -40,9 +40,9 @@ setuptools.setup(
     description="Computation of time-domain solutions of Maxwell's equations using the cartesian multipole expansion",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://c4science.ch/source/pynoza",
+    url="https://github.com/eliasleb/pynoza",
     project_urls={
-        "Bug Tracker": "https://c4science.ch/source/pynoza",
+        "Bug Tracker": "https://github.com/eliasleb/pynoza",
     },
     classifiers=[
         "Programming Language :: Python :: 3",
