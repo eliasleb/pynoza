@@ -56,7 +56,7 @@ def test_simple_example():
     t = np.linspace(0, 4, 1000)
     h = np.exp(-(t - 1)**2 * 100)
 
-    e_field = sol.compute_e_field(x1,x2, x3, t, h, None)
+    e_field = sol.compute_e_field(x1, x2, x3, t, h, None)
 
     return t, h, e_field
 
