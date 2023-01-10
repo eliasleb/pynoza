@@ -19,24 +19,23 @@
 
 import pynoza
 import pytest
-import sympy
 import numpy as np
 import sympy
 
 
-def check_args(fun, *args, **kwargs):
-    with pytest.raises(ValueError):
+def check_args(fun, *args, error=Exception, **kwargs):
+    with pytest.raises(error):
         fun(*args, **kwargs)
 
 
 def test_inputs():
-    check_args(pynoza.Solution, wave_speed="hello you")
-    check_args(pynoza.Solution, max_order=0.)
+    check_args(pynoza.Solution, wave_speed="hello", error=TypeError)
+    check_args(pynoza.Solution, max_order=0., error=TypeError)
     s = pynoza.Solution()
-    check_args(s.set_moments, charge_moment=1)
-    check_args(s.set_moments, current_moment=1)
-    check_args(s.set_moments, charge_moment=lambda a1, a2, a3: "hello you")
-    check_args(s.set_moments, current_moment=lambda a1, a2, a3: "hello you")
+    check_args(s.set_moments, charge_moment=1, error=TypeError)
+    check_args(s.set_moments, current_moment=1, error=TypeError)
+    check_args(s.set_moments, charge_moment=lambda a1, a2, a3: "hello", error=ValueError)
+    check_args(s.set_moments, current_moment=lambda a1, a2, a3: "hello", error=ValueError)
     x = np.array([0, ])
     t_sym = sympy.Symbol("t")
     h_sym = t_sym
