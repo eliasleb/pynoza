@@ -29,7 +29,7 @@ def get_charge_moment(current_moment: ndarray) -> ndarray:
     :return: the corresponding charge moment
     :rtype: ndarray
 
-    The moment at index `(i, a1, a2, a3)` is the moment of the `i`th coordinate corresponding to the multi-index
+    The moment at index `(i, a1, a2, a3)` is the moment of the `i`-th coordinate corresponding to the multi-index
     `(a1, a2, a3)`
     """
     charge_moment = np.zeros(current_moment.shape)

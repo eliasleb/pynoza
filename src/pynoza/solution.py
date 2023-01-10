@@ -261,7 +261,8 @@ class Solution:
                         compute_grid=True,
                         compute_txt=False):
         """
-        Compute the electric field from the moments. The method `recurse()` and `set_moments(...)` must be run before.
+        Compute the electric field from the moments. The method `recurse()` and `set_moments(...)` must be run
+        beforehand.
 
         :param x1: array of the spatial coordinates to evaluate the e_field-field at (aka x)
         :param x2: array of the spatial coordinates to evaluate the e_field-field at (aka y)
@@ -441,7 +442,13 @@ class Solution:
     def __repr__(self) -> str:
         return f"Solution: max_order={self.max_order}, c={self.c}, ran_recurse={self.ran_recurse}"
 
-    def get_e_field_text(self):
+    def get_e_field_text(self) -> str:
+        """
+        Get a text description of the electric field. Returns an empty string if the method :compute_e_field: has not
+        yet been called.
+
+        :return: a human-readable description of the electric field
+        """
         return self.e_field_text
 
 

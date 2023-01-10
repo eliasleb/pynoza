@@ -9,7 +9,7 @@
 project = 'pynoza'
 copyright = '2022, Elias Le Boudec'
 author = 'Elias Le Boudec'
-release = '0.0a1'
+release = '0.1'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
