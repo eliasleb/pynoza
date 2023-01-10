@@ -70,7 +70,7 @@ class Solution:
     dy: ndarray
     e_field_text: str
 
-    def __init__(self, max_order: int = 0, wave_speed: int = 1) -> None:
+    def __init__(self, max_order: int = 0, wave_speed: float = 1.) -> None:
         """
         Initialize the solution class.
         
@@ -78,9 +78,9 @@ class Solution:
         :param wave_speed: The Wave speed `c` used to compute the retarded time t-r/c, in natural units (default 1)
         """""
         if not isinstance(max_order, int):
-            raise ValueError(":max_order: must be of integer type")
+            raise TypeError(":max_order: must be of integer type")
         if not isinstance(wave_speed, numbers.Number):
-            raise ValueError(":wave_speed: must be a number")
+            raise TypeError(":wave_speed: must be a number")
 
         self.max_order = max_order
         self.c = wave_speed
@@ -235,7 +235,7 @@ class Solution:
         :param charge_moment: a callable returning the charge moment for a given multi-index a1, a2, a3"""
 
         if not callable(current_moment) or not callable(charge_moment):
-            raise ValueError(":current_moment: and :charge_moment: must be callable")
+            raise TypeError(":current_moment: and :charge_moment: must be callable")
         if not isinstance(current_moment(0, 0, 0), list) \
                 or not isinstance(charge_moment(0, 0, 0), list):
             raise ValueError(":current_moment: and :charge_moment: callables must return a list of numbers")
