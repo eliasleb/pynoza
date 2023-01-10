@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 # Copyright (C) 2022  Elias Le Boudec
 #
 #    This program is free software: you can redistribute it and/or modify
@@ -13,10 +16,6 @@
 #    You should have received a copy of the GNU Affero General Public License
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 import numpy as np
 import pandas as pd
 import sympy.functions.special
@@ -24,6 +23,9 @@ import itertools
 import scipy.interpolate
 import pynoza
 import pytest
+import matplotlib.pyplot as plt
+from matplotlib.collections import PatchCollection
+from matplotlib.patches import Rectangle
 
 
 def int_j(x0, sig, m):
@@ -53,13 +55,13 @@ def int_r(x0, sig, m):
         return -m * ((sig / 2 + x0) ** (m - 1) - (-sig / 2 + x0) ** (m - 1))
 
 
-def c_j(a1, a2, a3, x1, x2, w, h):
+def c_j(a1, a2, _a3, x1, x2, w, h):
     """
     Compute a current moment
 
     :param a1: multi-index, first dimension
     :param a2: multi-index, second dimension
-    :param a3: multi-index, third dimension
+    :param _a3: multi-index, third dimension
     :param x1: first coordinate of the rectangle center
     :param x2: second coordinate of the rectangle center
     :param w: width of the rectangle (first coordinate)
@@ -71,13 +73,13 @@ def c_j(a1, a2, a3, x1, x2, w, h):
     return int_j(x1, w, a1) * int_j(x2, h, a2)
 
 
-def c_r(a1, a2, a3, x1, x2, w, h):
+def c_r(a1, a2, _a3, x1, x2, w, h):
     """
     Compute a current moment
 
     :param a1: multi-index, first dimension
     :param a2: multi-index, second dimension
-    :param a3: multi-index, third dimension
+    :param _a3: multi-index, third dimension
     :param x1: first coordinate of the rectangle center
     :param x2: second coordinate of the rectangle center
     :param w: width of the rectangle (first coordinate)
@@ -87,6 +89,35 @@ def c_r(a1, a2, a3, x1, x2, w, h):
     x1 += w / 2
     x2 += h / 2
     return int_r(x1, w, a1) * int_j(x2, h, a2)
+
+
+def plot_current_density(xs: list[float, ...], ys: list[float, ...], ws: list[float, ...], hs: list[float, ...],
+                         length_logo, d1, d2):
+    """
+    Plot a given current density
+
+    :param xs: x-coordinates of all current rectangle lower right corner
+    :param ys: y-coordinates of all current rectangle lower right corner
+    :param ws: widths of all current rectangle
+    :param hs: heights of all current rectangle
+    :param length_logo: width of the logo in xs/ys units
+    :param d1: physical width of logo
+    :param d2: physical height of logo
+    """
+
+    plt.figure(figsize=(5, 2.8))
+
+    rectangles = [Rectangle((x / length_logo - d1, y / length_logo - d2),
+                            w / length_logo, h / length_logo) for x, y, w, h in zip(xs, ys, ws, hs)]
+    pc = PatchCollection(rectangles, facecolor="r")
+    plt.gca().add_collection(pc)
+
+    plt.xlim(-.6, .6)
+    plt.ylim(-.3, .3)
+    plt.xlabel(r"$x/\lambda$")
+    plt.ylabel(r"$y/\lambda$")
+    plt.tight_layout()
+    plt.savefig("tests/data/logo_current_density.pdf")
 
 
 @pytest.mark.parametrize("test_case, order, method", [
@@ -111,13 +142,12 @@ def test_solution(test_case, order, method, plot=False):
 
     case_ = test_case
 
-    mu = 4 * np.pi * 1e-7
-    gamma_SI = 4e-9
+    gamma_si = 4e-9
     gamma = 1
-    c0 = 299792458 * gamma_SI
+    c0 = 299792458. * gamma_si
 
-    Tg = np.sqrt(7 / 12)
-    wavelength = c0 * Tg
+    t_g = np.sqrt(7 / 12)
+    wavelength = c0 * t_g
 
     print(f"Computing {case_=}, {order=}")
     match case_:
@@ -128,20 +158,19 @@ def test_solution(test_case, order, method, plot=False):
         case _:
             a = 1
 
-    L = 2 * a
-    Llogo = 171
+    length = 2 * a
+    length_logo = 171
 
+    t = None
     match case_:
         case "logo":
-            margin = 0.1
-            #      1.  2.  3.  4.  5.  6.  7.  8.  9.  10. 11. 12. 13.  14.  15.  16.  17.  18.
             x1s = [0, 0, 10, 0, 0, 45, 45, 45, 45, 91, 91, 101, 91, 136, 136]
             x2s = [0, 10, 20, 30, 40, 0, 20, 30, 40, 0, 30, 20, 40, 10, 0]
             ws = [35, 10, 23, 10, 35, 10, 23, 10, 23, 10, 10, 23, 35, 10, 35]
             hs = [10, 10, 10, 10, 10, 20, 10, 10, 10, 20, 10, 10, 10, 40, 10]
 
             d1 = a
-            d2 = a * 50 / Llogo
+            d2 = a * 50 / length_logo
 
             w0 = 1
             h0 = 1
@@ -155,8 +184,10 @@ def test_solution(test_case, order, method, plot=False):
                     hs.append(h0)
             t = np.linspace(0, 10 * gamma, 200)
 
+            if plot:
+                plot_current_density(x1s, x2s, ws, hs, length_logo, d1, d2)
+
         case ("disc" | "rasc"):
-            margin = 1
             d1 = a
             d2 = a
             x1s, x2s, ws, hs = [], [], [], []
@@ -178,20 +209,22 @@ def test_solution(test_case, order, method, plot=False):
         case _:
             t = np.array([0, ])
 
-    def current_moment(a1, a2, a3):
+    def current_moment(ax, ay, az):
         moment = 0
-        if a3 == 0:
-            for xi, yi, wi, hi in zip(x1s, x2s, ws, hs):
-                moment += c_j(a1, a2, a3, xi / Llogo * L - d1, yi / Llogo * L - d2, wi / Llogo * L,
-                              hi / Llogo * L) / gamma_SI
+        if az == 0:
+            for x_i, y_i, wi, hi in zip(x1s, x2s, ws, hs):
+                moment += c_j(ax, ay, az, x_i / length_logo * length - d1,
+                              y_i / length_logo * length - d2, wi / length_logo * length,
+                              hi / length_logo * length) / gamma_si
         return [moment, 0, 0]
 
-    def charge_moment(a1, a2, a3):
+    def charge_moment(ax, ay, az):
         moment = 0
-        if a3 == 0:
-            for xi, yi, wi, hi in zip(x1s, x2s, ws, hs):
-                moment += c_r(a1, a2, a3, xi / Llogo * L - d1, yi / Llogo * L - d2, wi / Llogo * L,
-                              hi / Llogo * L) / gamma_SI
+        if az == 0:
+            for x_i, y_i, wi, hi in zip(x1s, x2s, ws, hs):
+                moment += c_r(ax, ay, az, x_i / length_logo * length - d1,
+                              y_i / length_logo * length - d2, wi / length_logo * length,
+                              hi / length_logo * length) / gamma_si
         return [moment, 0, 0]
 
     x1 = np.array([0, ])
@@ -205,9 +238,8 @@ def test_solution(test_case, order, method, plot=False):
             x3 = np.array([0, ])
 
     t_sym = sympy.Symbol("t", real=True)
-    gamma_sym = sympy.Symbol("gamma", real=True)
-    h_sym = (3*gamma_SI*sympy.sqrt(np.pi/2))**-.5\
-        * sympy.exp(-((t_sym-3*gamma)/gamma)**2)*(4*((t_sym-3*gamma)/gamma)**2-2)
+    h_sym = (3 * gamma_si * sympy.sqrt(np.pi / 2)) ** -.5 \
+            * sympy.exp(-((t_sym-3*gamma)/gamma)**2) * (4*((t_sym-3*gamma)/gamma)**2-2)
 
     if num or method == "rust":
         h_sym = sympy.lambdify(t_sym, h_sym)(t)
@@ -217,13 +249,12 @@ def test_solution(test_case, order, method, plot=False):
     sol.recurse()
     sol.set_moments(current_moment=current_moment,
                     charge_moment=charge_moment)
+    e_field = None
     match case_:
         case "logo":
             match method:
                 case "python":
-                    E = sol.compute_e_field(x1, x2, x3, t,
-                                            h_sym, t_sym,
-                                            verbose=False)
+                    e_field = sol.compute_e_field(x1, x2, x3, t, h_sym, t_sym, verbose=False)
                 case "rust":
                     import speenoza
                     current_moment_array = np.zeros((3, order + 3, order + 3, order + 3))
@@ -235,74 +266,97 @@ def test_solution(test_case, order, method, plot=False):
                         _x2.append(y)
                         _x3.append(z)
                     x1, x2, x3 = np.array(_x1), np.array(_x2), np.array(_x3)
-                    E = speenoza.multipole_e_field(x1.astype("float64").flatten(),
-                                                   x2.astype("float64").flatten(),
-                                                   x3.astype("float64").flatten(),
-                                                   t.astype("float64").flatten(),
-                                                   h_sym.astype("float64").flatten(),
-                                                   current_moment_array.astype("float64")).swapaxes(1, 2)
+                    e_field = speenoza.multipole_e_field(x1.astype("float64").flatten(),
+                                                         x2.astype("float64").flatten(),
+                                                         x3.astype("float64").flatten(),
+                                                         t.astype("float64").flatten(),
+                                                         h_sym.astype("float64").flatten(),
+                                                         current_moment_array.astype("float64")).swapaxes(1, 2)
         case "disc":
-            E = sol.compute_e_field(x1, x2, x3, t,
-                                    h_sym, t_sym,
-                                    verbose=False,
-                                    delayed=False)
+            e_field = sol.compute_e_field(x1, x2, x3, t, h_sym, t_sym, verbose=False, delayed=False)
+
+    e_field_x = None
     match method:
         case "python":
-            E1 = E[0, :, :, :, :]
+            e_field_x = e_field[0, :, :, :, :]
         case "rust":
-            E1 = E[0, :, :].reshape((1, 1, x3.size, t.size))
+            e_field_x = e_field[0, :, :].reshape((1, 1, x3.size, t.size))
 
     match case_:
         case "logo":
-            fname = "tests/data/Efield_at_2a_and_3a_lambdaOver2_v3.txt"
-            data_cmsl = pd.read_csv(fname,
-                                    skiprows=range(10),
-                                    names=("t", "absE2a", "E2a", "absE3a", "E3a"),
-                                    delim_whitespace=True)
-            e_cmsl_2a = scipy.interpolate.interp1d(data_cmsl["t"], data_cmsl["E2a"],
-                                                   fill_value="extrapolate")(t * gamma_SI)
-            e_cmsl_3a = scipy.interpolate.interp1d(data_cmsl["t"], data_cmsl["E3a"],
-                                                   fill_value="extrapolate")(t * gamma_SI)
+            filename = "tests/data/Efield_at_2a_and_3a_lambdaOver2_v3.txt"
+            data_comsol = pd.read_csv(filename,
+                                      skiprows=range(10),
+                                      names=("t", "absE2a", "E2a", "absE3a", "E3a"),
+                                      delim_whitespace=True)
+            e_comsol_2a = scipy.interpolate.interp1d(data_comsol["t"], data_comsol["E2a"],
+                                                     fill_value="extrapolate")(t * gamma_si)
+            e_comsol_3a = scipy.interpolate.interp1d(data_comsol["t"], data_comsol["E3a"],
+                                                     fill_value="extrapolate")(t * gamma_si)
             if num:
-                E1 = pynoza.set_extremities(E1, 0.1, dim = 3)
+                e_field_x = pynoza.set_extremities(e_field_x, 0.1, dim=3)
                 norm1 = 200
             else:
                 norm1 = 160
 
-            if plot:
-                import matplotlib.pyplot as plt
-                with pynoza.PlotAndWait(new_figure=True):
-                    plt.plot(t, e_cmsl_2a / 2, "k--")
-                    plt.plot(t, e_cmsl_3a / 2, "k--")
-                    plt.plot(t, E1[0, 0, 0, :], "b")
-                    plt.plot(t, E1[0, 0, 1, :], "b")
+            plt.figure(figsize=(5, 3))
+            c_si = 3e8
+            plt.plot(t / c_si * 1e9, e_field_x[0, 0, 0, :] / 1e3, "r*", markersize=5)
+            plt.plot(t / c_si * 1e9, e_field_x[0, 0, 1, :] / 1e3, "ro", markersize=4)
+            plt.plot(t / c_si * 1e9, e_comsol_2a / 2 / 1e3, "k-")
+            plt.plot(t / c_si * 1e9, e_comsol_3a / 2 / 1e3, "k:")
 
-            assert np.linalg.norm(e_cmsl_2a / 2 - E1[0, 0, 0, :], ord=2) / t.size < norm1 \
-                   and np.linalg.norm(e_cmsl_3a / 2 - E1[0, 0, 1, :], ord=2) / t.size < 170
+            loc_table_x = (19.5, 21)
+            loc_table_y = (28, 40)
+            line_length = 1
+            plt.plot((loc_table_x[0], loc_table_x[0] + line_length), (loc_table_y[0], loc_table_y[0]), "k-")
+            plt.scatter((loc_table_x[1], ), (loc_table_y[0], ), marker="*", color="r", s=25)
+            plt.plot((loc_table_x[0], loc_table_x[0] + line_length), (loc_table_y[1], loc_table_y[1]), "k:")
+            plt.scatter((loc_table_x[1], ), (loc_table_y[1], ), marker="o", color="r", s=16)
+
+            text_len_x = 2.5
+            text_len_y = 10
+            text_height_x = 2
+            plt.text(loc_table_x[0] - text_len_x, loc_table_y[0] - text_height_x, r"$z = \lambda$")
+            plt.text(loc_table_x[0] - text_len_x, loc_table_y[1] - text_height_x, r"$z = \frac{3}{2}\lambda$")
+            plt.text(loc_table_x[0] + .1, loc_table_y[1] + text_len_y, r"Multipole", rotation=90)
+            plt.text(loc_table_x[1] - 0.2, loc_table_y[1] + text_len_y, r"Simulation", rotation=90)
+
+            plt.xlim(3, 22)
+            plt.xlabel("Time (ns)")
+            plt.ylabel("kV/m")
+
+            plt.tight_layout()
+            plt.savefig("tests/data/test_analytical_vs_COMSOL.pdf")
+
+            if plot:
+                plt.show()
+
+            assert np.linalg.norm(e_comsol_2a / 2 - e_field_x[0, 0, 0, :], ord=2) / t.size < norm1 \
+                   and np.linalg.norm(e_comsol_3a / 2 - e_field_x[0, 0, 1, :], ord=2) / t.size < 170
         case "disc":
-            fname = "data/ratio-0-5-v6.txt"
             d = pd.read_csv("tests/data/data_paper.csv",
                             skiprows=1)
-            delay = -3*gamma_SI*1e9
-            e_paper1 = scipy.interpolate.interp1d(d["X.2"] * Tg * gamma_SI * 1e9 - delay, d["Y.2"],
-                                                  fill_value="extrapolate")(t * gamma_SI * 1e9)
-            e_paper2 = scipy.interpolate.interp1d(d["X.1"] * Tg * gamma_SI * 1e9 - delay, d["Y.1"],
-                                                  fill_value="extrapolate")(t * gamma_SI * 1e9)
-            e_paper3 = scipy.interpolate.interp1d(d["X"] * Tg * gamma_SI * 1e9 - delay, d["Y"],
-                                                  fill_value="extrapolate")(t * gamma_SI * 1e9)
+            delay = -3 * gamma_si * 1e9
+            e_paper1 = scipy.interpolate.interp1d(d["X.2"] * t_g * gamma_si * 1e9 - delay, d["Y.2"],
+                                                  fill_value="extrapolate")(t * gamma_si * 1e9)
+            e_paper2 = scipy.interpolate.interp1d(d["X.1"] * t_g * gamma_si * 1e9 - delay, d["Y.1"],
+                                                  fill_value="extrapolate")(t * gamma_si * 1e9)
+            e_paper3 = scipy.interpolate.interp1d(d["X"] * t_g * gamma_si * 1e9 - delay, d["Y"],
+                                                  fill_value="extrapolate")(t * gamma_si * 1e9)
+            plt.figure()
+            plt.plot(e_paper1 * 1e2, "k--")
+            plt.plot(e_paper2 * 1e2, "k--")
+            plt.plot(e_paper3 * 1e2, "k--")
+            plt.plot(e_field_x[0, 0, 0, :] * x3[0] / 1e6, "b")
+            plt.plot(e_field_x[0, 0, 1, :] * x3[1] / 1e6, "b")
+            plt.plot(e_field_x[0, 0, 2, :] * x3[2] / 1e6, "b")
             if plot:
-                import matplotlib.pyplot as plt
-                with pynoza.PlotAndWait(new_figure=True):
-                    plt.plot(e_paper1 * 1e2, "k--")
-                    plt.plot(e_paper2 * 1e2, "k--")
-                    plt.plot(e_paper3 * 1e2, "k--")
-                    plt.plot(E1[0, 0, 0, :] * x3[0] / 1e6, "b")
-                    plt.plot(E1[0, 0, 1, :] * x3[1] / 1e6, "b")
-                    plt.plot(E1[0, 0, 2, :] * x3[2] / 1e6, "b")
+                plt.show()
 
-            assert np.linalg.norm(e_paper1 * 1e2 - E1[0, 0, 0, :] * x3[0] / 1e6, ord=2) / t.size < 0.3 \
-                   and np.linalg.norm(e_paper2 * 1e2 - E1[0, 0, 1, :] * x3[1] / 1e6, ord=2) / t.size < 0.3 \
-                   and np.linalg.norm(e_paper3 * 1e2 - E1[0, 0, 2, :] * x3[2] / 1e6, ord=2) / t.size < 0.3
+            assert np.linalg.norm(e_paper1 * 1e2 - e_field_x[0, 0, 0, :] * x3[0] / 1e6, ord=2) / t.size < 0.3 \
+                   and np.linalg.norm(e_paper2 * 1e2 - e_field_x[0, 0, 1, :] * x3[1] / 1e6, ord=2) / t.size < 0.3 \
+                   and np.linalg.norm(e_paper3 * 1e2 - e_field_x[0, 0, 2, :] * x3[2] / 1e6, ord=2) / t.size < 0.3
 
     with open(f"tests/data/field-{case_}.txt", "w+") as fd:
         fd.write(sol.get_e_field_text())
@@ -310,6 +364,12 @@ def test_solution(test_case, order, method, plot=False):
 
 if __name__ == "__main__":
     import argparse
+
+    plt.rcParams.update({
+        "text.usetex": True,
+        "font.family": "Times"
+    })
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--order", metavar="order", type=int, required=True)
     parser.add_argument("--case", metavar="case", type=str, choices=["logo", "logo_num", "disc"], required=True)
