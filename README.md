@@ -6,6 +6,8 @@ Python implementation of time-domain solutions of Maxwell's equations using the 
 
 Currently, only the electric field computation is supported, and the current density must be time-separable, i.e., $\mathbf{J}(t,\mathbf{x})=h(t)\mathbf{j}(\mathbf{x})$
 
+The documentation is [available here](https://pynoza.readthedocs.io/en/latest/).
+
 ## Installation
 To install, clone the repository using `git clone https://github.com/eliasleb/pynoza.git`.
 
