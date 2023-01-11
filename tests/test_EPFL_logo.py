@@ -27,11 +27,6 @@ import matplotlib.pyplot as plt
 from matplotlib.collections import PatchCollection
 from matplotlib.patches import Rectangle
 
-plt.rcParams.update({
-    "text.usetex": True,
-    "font.family": "Times"
-})
-
 
 def int_j(x0, sig, m):
     """
@@ -305,37 +300,36 @@ def test_solution(test_case, order, method, plot=False):
             else:
                 norm1 = 160
 
-            plt.figure(figsize=(5, 3))
-            c_si = 3e8
-            plt.plot(t / c_si * 1e9, e_field_x[0, 0, 0, :] / 1e3, "r*", markersize=5)
-            plt.plot(t / c_si * 1e9, e_field_x[0, 0, 1, :] / 1e3, "ro", markersize=4)
-            plt.plot(t / c_si * 1e9, e_comsol_2a / 2 / 1e3, "k-")
-            plt.plot(t / c_si * 1e9, e_comsol_3a / 2 / 1e3, "k:")
-
-            loc_table_x = (19.5, 21)
-            loc_table_y = (28, 40)
-            line_length = 1
-            plt.plot((loc_table_x[0], loc_table_x[0] + line_length), (loc_table_y[0], loc_table_y[0]), "k-")
-            plt.scatter((loc_table_x[1], ), (loc_table_y[0], ), marker="*", color="r", s=25)
-            plt.plot((loc_table_x[0], loc_table_x[0] + line_length), (loc_table_y[1], loc_table_y[1]), "k:")
-            plt.scatter((loc_table_x[1], ), (loc_table_y[1], ), marker="o", color="r", s=16)
-
-            text_len_x = 2.5
-            text_len_y = 10
-            text_height_x = 2
-            plt.text(loc_table_x[0] - text_len_x, loc_table_y[0] - text_height_x, r"$z = \lambda$")
-            plt.text(loc_table_x[0] - text_len_x, loc_table_y[1] - text_height_x, r"$z = \frac{3}{2}\lambda$")
-            plt.text(loc_table_x[0] + .1, loc_table_y[1] + text_len_y, r"Multipole", rotation=90)
-            plt.text(loc_table_x[1] - 0.2, loc_table_y[1] + text_len_y, r"Simulation", rotation=90)
-
-            plt.xlim(3, 22)
-            plt.xlabel("Time (ns)")
-            plt.ylabel("kV/m")
-
-            plt.tight_layout()
-            plt.savefig("tests/data/test_analytical_vs_COMSOL.pdf")
-
             if plot:
+                plt.figure(figsize=(5, 3))
+                c_si = 3e8
+                plt.plot(t / c_si * 1e9, e_field_x[0, 0, 0, :] / 1e3, "r*", markersize=5)
+                plt.plot(t / c_si * 1e9, e_field_x[0, 0, 1, :] / 1e3, "ro", markersize=4)
+                plt.plot(t / c_si * 1e9, e_comsol_2a / 2 / 1e3, "k-")
+                plt.plot(t / c_si * 1e9, e_comsol_3a / 2 / 1e3, "k:")
+
+                loc_table_x = (19.5, 21)
+                loc_table_y = (28, 40)
+                line_length = 1
+                plt.plot((loc_table_x[0], loc_table_x[0] + line_length), (loc_table_y[0], loc_table_y[0]), "k-")
+                plt.scatter((loc_table_x[1], ), (loc_table_y[0], ), marker="*", color="r", s=25)
+                plt.plot((loc_table_x[0], loc_table_x[0] + line_length), (loc_table_y[1], loc_table_y[1]), "k:")
+                plt.scatter((loc_table_x[1], ), (loc_table_y[1], ), marker="o", color="r", s=16)
+
+                text_len_x = 2.5
+                text_len_y = 10
+                text_height_x = 2
+                plt.text(loc_table_x[0] - text_len_x, loc_table_y[0] - text_height_x, r"$z = \lambda$")
+                plt.text(loc_table_x[0] - text_len_x, loc_table_y[1] - text_height_x, r"$z = \frac{3}{2}\lambda$")
+                plt.text(loc_table_x[0] + .1, loc_table_y[1] + text_len_y, r"Multipole", rotation=90)
+                plt.text(loc_table_x[1] - 0.2, loc_table_y[1] + text_len_y, r"Simulation", rotation=90)
+
+                plt.xlim(3, 22)
+                plt.xlabel("Time (ns)")
+                plt.ylabel("kV/m")
+
+                plt.tight_layout()
+                plt.savefig("tests/data/test_analytical_vs_COMSOL.pdf")
                 plt.show()
 
             assert np.linalg.norm(e_comsol_2a / 2 - e_field_x[0, 0, 0, :], ord=2) / t.size < norm1 \
@@ -350,14 +344,14 @@ def test_solution(test_case, order, method, plot=False):
                                                   fill_value="extrapolate")(t * gamma_si * 1e9)
             e_paper3 = scipy.interpolate.interp1d(d["X"] * t_g * gamma_si * 1e9 - delay, d["Y"],
                                                   fill_value="extrapolate")(t * gamma_si * 1e9)
-            plt.figure()
-            plt.plot(e_paper1 * 1e2, "k--")
-            plt.plot(e_paper2 * 1e2, "k--")
-            plt.plot(e_paper3 * 1e2, "k--")
-            plt.plot(e_field_x[0, 0, 0, :] * x3[0] / 1e6, "b")
-            plt.plot(e_field_x[0, 0, 1, :] * x3[1] / 1e6, "b")
-            plt.plot(e_field_x[0, 0, 2, :] * x3[2] / 1e6, "b")
             if plot:
+                plt.figure()
+                plt.plot(e_paper1 * 1e2, "k--")
+                plt.plot(e_paper2 * 1e2, "k--")
+                plt.plot(e_paper3 * 1e2, "k--")
+                plt.plot(e_field_x[0, 0, 0, :] * x3[0] / 1e6, "b")
+                plt.plot(e_field_x[0, 0, 1, :] * x3[1] / 1e6, "b")
+                plt.plot(e_field_x[0, 0, 2, :] * x3[2] / 1e6, "b")
                 plt.show()
 
             assert np.linalg.norm(e_paper1 * 1e2 - e_field_x[0, 0, 0, :] * x3[0] / 1e6, ord=2) / t.size < 0.3 \
@@ -370,6 +364,11 @@ def test_solution(test_case, order, method, plot=False):
 
 if __name__ == "__main__":
     import argparse
+
+    plt.rcParams.update({
+        "text.usetex": True,
+        "font.family": "Times"
+    })
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--order", metavar="order", type=int, required=True)
