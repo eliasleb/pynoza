@@ -27,6 +27,11 @@ import matplotlib.pyplot as plt
 from matplotlib.collections import PatchCollection
 from matplotlib.patches import Rectangle
 
+plt.rcParams.update({
+    "text.usetex": True,
+    "font.family": "Times"
+})
+
 
 def int_j(x0, sig, m):
     """
@@ -117,7 +122,8 @@ def plot_current_density(xs: list[float, ...], ys: list[float, ...], ws: list[fl
     plt.xlabel(r"$x/\lambda$")
     plt.ylabel(r"$y/\lambda$")
     plt.tight_layout()
-    plt.savefig("tests/data/logo_current_density.pdf")
+    if __name__ == "__main__":
+        plt.savefig("tests/data/logo_current_density.pdf")
 
 
 @pytest.mark.parametrize("test_case, order, method", [
@@ -364,11 +370,6 @@ def test_solution(test_case, order, method, plot=False):
 
 if __name__ == "__main__":
     import argparse
-
-    plt.rcParams.update({
-        "text.usetex": True,
-        "font.family": "Times"
-    })
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--order", metavar="order", type=int, required=True)
