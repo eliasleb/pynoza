@@ -105,27 +105,24 @@ def plot_current_density(xs: list[float, ...], ys: list[float, ...], ws: list[fl
     :param d2: physical height of logo
     """
 
-    plt.figure(figsize=(5, 2.8))
-
     rectangles = [Rectangle((x / length_logo - d1, y / length_logo - d2),
                             w / length_logo, h / length_logo) for x, y, w, h in zip(xs, ys, ws, hs)]
     pc = PatchCollection(rectangles, facecolor="r")
     plt.gca().add_collection(pc)
 
-    plt.xlim(-.6, .6)
-    plt.ylim(-.3, .3)
-    plt.xlabel(r"$x/\lambda$")
-    plt.ylabel(r"$y/\lambda$")
-    plt.tight_layout()
-    if __name__ == "__main__":
-        plt.savefig("tests/data/logo_current_density.pdf")
+
+def legends_matrix(loc_table_x, loc_table_y, lines, line_colors, markers, marker_colors, marker_sizes, line_length=1):
+    for y, line, line_color, marker, marker_color, marker_size in zip(
+            loc_table_y, lines, line_colors, markers, marker_colors, marker_sizes):
+        plt.plot((loc_table_x[0], loc_table_x[0] + line_length), (y, y), line, color=line_color)
+        plt.scatter((loc_table_x[1],), (y,), marker=marker, color=marker_color, s=marker_size**2)
 
 
 @pytest.mark.parametrize("test_case, order, method", [
     ("logo", 8, "python"),
     ("disc", 24, "python"),
     ("logo_num", 8, "python")])
-def test_solution(test_case, order, method, plot=False):
+def test_solution(test_case, order, method, plot=False, cname="xyz"):
     """
     Test the pynoza :solution: class by comparing
     with either COMSOL simulation (case_="logo") or
@@ -186,7 +183,18 @@ def test_solution(test_case, order, method, plot=False):
             t = np.linspace(0, 10 * gamma, 200)
 
             if plot:
+                plt.figure(figsize=(5, 2.8))
                 plot_current_density(x1s, x2s, ws, hs, length_logo, d1, d2)
+                if cname == "xyz":
+                    plt.xlabel(r"$x/\lambda$")
+                    plt.ylabel(r"$y/\lambda$")
+                else:
+                    plt.xlabel(r"$x_1/\lambda$")
+                    plt.ylabel(r"$x_2/\lambda$")
+                plt.xlim(-.6, .6)
+                plt.ylim(-.3, .3)
+                plt.tight_layout()
+                plt.savefig("tests/data/logo_current_density.pdf")
 
         case ("disc" | "rasc"):
             d1 = a
@@ -202,6 +210,19 @@ def test_solution(test_case, order, method, plot=False):
                     x2s.append(yi - h0 / 2)
                     ws.append(w0)
                     hs.append(h0)
+            if plot:
+                plt.figure(figsize=(2.8, 2.8))
+                plot_current_density(x1s, x2s, ws, hs, length_logo, .5, .5)
+                plt.xlim(-.6, .6)
+                plt.ylim(-.6, .6)
+                if cname == "xyz":
+                    plt.xlabel(r"$x/\lambda$")
+                    plt.ylabel(r"$y/\lambda$")
+                else:
+                    plt.xlabel(r"$x_1/\lambda$")
+                    plt.ylabel(r"$x_2/\lambda$")
+                plt.tight_layout()
+                plt.savefig("tests/data/disc_current_density.pdf")
             match case_:
                 case "disc":
                     t = np.linspace(0, 6 * gamma, 200)
@@ -282,6 +303,10 @@ def test_solution(test_case, order, method, plot=False):
             e_field_x = e_field[0, :, :, :, :]
         case "rust":
             e_field_x = e_field[0, :, :].reshape((1, 1, x3.size, t.size))
+    if cname == "xyz":
+        var_name = "z"
+    else:
+        var_name = "x_3"
 
     match case_:
         case "logo":
@@ -303,30 +328,34 @@ def test_solution(test_case, order, method, plot=False):
             if plot:
                 plt.figure(figsize=(5, 3))
                 c_si = 3e8
-                plt.plot(t / c_si * 1e9, e_field_x[0, 0, 0, :] / 1e3, "r*", markersize=5)
-                plt.plot(t / c_si * 1e9, e_field_x[0, 0, 1, :] / 1e3, "ro", markersize=4)
-                plt.plot(t / c_si * 1e9, e_comsol_2a / 2 / 1e3, "k-")
-                plt.plot(t / c_si * 1e9, e_comsol_3a / 2 / 1e3, "k:")
-
                 loc_table_x = (19.5, 21)
                 loc_table_y = (28, 40)
-                line_length = 1
-                plt.plot((loc_table_x[0], loc_table_x[0] + line_length), (loc_table_y[0], loc_table_y[0]), "k-")
-                plt.scatter((loc_table_x[1], ), (loc_table_y[0], ), marker="*", color="r", s=25)
-                plt.plot((loc_table_x[0], loc_table_x[0] + line_length), (loc_table_y[1], loc_table_y[1]), "k:")
-                plt.scatter((loc_table_x[1], ), (loc_table_y[1], ), marker="o", color="r", s=16)
+                lines = ["-", ":"]
+                line_colors = ["k", "k"]
+                markers = ["*", "o"]
+                marker_sizes = [5, 4]
+                marker_colors = ["r", "r"]
+
+                for ind, (e_comsol, line, line_color, marker, marker_size, marker_color) in enumerate(zip(
+                        [e_comsol_2a, e_comsol_3a], lines, line_colors, markers, marker_sizes, marker_colors)):
+                    plt.plot(t / c_si * 1e9, e_field_x[0, 0, ind, :] / 1e3, marker, markersize=marker_size,
+                             color=marker_color)
+                    plt.plot(t / c_si * 1e9, e_comsol / 2 / 1e3, line, color=line_color)
+
+                legends_matrix(loc_table_x, loc_table_y, lines, line_colors, markers, marker_colors, marker_sizes)
 
                 text_len_x = 2.5
                 text_len_y = 10
                 text_height_x = 2
-                plt.text(loc_table_x[0] - text_len_x, loc_table_y[0] - text_height_x, r"$z = \lambda$")
-                plt.text(loc_table_x[0] - text_len_x, loc_table_y[1] - text_height_x, r"$z = \frac{3}{2}\lambda$")
+                plt.text(loc_table_x[0] - text_len_x, loc_table_y[0] - text_height_x, fr"${var_name} = \lambda$")
+                plt.text(loc_table_x[0] - text_len_x, loc_table_y[1] - text_height_x,
+                         fr"${var_name} = \frac{3}{2}\lambda$")
                 plt.text(loc_table_x[0] + .1, loc_table_y[1] + text_len_y, r"Multipole", rotation=90)
                 plt.text(loc_table_x[1] - 0.2, loc_table_y[1] + text_len_y, r"Simulation", rotation=90)
 
                 plt.xlim(3, 22)
                 plt.xlabel("Time (ns)")
-                plt.ylabel("kV/m")
+                plt.ylabel("Electric field (kV/m)")
 
                 plt.tight_layout()
                 plt.savefig("tests/data/test_analytical_vs_COMSOL.pdf")
@@ -345,13 +374,40 @@ def test_solution(test_case, order, method, plot=False):
             e_paper3 = scipy.interpolate.interp1d(d["X"] * t_g * gamma_si * 1e9 - delay, d["Y"],
                                                   fill_value="extrapolate")(t * gamma_si * 1e9)
             if plot:
-                plt.figure()
-                plt.plot(e_paper1 * 1e2, "k--")
-                plt.plot(e_paper2 * 1e2, "k--")
-                plt.plot(e_paper3 * 1e2, "k--")
-                plt.plot(e_field_x[0, 0, 0, :] * x3[0] / 1e6, "b")
-                plt.plot(e_field_x[0, 0, 1, :] * x3[1] / 1e6, "b")
-                plt.plot(e_field_x[0, 0, 2, :] * x3[2] / 1e6, "b")
+                plt.figure(figsize=(5, 3))
+                c_si = 3e8
+                n_d_paper = 5
+                dark_red = "#a20000ff"
+                dark_gray = "#424242ff"
+                loc_table_x = (7.5, 9.5)
+                loc_table_y = (-180, -155, -130)
+                lines = ["-", ":", "-."]
+                line_colors = ["k", "k", dark_gray]
+                markers = ["*", "o", "s"]
+                marker_colors = ["r", "r", dark_red]
+                marker_sizes = [5, 4, 4]
+
+                for ind, (e_paper, line, line_color, marker, marker_size, marker_color) in enumerate(zip(
+                        [e_paper1, e_paper2, e_paper3], lines, line_colors, markers, marker_sizes, marker_colors)):
+                    plt.plot(t[::n_d_paper] / c_si * 1e9, e_paper[::n_d_paper] * 1e2, marker, color=marker_color,
+                             markersize=5)
+                    plt.plot(t / c_si * 1e9, e_field_x[0, 0, ind, :] * x3[ind] / 1e6, line, color=line_color)
+
+                legends_matrix(loc_table_x, loc_table_y, lines, line_colors, markers, marker_colors, marker_sizes)
+
+                text_len_x = 3.5
+                text_len_y = 20
+                text_height_x = 10
+                plt.text(loc_table_x[0] - text_len_x, loc_table_y[0] - text_height_x, fr"${var_name} = 27\lambda$")
+                plt.text(loc_table_x[0] - text_len_x, loc_table_y[1] - text_height_x, fr"${var_name} = 81\lambda$")
+                plt.text(loc_table_x[0] - text_len_x, loc_table_y[2] - text_height_x, fr"${var_name} = 162\lambda$")
+                plt.text(loc_table_x[0] + .1, loc_table_y[2] + text_len_y, r"Approx.", rotation=90)
+                plt.text(loc_table_x[1] - 0.3, loc_table_y[2] + text_len_y, r"Exact", rotation=90)
+                plt.xlim(0, 20)
+                plt.xlabel("Time (ns)")
+                plt.ylabel("Voltage (MV)")
+                plt.tight_layout()
+                plt.savefig("tests/data/test_approximate_vs_exact.pdf")
                 plt.show()
 
             assert np.linalg.norm(e_paper1 * 1e2 - e_field_x[0, 0, 0, :] * x3[0] / 1e6, ord=2) / t.size < 0.3 \
@@ -374,6 +430,8 @@ if __name__ == "__main__":
     parser.add_argument("--order", metavar="order", type=int, required=True)
     parser.add_argument("--case", metavar="case", type=str, choices=["logo", "logo_num", "disc"], required=True)
     parser.add_argument("--method", metavar="method", type=str, choices=["python", "rust"], required=True)
+    parser.add_argument("--cname", metavar="cname", type=str, choices=["xyz", "x1x2x3"], required=False,
+                        default="xyz")
 
     args = parser.parse_args()
-    test_solution(args.case, args.order, args.method, plot=True)
+    test_solution(args.case, args.order, args.method, plot=True, cname=args.cname)
