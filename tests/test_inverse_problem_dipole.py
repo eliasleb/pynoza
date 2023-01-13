@@ -112,20 +112,9 @@ def direct_problem_simple(x1, x2, x3, t, h, order=2):
         else:
             return [0, 0, 0]
 
-    def charge_moment(a1, a2, a3):
-        a = (a1, a2, a3)
-        if a == (1, 0, 1):
-            return [-1, 0, 0]
-        elif a == (0, 1, 1):
-            return [0, -1, 0]
-        elif a == (0, 0, 2):
-            return [0, 0, -2]
-        else:
-            return [0, 0, 0]
-
     sol = pynoza.solution.Solution(max_order=order)
     sol.recurse()
-    sol.set_moments(charge_moment=charge_moment, current_moment=current_moment)
+    sol.set_moments(current_moment=current_moment)
     e = sol.compute_e_field(x1, x2, x3, t, h, None, compute_grid=False)
     return e.swapaxes(1, 2)
 

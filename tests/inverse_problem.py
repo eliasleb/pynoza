@@ -72,9 +72,7 @@ def get_fields(sol_python, sol_rust, find_center, t, x1, x2, x3, current_moment,
     if method == "python":
         pass
     c_mom = lambda a1, a2, a3: list(current_moment[:, a1, a2, a3])
-    charge_moment = pynoza.get_charge_moment(current_moment)
-    r_mom = lambda a1, a2, a3: list(charge_moment[:, a1, a2, a3])
-    sol_python.set_moments(c_mom, r_mom)
+    sol_python.set_moments(c_mom)
     if find_center:
         if method == "python":
             e_python = sol_python.compute_e_field(x1 - center[0],

@@ -240,15 +240,6 @@ def test_solution(test_case, order, method, plot=False, cname="xyz"):
                               hi / length_logo * length) / gamma_si
         return [moment, 0, 0]
 
-    def charge_moment(ax, ay, az):
-        moment = 0
-        if az == 0:
-            for x_i, y_i, wi, hi in zip(x1s, x2s, ws, hs):
-                moment += c_r(ax, ay, az, x_i / length_logo * length - d1,
-                              y_i / length_logo * length - d2, wi / length_logo * length,
-                              hi / length_logo * length) / gamma_si
-        return [moment, 0, 0]
-
     x1 = np.array([0, ])
     x2 = np.array([0, ])
     match case_:
@@ -269,8 +260,7 @@ def test_solution(test_case, order, method, plot=False, cname="xyz"):
     sol = pynoza.solution.Solution(max_order=order,
                                    wave_speed=c0)
     sol.recurse()
-    sol.set_moments(current_moment=current_moment,
-                    charge_moment=charge_moment)
+    sol.set_moments(current_moment=current_moment)
     e_field = None
     match case_:
         case "logo":

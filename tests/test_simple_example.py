@@ -39,14 +39,12 @@ def test_simple_example():
     current_moment_array = np.zeros((3, max_order + 2, max_order + 2, max_order + 2))
     for ind, _ in np.ndenumerate(np.zeros(current_moment_array.shape[1:])):
         current_moment_array[:, ind[0], ind[1], ind[2]] = toy_current_density(ind[0], ind[1], ind[2])
-    charge_moment_array = pynoza.get_charge_moment(current_moment_array)
 
     current_moment = lambda a1, a2, a3: list(current_moment_array[:, a1, a2, a3])
-    charge_moment = lambda a1, a2, a3: list(charge_moment_array[:, a1, a2, a3])
 
     sol = pynoza.Solution(max_order)
     sol.recurse()
-    sol.set_moments(current_moment, charge_moment)
+    sol.set_moments(current_moment)
 
     wavelength = 1
     x1 = np.array((wavelength, 2 * wavelength, ))

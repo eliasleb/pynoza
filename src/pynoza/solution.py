@@ -15,6 +15,8 @@ import scipy.interpolate
 import numbers
 import cython
 
+import pynoza.helpers
+
 
 class Interpolator(scipy.interpolate.interp1d):
     """
@@ -227,18 +229,26 @@ class Solution:
 
     def set_moments(self,
                     current_moment=lambda a1, a2, a3: [0, 0, 0],
-                    charge_moment=lambda a1, a2, a3: [0, 0, 0],) -> None:
+                    charge_moment=None) -> None:
         """
         Set the current and charge moment functions.
 
         :param current_moment: a callable returning the current moment for a given multi-index a1, a2, a3
-        :param charge_moment: a callable returning the charge moment for a given multi-index a1, a2, a3"""
+        :param charge_moment: a callable returning the charge moment for a given multi-index a1, a2, a3 (optional)
 
-        if not callable(current_moment) or not callable(charge_moment):
-            raise TypeError(":current_moment: and :charge_moment: must be callable")
-        if not isinstance(current_moment(0, 0, 0), list) \
-                or not isinstance(charge_moment(0, 0, 0), list):
-            raise ValueError(":current_moment: and :charge_moment: callables must return a list of numbers")
+        If the parameter :charge_moment: is not given, it is automatically computed according to
+        :pynoza.helpers.get_charge_moment:.
+        """
+
+        if not callable(current_moment):
+            raise TypeError(":current_moment: must be callable")
+        if not isinstance(current_moment(0, 0, 0), list):
+            raise ValueError(":current_moment: callable must return a list of numbers")
+        if charge_moment is not None:
+            if not callable(charge_moment):
+                raise TypeError(":charge_moment: must be callable")
+            if not isinstance(charge_moment(0, 0, 0), list):
+                raise ValueError(":charge_moment: callable must return a list of numbers")
 
         self.ran_set_moments = True
         self.current_moment = np.zeros((3, self.max_order + 1, self.max_order + 1, self.max_order + 1))
@@ -246,7 +256,10 @@ class Solution:
 
         for ind, _ in np.ndenumerate(zeros(self._shape)):
             self.current_moment[:, ind[0], ind[1], ind[2]] = current_moment(*ind)
-            self.charge_moment[:, ind[0], ind[1], ind[2]] = charge_moment(*ind)
+            if charge_moment is not None:
+                self.charge_moment[:, ind[0], ind[1], ind[2]] = charge_moment(*ind)
+        if charge_moment is None:
+            self.charge_moment = pynoza.helpers.get_charge_moment(self.current_moment)
 
     @cython.ccall
     def compute_e_field(self,
