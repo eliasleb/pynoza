@@ -9,9 +9,8 @@ Currently, only the electric field computation is supported, and the current den
 The documentation is [available here](https://pynoza.readthedocs.io/en/latest/).
 
 ## Installation
-To install, clone the repository using `git clone https://github.com/eliasleb/pynoza.git`.
-
-Then, from the root `pynoza` folder, run `pip install .`.
+To install directly from git, use
+``pip install "git+https://github.com/eliasleb/pynoza"``.
 
 ## Tutorial
 

@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 import itertools
+
 matplotlib.use("TkAgg")
 
 
@@ -41,19 +42,18 @@ def demo_logo():
     y_coordinates = [0, 10, 20, 30, 40, 0, 20, 30, 40, 0, 30, 20, 40, 10, 0]
     widths = [35, 10, 23, 10, 35, 10, 23, 10, 23, 10, 10, 23, 35, 10, 35]
     heights = [10, 10, 10, 10, 10, 20, 10, 10, 10, 20, 10, 10, 10, 40, 10]
-    size_x = a
-    size_y = a * aspect_ratio
+    shift_x = a
+    shift_y = a * aspect_ratio
 
-    # Approximation of the `P'
+    # Approximation of the curvy part of the `P'
     pixel_width = 1
     pixel_height = 1
     x_coordinate_candidates = np.arange(0, length_logo, pixel_width)
     y_coordinate_candidates = np.arange(0, length_logo, pixel_height)
-
     for x, y in itertools.product(x_coordinate_candidates, y_coordinate_candidates):
         if 15**2 >= (x - 60)**2 + (y - 35)**2 >= 5**2 and x > 60:
-            x_coordinates.append(x - pixel_width / 2)
-            y_coordinates.append(y - pixel_height / 2)
+            x_coordinates.append(x)
+            y_coordinates.append(y)
             widths.append(pixel_width)
             heights.append(pixel_height)
 
@@ -63,8 +63,8 @@ def demo_logo():
             for x_i, y_i, w_i, h_i in zip(x_coordinates, y_coordinates, widths, heights):
                 moment += current_moment_rectangle(
                     ax, ay, az,
-                    x_i / length_logo * length - size_x,
-                    y_i / length_logo * length - size_y,
+                    x_i / length_logo * length - shift_x,
+                    y_i / length_logo * length - shift_y,
                     w_i / length_logo * length,
                     h_i / length_logo * length
                 ) / gamma_si
@@ -72,14 +72,22 @@ def demo_logo():
 
     x = np.array([0, ])
     y = np.array([0, ])
-    z = np.array((2, 3,)) * a
+    z = np.array([2, 3, ]) * a
 
-    sol = pynoza.solution.Solution(max_order=order,
-                                   wave_speed=c0)
-    sol.recurse()
-    sol.set_moments(current_moment=current_moment,
-                    charge_moment=None)
-    e_field = sol.compute_e_field(x, y, z, t, hp, t, verbose=False)
+    solution = pynoza.Solution(
+        max_order=order,
+        wave_speed=c0
+    )
+    solution.recurse()
+    solution.set_moments(
+        current_moment=current_moment,
+        charge_moment=None
+    )
+    e_field = solution.compute_e_field(
+        x, y, z, t,
+        hp, t,
+        verbose=False
+    )
     e_field_x = e_field[0, :, :, :, :]
 
     plt.plot(t, e_field_x.squeeze().T)
