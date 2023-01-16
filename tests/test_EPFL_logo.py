@@ -351,6 +351,11 @@ def test_solution(test_case, order, method, plot=False, cname="xyz"):
                 plt.savefig("tests/data/test_analytical_vs_COMSOL.pdf")
                 plt.show()
 
+            lse_2a = np.linalg.norm(e_comsol_2a / 2 - e_field_x[0, 0, 0, :], ord=2) / t.size
+            lse_3a = np.linalg.norm(e_comsol_3a / 2 - e_field_x[0, 0, 1, :], ord=2) / t.size
+            lse = (lse_2a + lse_3a) / 2
+            print(f"{lse=}")
+
             assert np.linalg.norm(e_comsol_2a / 2 - e_field_x[0, 0, 0, :], ord=2) / t.size < norm1 \
                    and np.linalg.norm(e_comsol_3a / 2 - e_field_x[0, 0, 1, :], ord=2) / t.size < 170
         case "disc":
@@ -408,6 +413,32 @@ def test_solution(test_case, order, method, plot=False, cname="xyz"):
         fd.write(sol.get_e_field_text())
 
 
+def plot_lse_logo():
+
+    orders = range(11)
+    lses = [
+        1663.5875518751154,
+        1122.4116072604822,
+        370.113466300506,
+        370.113466300506,
+        187.79797208479295,
+        187.79797208479295,
+        164.90432083428794,
+        164.90432083428794,
+        162.29050193127722,
+        162.29050193127722,
+        162.23040795771308
+    ]
+    plt.figure(figsize=(5, 3))
+    plt.plot(np.array(orders) + 2, 20 * np.log10(np.array(lses)/1e3), "ko-")
+
+    plt.ylabel(r"Least-square error (dBkV)")
+    plt.xlabel("Truncation order $n$")
+
+    plt.tight_layout()
+    plt.savefig("tests/data/lse_logo.pdf")
+
+
 if __name__ == "__main__":
     import argparse
 
@@ -415,6 +446,8 @@ if __name__ == "__main__":
         "text.usetex": True,
         "font.family": "Times"
     })
+
+    plot_lse_logo()
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--order", metavar="order", type=int, required=True)
