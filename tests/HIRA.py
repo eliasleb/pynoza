@@ -60,12 +60,12 @@ def add_symmetries(*args):
                 = (arg * s for arg, s in zip(args, signature))
             i_sym += 1
 
-        apply_symmetry(-1, 1, 1, -1, 1, 1)
-        # apply_symmetry(1, -1, 1, 1, -1, 1)
+        # apply_symmetry(-1, 1, 1, -1, 1, 1)
+        apply_symmetry(1, -1, 1, 1, -1, 1)
         # apply_symmetry(-1, -1, 1, -1, -1, 1)
         apply_symmetry(1, 1, -1, -1, -1, 1)
-        apply_symmetry(-1, 1, -1, 1, -1, 1)
-        # apply_symmetry(1, -1, -1, -1, 1, 1)
+        # apply_symmetry(-1, 1, -1, 1, -1, 1)
+        apply_symmetry(1, -1, -1, -1, 1, 1)
         # apply_symmetry(-1, -1, -1, 1, 1, 1)
 
     assert i_sym // x1.size == times_added
@@ -81,17 +81,12 @@ def add_symmetries(*args):
 def inverse_problem_hira(**kwargs):
 
     print(f"{kwargs=}")
-
-    filename = kwargs.get("filename",
-                          "../../../git_ignore/GLOBALEM/hira_v12.txt")
-    x1, x2, x3, ex, ey, ez = read_comsol_file(filename)
     c0 = 3e8
     f = 500e6 / c0
     gamma = np.sqrt(12 / 7) / f
     t0 = 3 * gamma
     dt = float(kwargs["dt"])
     dt *= c0
-    t = np.arange(0, ex.shape[1] * dt, dt)
     down_sample_time = int(kwargs.get("down_sample_time", 6))
     obs_r = np.linspace(float(kwargs.get("r_obs_min", 1)),
                         float(kwargs.get("r_obs_max", 1.6)),
@@ -103,42 +98,72 @@ def inverse_problem_hira(**kwargs):
                           float(kwargs.get("phi_obs_max", 2 * np.pi)),
                           int(kwargs.get("n_phi_obs", 8)))
 
-    x1, x2, x3, ex, ey, ez = add_symmetries(x1, x2, x3, ex, ey, ez)
+    center_x = float(kwargs.get("center_x", 0.))
 
-    ex = ex[:, ::down_sample_time]
-    ey = ey[:, ::down_sample_time]
-    ez = ez[:, ::down_sample_time]
-    t = t[::down_sample_time]
+    filename = kwargs.get("filename",
+                          "../../../git_ignore/GLOBALEM/hira_v12.txt")
+    try:
+        with open("data/x1x2x3exeyez_at_obs.pickle", "rb") as fd:
+            x1, x2, x3, ex, ey, ez = pickle.load(fd)
+            t = np.arange(0, ex.shape[1] * dt, dt)
+            print("Successfully read file")
+    except FileNotFoundError:
+        x1, x2, x3, ex, ey, ez = read_comsol_file(filename)
+        x1, x2, x3, ex, ey, ez = add_symmetries(x1, x2, x3, ex, ey, ez)
 
-    def to_cartesian(radius, theta, phi):
-        return radius * np.cos(phi) * np.sin(theta), radius * np.sin(phi) * np.sin(theta), radius * np.cos(theta)
+        ex = ex[:, ::down_sample_time]
+        ey = ey[:, ::down_sample_time]
+        ez = ez[:, ::down_sample_time]
+        t = np.arange(0, ex.shape[1] * dt, dt)
+        t = t[::down_sample_time]
 
-    indices_obs = list()
-    for ri, ti, pi in itertools.product(obs_r, obs_theta, obs_phi):
-        obs_x, obs_y, obs_z = to_cartesian(ri, ti, pi)
-        dist = (x1 - obs_x) ** 2 + (x2 - obs_y) ** 2 + (x3 - obs_z) ** 2
-        indices_obs.append(dist.argmin())
+        def to_cartesian(radius, theta, phi):
+            return radius * np.cos(phi) * np.sin(theta), radius * np.sin(phi) * np.sin(theta), radius * np.cos(theta)
 
-    x1 = x1[indices_obs]
-    x2 = x2[indices_obs]
-    x3 = x3[indices_obs]
-    ex = ex[indices_obs, :]
-    ey = ey[indices_obs, :]
-    ez = ez[indices_obs, :]
+        indices_obs = list()
+        for ri, ti, pi in itertools.product(obs_r, obs_theta, obs_phi):
+            obs_x, obs_y, obs_z = to_cartesian(ri, ti, pi)
+            dist = (x1 - obs_x) ** 2 + (x2 - obs_y) ** 2 + (x3 - obs_z) ** 2
+            indices_obs.append(dist.argmin())
+
+        x1 = x1[indices_obs]
+        x2 = x2[indices_obs]
+        x3 = x3[indices_obs]
+        ex = ex[indices_obs, :]
+        ey = ey[indices_obs, :]
+        ez = ez[indices_obs, :]
+
+        with open("data/x1x2x3exeyez_at_obs.pickle", "wb") as fd:
+            pickle.dump((x1, x2, x3, ex, ey, ez), fd)
+    print(f"{center_x}")
+    x1 = x1 - center_x
 
     r = np.sqrt(x1 ** 2 + x2 ** 2 + x3 ** 2)
-    t_max = t.max()
+    print(f"{r=}, {x1=}, {x2=}, {x3=}")
+    t_max = np.max(t)
 
     def force_decay(e, t_delay):
         cut = 0.5 * t_max
         return e * ((t_delay <= cut) + (t_delay > cut) * np.exp(-((t_delay - cut) / gamma) ** 2))
-
     td = t.reshape(1, t.size) - r.reshape(r.size, 1)
 
-    ex = force_decay(ex, td)
-    ey = force_decay(ey, td)
-    ez = force_decay(ez, td)
+    # ex = force_decay(ex, td)
+    # ey = force_decay(ey, td)
+    # ez = force_decay(ez, td)
 
+    # import matplotlib
+    # matplotlib.use("TkAgg")
+    # import matplotlib.pyplot as plt
+#
+    # ax = plt.figure().add_subplot(projection='3d')
+    # plt.show(block=False)
+    # max_e = max((np.max(np.abs(ex)), np.max(np.abs(ey)), np.max(np.abs(ez))))
+    # for ind_t, ti in enumerate(t[::2]):
+    #     plt.title(f"{ti=:.3f}")
+    #     ax.quiver(x1, x2, x3, ex[:, ind_t]/max_e, ey[:, ind_t]/max_e, ez[:, ind_t]/max_e, length=.2,
+    #               normalize=False)
+    #     plt.waitforbuttonpress()
+    #     ax.clear()
 
     print(f"{ex.shape=}")
 
@@ -176,24 +201,29 @@ def inverse_problem_hira(**kwargs):
               "compute_grid": False,
               "estimate": estimate}
     shape_mom = (3, order + 3, order + 3, order + 3)
-    dim_mom = 2 * sum([1 for i, j, k in itertools.product(range(order + 1), range(order + 1), range(order + 1))
-                       if i + j + k <= order and j % 2 == 1]) \
-        + sum([1 for i, j, k in itertools.product(range(order + 1), range(order + 1), range(order + 1))
-               if i + j + k <= order and j % 2 == 0])
+    dim_mom = sum([1 for i, j, k in itertools.product(range(order + 1), range(order + 1), range(order + 1))
+                       if i + j + k <= order and i % 2 == 1 and k % 2 == 1]) \
+    + sum([1 for i, j, k in itertools.product(range(order + 1), range(order + 1), range(order + 1))
+                       if i + j + k <= order and i % 2 == 1 and k % 2 == 0]) \
+    + sum([1 for i, j, k in itertools.product(range(order + 1), range(order + 1), range(order + 1))
+                       if i + j + k <= order and i % 2 == 0 and k % 2 == 1])
 
     def get_current_moment(moment):
         current_moment_ = np.zeros(shape_mom)
         ind = 0
         for a1, a2, a3 in itertools.product(range(order + 1), range(order + 1), range(order + 1)):
             if a1 + a2 + a3 <= order:
-                if a2 % 2 == 1:
-                    current_moment_[0, a1, a2, a3] = moment[ind]
-                    ind += 1
-                    current_moment_[2, a1, a2, a3] = moment[ind]
-                    ind += 1
-                else:
-                    current_moment_[1, a1, a2, a3] = moment[ind]
-                    ind += 1
+                if a1 % 2 == 1:  # alpha_x is odd
+                    if a3 % 2 == 1:  # alpha_z is odd:
+                        current_moment_[1, a1, a2, a3] = moment[ind]
+                        ind += 1
+                    else:
+                        current_moment_[2, a1, a2, a3] = moment[ind]
+                        ind += 1
+                else:  # alpha_x is even
+                    if a3 % 2 == 1:
+                        current_moment_[0, a1, a2, a3] = moment[ind]
+                        ind += 1
         assert ind == moment.size
         return current_moment_
 
@@ -260,8 +290,9 @@ if __name__ == "__main__":
     parser.add_argument("--scale")
     parser.add_argument("--find_center")
     parser.add_argument("--max_global_tries")
+    parser.add_argument("--center_x")
     parser.add_argument("--filename", required=True)
     parser.add_argument("--dt", help="Sampling time, in second", required=True)
 
-    kwargs = parser.parse_args()
-    inverse_problem_hira(**vars(kwargs))
+    parsed = parser.parse_args()
+    inverse_problem_hira(**vars(parsed))
