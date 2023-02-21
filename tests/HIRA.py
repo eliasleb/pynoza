@@ -88,17 +88,15 @@ def inverse_problem_hira(**kwargs):
     dt = float(kwargs["dt"])
     dt *= c0
     down_sample_time = int(kwargs.get("down_sample_time", 6))
-    obs_r = np.linspace(float(kwargs.get("r_obs_min", 1)),
-                        float(kwargs.get("r_obs_max", 1.6)),
-                        int(kwargs.get("n_r_obs", 2)))
-    obs_theta = np.linspace(float(kwargs.get("theta_obs_min", 0.)),
-                            float(kwargs.get("theta_obs_max", np.pi)),
-                            int(kwargs.get("n_theta_obs", 3)))
-    obs_phi = np.linspace(float(kwargs.get("phi_obs_min", 0.)),
-                          float(kwargs.get("phi_obs_max", 2 * np.pi)),
-                          int(kwargs.get("n_phi_obs", 8)))
 
     center_x = float(kwargs.get("center_x", 0.))
+
+    obs_x1 = np.array([float(xi) for xi in kwargs.get("x1", [1., ])])
+    obs_x2 = np.array([float(xi) for xi in kwargs.get("x2", [0., ])])
+    obs_x3 = np.array([float(xi) for xi in kwargs.get("x3", [0., ])])
+    before = kwargs["before"]
+
+    assert len(obs_x1) == len(obs_x2) == len(obs_x3)
 
     filename = kwargs.get("filename",
                           "../../../git_ignore/GLOBALEM/hira_v12.txt")
@@ -109,29 +107,30 @@ def inverse_problem_hira(**kwargs):
             print("Successfully read file")
     except FileNotFoundError:
         x1, x2, x3, ex, ey, ez = read_comsol_file(filename)
-        x1, x2, x3, ex, ey, ez = add_symmetries(x1, x2, x3, ex, ey, ez)
 
-        ex = ex[:, ::down_sample_time]
-        ey = ey[:, ::down_sample_time]
-        ez = ez[:, ::down_sample_time]
-        t = np.arange(0, ex.shape[1] * dt, dt)
-        t = t[::down_sample_time]
-
-        def to_cartesian(radius, theta, phi):
-            return radius * np.cos(phi) * np.sin(theta), radius * np.sin(phi) * np.sin(theta), radius * np.cos(theta)
+        n_added_samples = int(before / dt)
+        t = np.arange(-n_added_samples * dt, ex.shape[1] * dt, dt)
 
         indices_obs = list()
-        for ri, ti, pi in itertools.product(obs_r, obs_theta, obs_phi):
-            obs_x, obs_y, obs_z = to_cartesian(ri, ti, pi)
+        for obs_x, obs_y, obs_z in zip(obs_x1, obs_x2, obs_x3):
             dist = (x1 - obs_x) ** 2 + (x2 - obs_y) ** 2 + (x3 - obs_z) ** 2
             indices_obs.append(dist.argmin())
 
         x1 = x1[indices_obs]
         x2 = x2[indices_obs]
         x3 = x3[indices_obs]
+
         ex = ex[indices_obs, :]
         ey = ey[indices_obs, :]
         ez = ez[indices_obs, :]
+        ex = np.pad(ex, pad_width=((0, 0), (n_added_samples, 0)), mode="constant", constant_values=0)
+        ey = np.pad(ey, pad_width=((0, 0), (n_added_samples, 0)), mode="constant", constant_values=0)
+        ez = np.pad(ez, pad_width=((0, 0), (n_added_samples, 0)), mode="constant", constant_values=0)
+
+        t = t[::down_sample_time]
+        ex = ex[:, ::down_sample_time]
+        ey = ey[:, ::down_sample_time]
+        ez = ez[:, ::down_sample_time]
 
         with open("data/x1x2x3exeyez_at_obs.pickle", "wb") as fd:
             pickle.dump((x1, x2, x3, ex, ey, ez), fd)
@@ -139,12 +138,8 @@ def inverse_problem_hira(**kwargs):
     x1 = x1 - center_x
 
     r = np.sqrt(x1 ** 2 + x2 ** 2 + x3 ** 2)
-    print(f"{r=}, {x1=}, {x2=}, {x3=}")
     t_max = np.max(t)
 
-    def force_decay(e, t_delay):
-        cut = 0.5 * t_max
-        return e * ((t_delay <= cut) + (t_delay > cut) * np.exp(-((t_delay - cut) / gamma) ** 2))
     td = t.reshape(1, t.size) - r.reshape(r.size, 1)
 
     # ex = force_decay(ex, td)
@@ -154,11 +149,10 @@ def inverse_problem_hira(**kwargs):
     # import matplotlib
     # matplotlib.use("TkAgg")
     # import matplotlib.pyplot as plt
-#
     # ax = plt.figure().add_subplot(projection='3d')
     # plt.show(block=False)
     # max_e = max((np.max(np.abs(ex)), np.max(np.abs(ey)), np.max(np.abs(ez))))
-    # for ind_t, ti in enumerate(t[::2]):
+    # for ind_t, ti in enumerate(t[::4]):
     #     plt.title(f"{ti=:.3f}")
     #     ax.quiver(x1, x2, x3, ex[:, ind_t]/max_e, ey[:, ind_t]/max_e, ez[:, ind_t]/max_e, length=.2,
     #               normalize=False)
@@ -188,42 +182,51 @@ def inverse_problem_hira(**kwargs):
     estimate = None
 
     order = int(kwargs.get("order", 1))
-    kwargs = {"tol": float(kwargs.get("tol", 1e-3)),
+    kwargs = {"tol": 1e-6,
               "n_points": int(kwargs.get("n_points", 20)),
-              "error_tol": float(kwargs.get("error_tol", 1E-3)),
+              "error_tol": 1e-6,
               "coeff_derivative": 0,
               "verbose_every": int(kwargs.get("verbose_every", 100)),
               "plot": kwargs.get("plot").lower() == "true",
               "scale": float(kwargs.get("scale", 1e4)),
               "h_num": get_h_num,
               "find_center": kwargs.get("find_center", "true").lower() == "true",
-              "max_global_tries": int(kwargs.get("max_global_tries", 1)),
+              "max_global_tries": 1,
               "compute_grid": False,
-              "estimate": estimate}
+              "estimate": estimate,
+              "p": 2}
     shape_mom = (3, order + 3, order + 3, order + 3)
-    dim_mom = sum([1 for i, j, k in itertools.product(range(order + 1), range(order + 1), range(order + 1))
-                       if i + j + k <= order and i % 2 == 1 and k % 2 == 1]) \
-    + sum([1 for i, j, k in itertools.product(range(order + 1), range(order + 1), range(order + 1))
-                       if i + j + k <= order and i % 2 == 1 and k % 2 == 0]) \
-    + sum([1 for i, j, k in itertools.product(range(order + 1), range(order + 1), range(order + 1))
-                       if i + j + k <= order and i % 2 == 0 and k % 2 == 1])
+
+    def zero_moments(ax, ay, az):
+        dims = set()
+        if ax % 2 == 0:
+            dims = dims.union({2, 3})
+        else:
+            dims.add(1)
+        if az % 2 == 0:
+            dims = dims.union({1, 2})
+        else:
+            dims.add(3)
+        if ay % 2 == 0:
+            dims.add(2)
+        else:
+            dims = dims.union({1, 3})
+        return dims
+
+    dim_mom = sum([len({1, 2, 3}.difference(zero_moments(i, j, k)))
+                   for i, j, k in itertools.product(range(order + 1), range(order + 1), range(order + 1))
+                   if i + j + k <= order])
 
     def get_current_moment(moment):
         current_moment_ = np.zeros(shape_mom)
         ind = 0
         for a1, a2, a3 in itertools.product(range(order + 1), range(order + 1), range(order + 1)):
             if a1 + a2 + a3 <= order:
-                if a1 % 2 == 1:  # alpha_x is odd
-                    if a3 % 2 == 1:  # alpha_z is odd:
-                        current_moment_[1, a1, a2, a3] = moment[ind]
-                        ind += 1
-                    else:
-                        current_moment_[2, a1, a2, a3] = moment[ind]
-                        ind += 1
-                else:  # alpha_x is even
-                    if a3 % 2 == 1:
-                        current_moment_[0, a1, a2, a3] = moment[ind]
-                        ind += 1
+                dims = {1, 2, 3}.difference(zero_moments(a1, a2, a3))
+                for dim in dims:
+                    current_moment_[dim - 1, a1, a2, a3] = moment[ind]
+                    ind += 1
+
         assert ind == moment.size
         return current_moment_
 
@@ -272,27 +275,20 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--down_sample_time", help="Time down-sampling factor")
-    parser.add_argument("--r_obs_min")
-    parser.add_argument("--r_obs_max")
-    parser.add_argument("--n_r_obs")
-    parser.add_argument("--n_theta_obs")
-    parser.add_argument("--n_phi_obs")
-    parser.add_argument("--phi_obs_min")
-    parser.add_argument("--phi_obs_max")
-    parser.add_argument("--theta_obs_min")
-    parser.add_argument("--theta_obs_max")
+    parser.add_argument("--x1", nargs="+", required=True)
+    parser.add_argument("--x2", nargs="+", required=True)
+    parser.add_argument("--x3", nargs="+", required=True)
     parser.add_argument("--order")
-    parser.add_argument("--tol")
     parser.add_argument("--n_points")
     parser.add_argument("--n_tail", required=True)
     parser.add_argument("--verbose_every")
     parser.add_argument("--plot")
     parser.add_argument("--scale")
     parser.add_argument("--find_center")
-    parser.add_argument("--max_global_tries")
     parser.add_argument("--center_x")
     parser.add_argument("--filename", required=True)
     parser.add_argument("--dt", help="Sampling time, in second", required=True)
+    parser.add_argument("--before", required=True, type=float)
 
     parsed = parser.parse_args()
     inverse_problem_hira(**vars(parsed))

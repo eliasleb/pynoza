@@ -157,6 +157,8 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
         n_calls += 1
 
         current_moment_, h_, center_ = unravel_params(x)
+        if center_ is not None:
+            center_[1] = 0.
         h_ = get_h_num(h_, t)
         current_moment_ = current_moment_callable(current_moment_)
         e_opt = get_fields(sol_python, sol_rust, find_center, t, x1, x2, x3, current_moment_, h_, None, center_,
