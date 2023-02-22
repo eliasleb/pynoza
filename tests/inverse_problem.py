@@ -6,6 +6,10 @@ import matplotlib.pyplot as plt
 import os
 from matplotlib import cm
 import speenoza
+import six
+import sys
+sys.modules['sklearn.externals.six'] = six
+import mlrose
 
 
 METHOD = "python"
@@ -204,27 +208,47 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
 
         return error
 
-    options = {'maxiter': 1e3,
+    options = {'maxiter': 1_000_000_000,
                "disp": True,
                "gtol": tol
                }
 
     np.random.seed(0)
     print(f"There are {x0.size} degrees of freedom.")
-    for i_try in range(max_global_tries):
-        print("Try", i_try)
-        if estimate is None:
-            x0 = np.random.random(x0.shape) * 2 - 1
-            x0[-3:] = np.array([0, 0, 0])
-        else:
-            x0 = ravel_params(*estimate)
-        n_calls = 0
-        res = scipy.optimize.minimize(get_error, x0,
-                                      method="BFGS",
-                                      options=options)
 
-        if res.fun <= error_tol:
-            break
+    fitness = mlrose.CustomFitness(
+        get_error,
+        "continuous"
+    )
+
+    model = mlrose.ContinuousOpt(x0.size, fitness, maximize=False,
+                                 min_val=-np.inf, max_val=np.inf)
+
+    x0 = np.random.random(x0.shape) * 2 - 1
+    x0[-3:] = np.array([0, 0, 0])
+    n_calls = 0
+
+    # res, best_fitness = mlrose.hill_climb(
+    #     model,
+    #     restarts=0,
+    #     random_state=0,
+    #     init_state=x0
+    # )
+    # print(f"{res=}")
+    # current_moment, h, center = unravel_params(res)
+
+    res = scipy.optimize.minimize(get_error, x0,
+                                  method="BFGS",
+                                  options=options)
+    # res = scipy.optimize.basinhopping(
+    #     get_error,
+    #     x0,
+    #     disp=True,
+    #     niter=1_000_000,
+    #     T=.1,
+    #     accept_test=lambda f_new=None, **_: f_new < 0.3,
+    # )
+
     current_moment, h, center = unravel_params(res.x)
 
     return current_moment_callable(current_moment), get_h_num(h, t), center, e_opt.squeeze() * scale
