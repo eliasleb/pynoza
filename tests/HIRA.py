@@ -6,6 +6,8 @@ import itertools
 import scipy.interpolate
 import time
 import pickle
+# import mikheev
+# import pynoza
 
 
 def read_comsol_file(filename):
@@ -91,10 +93,39 @@ def inverse_problem_hira(**kwargs):
 
     center_x = float(kwargs.get("center_x", 0.))
 
+    # mikheev_data = mikheev.read_paper_data()
+    # d = .9
+    # x1 = np.array((0, .3, 0, 0, .3, 0, 0, .3, 0, .21,)) * d
+    # x2 = np.array((.6, .6, .6, 1, 1, 1, 1.5, 1.5, 1.5, 1,)) * d
+    # x3 = np.array((0, 0, .3, 0, 0, .3, 0, 0, .3, .21,)) * d
+    # ez = []
+    # t = np.linspace(-kwargs["before"], 3.5, 500)
+    # thresh = 1
+    # plt.figure()
+    # for p, xi, yi, zi in zip(mikheev_data, x1, x2, x3):
+    #     ri = np.sqrt(xi ** 2 + yi ** 2 + zi ** 2)
+    #     start = np.where(np.abs(mikheev_data[p]["y"]) > thresh)[0][0]
+    #     ezi = pynoza.solution.Interpolator((mikheev_data[p]["x"][start:] - mikheev_data[p]["x"][start]) * 1e-9 * c0,
+    #                                        mikheev_data[p]["y"][start:])(t - ri)
+    #     ez.append(ezi)
+#
+    # ez = np.array(ez)
+    # ex = np.zeros(ez.shape)
+    # ey = np.zeros(ez.shape)
+#
+    # # SKIP pts 1, 2, 3
+    # x1 = x1[3:]
+    # x2 = x2[3:]
+    # x3 = x3[3:]
+    # ex = ex[3:, :]
+    # ey = ey[3:, :]
+    # ez = ez[3:, :]
+
     obs_x1 = np.array([float(xi) for xi in kwargs.get("x1", [1., ])])
     obs_x2 = np.array([float(xi) for xi in kwargs.get("x2", [0., ])])
     obs_x3 = np.array([float(xi) for xi in kwargs.get("x3", [0., ])])
     before = kwargs["before"]
+    coeff_derivative = kwargs["coeff_derivative"]
 
     assert len(obs_x1) == len(obs_x2) == len(obs_x3)
 
@@ -138,9 +169,10 @@ def inverse_problem_hira(**kwargs):
     x1 = x1 - center_x
 
     r = np.sqrt(x1 ** 2 + x2 ** 2 + x3 ** 2)
-    t_max = np.max(t)
+    print(f"{r=}")
+    # t_max = np.max(t)
 
-    td = t.reshape(1, t.size) - r.reshape(r.size, 1)
+    # td = t.reshape(1, t.size) - r.reshape(r.size, 1)
 
     # ex = force_decay(ex, td)
     # ey = force_decay(ey, td)
@@ -167,25 +199,29 @@ def inverse_problem_hira(**kwargs):
 
     tail = int(kwargs["n_tail"])
 
-    def get_h_num(h, t):
-        if h.size == 0:
-            h_num = np.exp(-((t - t0) / gamma) ** 2) * (4 * ((t - t0) / gamma) ** 2 - 2)
+    # beta = 0.05
+    # tr = 160e-12 * c0
+    # erfc = scipy.special.erfc
+
+    def get_h_num(h_, t_):
+        if h_.size == 0:
+            h_num = np.exp(-((t_ - t0) / gamma) ** 2) * (4 * ((t_ - t0) / gamma) ** 2 - 2)
             return h_num
-        elif h.size == 2:
-            h_num = lambda delay: np.exp(-((t - t0 - delay) / gamma) ** 2) * (4 * ((t - t0 - delay) / gamma) ** 2 - 2)
-            return h_num(0) + h[0] * h_num(h[1] ** 2)
+        elif h_.size == 2:
+            h_num = lambda delay: np.exp(-((t_ - t0 - delay) / gamma) ** 2) * (4 * ((t_ - t0 - delay) / gamma) ** 2 - 2)
+            return h_num(0) + h_[0] * h_num(h[1] ** 2)
         else:
-            return scipy.interpolate.interp1d(np.linspace(t.min(), t.max(), 1 + h.size + tail),
-                                              np.concatenate((np.array((0,)), h.ravel(), np.zeros((tail,)))),
-                                              kind="cubic")(t)  # * np.exp(-1/((t/0.1)**2 + 1e-16))
+            return scipy.interpolate.interp1d(np.linspace(np.min(t_), np.max(t_), 1 + h_.size + tail),
+                                              np.concatenate((np.array((0,)), h_.ravel(), np.zeros((tail,)))),
+                                              kind="cubic")(t_)  # * np.exp(-1/((t/0.1)**2 + 1e-16))
 
     estimate = None
 
     order = int(kwargs.get("order", 1))
-    kwargs = {"tol": 1e-6,
+    kwargs = {"tol": 1e-15,
               "n_points": int(kwargs.get("n_points", 20)),
-              "error_tol": 1e-6,
-              "coeff_derivative": 0,
+              "error_tol": 1e-15,
+              "coeff_derivative": coeff_derivative,
               "verbose_every": int(kwargs.get("verbose_every", 100)),
               "plot": kwargs.get("plot").lower() == "true",
               "scale": float(kwargs.get("scale", 1e4)),
@@ -194,7 +230,8 @@ def inverse_problem_hira(**kwargs):
               "max_global_tries": 1,
               "compute_grid": False,
               "estimate": estimate,
-              "p": 2}
+              "p": 2
+              }
     shape_mom = (3, order + 3, order + 3, order + 3)
 
     def zero_moments(ax, ay, az):
@@ -211,6 +248,10 @@ def inverse_problem_hira(**kwargs):
             dims.add(2)
         else:
             dims = dims.union({1, 3})
+        #######
+        if az > 0:
+            return {1, 2, 3}
+
         return dims
 
     dim_mom = sum([len({1, 2, 3}.difference(zero_moments(i, j, k)))
@@ -224,7 +265,7 @@ def inverse_problem_hira(**kwargs):
             if a1 + a2 + a3 <= order:
                 dims = {1, 2, 3}.difference(zero_moments(a1, a2, a3))
                 for dim in dims:
-                    current_moment_[dim - 1, a1, a2, a3] = moment[ind]
+                    current_moment_[dim - 1, a1, a2, a3] = moment[ind] / 10**(a1 + a2 + a3)
                     ind += 1
 
         assert ind == moment.size
@@ -241,7 +282,9 @@ def inverse_problem_hira(**kwargs):
         inverse_problem.plot_moment(current_moment)
 
         plt.figure()
-        plt.plot(t, h / np.max(np.abs(h)))
+        max_h = np.max(np.abs(h))
+        if max_h > 0:
+            plt.plot(t, h / max_h)
         plt.xlabel("Time (relative)")
         plt.ylabel("Amplitude (normalized)")
         plt.title("Current vs time")
@@ -289,6 +332,7 @@ if __name__ == "__main__":
     parser.add_argument("--filename", required=True)
     parser.add_argument("--dt", help="Sampling time, in second", required=True)
     parser.add_argument("--before", required=True, type=float)
+    parser.add_argument("--coeff_derivative", required=True, type=float)
 
     parsed = parser.parse_args()
     inverse_problem_hira(**vars(parsed))

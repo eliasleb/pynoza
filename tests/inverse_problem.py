@@ -1,3 +1,4 @@
+import itertools
 import pynoza
 import numpy as np
 import scipy.optimize
@@ -80,18 +81,18 @@ def get_fields(sol_python, sol_rust, find_center, t, x1, x2, x3, current_moment,
     if find_center:
         if method == "python":
             e_python = sol_python.compute_e_field(x1 - center[0],
-                                                  x2 - center[1],
-                                                  x3 - center[2],
+                                                  x2,
+                                                  x3 - center[1],
                                                   t, h_sym, t_sym, compute_grid=False)
             return e_python
-        else:
-            e_rust = sol_rust.par_compute_e_field((x1 - center[0]).reshape(-1),
-                                                  (x2 - center[1]).reshape(-1),
-                                                  (x3 - center[2]).reshape(-1),
-                                                  t.reshape(-1), h_sym.reshape(-1),
-                                                  current_moment).swapaxes(1, 2)
-
-            return e_rust
+        # else:
+        #     e_rust = sol_rust.par_compute_e_field((x1 - center[0]).reshape(-1),
+        #                                           (x2 - center[1]).reshape(-1),
+        #                                           (x3 - center[2]).reshape(-1),
+        #                                           t.reshape(-1), h_sym.reshape(-1),
+        #                                           current_moment).swapaxes(1, 2)
+#
+        #     return e_rust
     else:
         if method == "python":
             return sol_python.compute_e_field(x1, x2, x3, t, h_sym, t_sym, compute_grid=False)
@@ -126,14 +127,12 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
 
     dt = np.max(np.diff(t))
 
-    #if METHOD == "python":
     sol_python = pynoza.Solution(max_order=order,
-                          wave_speed=1, )
+                                 wave_speed=1, )
     sol_python.recurse()
-   # else:
     sol_rust = speenoza.Speenoza(order)
 
-    center = np.zeros((3, ))
+    center = np.zeros((2, ))
     current_moment = np.zeros((dim_moment, ))
     h = np.zeros((n_points, ))
 
@@ -142,7 +141,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
             return np.concatenate((np.ravel(current_moments), np.ravel(h_), np.ravel(center_)))
 
         def unravel_params(params):
-            return params[:dim_moment], params[dim_moment:-3], params[-3:]
+            return params[:dim_moment], params[dim_moment:-2], params[-2:]
     else:
         def ravel_params(current_moments, h_, *_):
             return np.concatenate((np.ravel(current_moments), np.ravel(h_)))
@@ -155,14 +154,14 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
     n_calls = 0
     e_opt = None
 
+    old_error = 100
+
     def get_error(x):
-        nonlocal n_calls, e_opt
+        nonlocal n_calls, e_opt, old_error
 
         n_calls += 1
 
         current_moment_, h_, center_ = unravel_params(x)
-        if center_ is not None:
-            center_[1] = 0.
         h_ = get_h_num(h_, t)
         current_moment_ = current_moment_callable(current_moment_)
         e_opt = get_fields(sol_python, sol_rust, find_center, t, x1, x2, x3, current_moment_, h_, None, center_,
@@ -177,7 +176,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
         error = np.sum(component_wise_error) / total_energy
 
         if coeff_derivative > 0:
-            error += coeff_derivative*np.sum(np.diff(h)**2)/np.sum(h**2)*dt
+            error += coeff_derivative * np.sum(np.diff(h_)**2)/np.sum(h_**2)*dt
 
         if n_calls % verbose_every == 0:
             if plot:
@@ -200,11 +199,13 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
                         plt.plot(t, h_ / max_h * max_true, "k-.")
                     if find_center:
                         plt.subplot(2, 3, 2)
-                        plt.title(f"center = ({center_[0]:+.03f}, {center_[1]:+.03f} {center_[2]:+.03f})")
+                        plt.title(f"center = ({center_[0]:+.03f}, 0, {center_[1]:+.03f})")
 
             os.system("clear")
-            print(f"{'#'*np.clip(int(error*50), 0, 50)}{error:.3f}, {n_calls=}, {component_wise_error/total_energy=}",
+            print(f"{'#'*np.clip(int(error*50), 0, 50)}{error:.03f}, {n_calls=:}, {old_error-error=:+.03e}",
                   end='\r')
+
+        old_error = error
 
         return error
 
@@ -216,26 +217,9 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
     np.random.seed(0)
     print(f"There are {x0.size} degrees of freedom.")
 
-    fitness = mlrose.CustomFitness(
-        get_error,
-        "continuous"
-    )
-
-    model = mlrose.ContinuousOpt(x0.size, fitness, maximize=False,
-                                 min_val=-np.inf, max_val=np.inf)
-
     x0 = np.random.random(x0.shape) * 2 - 1
-    x0[-3:] = np.array([0, 0, 0])
+    x0[-2:] = np.array([0, 0])
     n_calls = 0
-
-    # res, best_fitness = mlrose.hill_climb(
-    #     model,
-    #     restarts=0,
-    #     random_state=0,
-    #     init_state=x0
-    # )
-    # print(f"{res=}")
-    # current_moment, h, center = unravel_params(res)
 
     res = scipy.optimize.minimize(get_error, x0,
                                   method="BFGS",
@@ -244,11 +228,10 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
     #     get_error,
     #     x0,
     #     disp=True,
-    #     niter=1_000_000,
+    #     niter=10,
     #     T=.1,
     #     accept_test=lambda f_new=None, **_: f_new < 0.3,
     # )
-
     current_moment, h, center = unravel_params(res.x)
 
     return current_moment_callable(current_moment), get_h_num(h, t), center, e_opt.squeeze() * scale
