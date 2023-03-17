@@ -7,10 +7,7 @@ import matplotlib.pyplot as plt
 import os
 from matplotlib import cm
 import speenoza
-import six
 import sys
-sys.modules['sklearn.externals.six'] = six
-import mlrose
 
 
 METHOD = "python"
@@ -202,7 +199,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
                         plt.title(f"center = ({center_[0]:+.03f}, 0, {center_[1]:+.03f})")
 
             os.system("clear")
-            print(f"{'#'*np.clip(int(error*50), 0, 50)}{error:.03f}, {n_calls=:}, {old_error-error=:+.03e}",
+            print(f"{'#'*np.clip(int(error*50), 0, 50)}{error:.03f}, {n_calls=:}",
                   end='\r')
 
         old_error = error

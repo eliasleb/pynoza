@@ -145,6 +145,7 @@ def inverse_problem_hira(**kwargs):
         indices_obs = list()
         for obs_x, obs_y, obs_z in zip(obs_x1, obs_x2, obs_x3):
             dist = (x1 - obs_x) ** 2 + (x2 - obs_y) ** 2 + (x3 - obs_z) ** 2
+            print(f"Found point at distance {np.min(dist)}")
             indices_obs.append(dist.argmin())
 
         x1 = x1[indices_obs]
@@ -165,6 +166,8 @@ def inverse_problem_hira(**kwargs):
 
         with open("data/x1x2x3exeyez_at_obs.pickle", "wb") as fd:
             pickle.dump((x1, x2, x3, ex, ey, ez), fd)
+    if t.size > ex.shape[1]:
+        t = t[:ex.shape[1]]
     print(f"{center_x}")
     x1 = x1 - center_x
 
@@ -248,10 +251,6 @@ def inverse_problem_hira(**kwargs):
             dims.add(2)
         else:
             dims = dims.union({1, 3})
-        #######
-        if az > 0:
-            return {1, 2, 3}
-
         return dims
 
     dim_mom = sum([len({1, 2, 3}.difference(zero_moments(i, j, k)))
@@ -312,7 +311,39 @@ def inverse_problem_hira(**kwargs):
             pass
 
 
+def optimization_results():
+    import re
+
+    orders = range(1, 8, 2)
+    n_points_s = range(95, 115 + 1, 5)
+    results = np.nan * np.ones((len(orders), len(n_points_s)))
+
+    for i, order in enumerate(orders):
+        for j, n_points in enumerate(n_points_s):
+            filename = f"data/order-{order}-ti-hira-{n_points}-v2.txt"
+            with open(filename, "r") as fd:
+                lines = fd.readlines()
+                end = " ".join(lines[-6:])
+                matches = re.findall(r"Current function value: \d+\.\d+", end)
+                if matches:
+                    results[i, j] = float(matches[0].split("value: ")[1])
+    print(np.min(results), np.argmin(results))
+
+    plt.figure()
+    plt.contourf(orders, n_points_s, -results.T)
+
+    plt.colorbar()
+    plt.tight_layout()
+    plt.show()
+
+
 if __name__ == "__main__":
+    # import matplotlib
+    # matplotlib.use("TkAgg")
+    # optimization_results()
+    # import sys
+    # sys.exit(0)
+
     import argparse
 
     parser = argparse.ArgumentParser()

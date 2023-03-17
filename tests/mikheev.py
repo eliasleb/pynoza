@@ -33,8 +33,8 @@ def read_paper_data():
                 name_x = "X"
                 name_y = "Y"
             else:
-                name_x = f"X.{i}"  # + len(points)
-                name_y = f"Y.{i}"  # + len(points)
+                name_x = f"X.{i + len(points)}"  # f"X.{i}"
+                name_y = f"Y.{i + len(points)}"  # f"Y.{i}"
             d[p] = {"x": np.array(df[name_x][np.isfinite(df[name_x])]),
                     "y": np.array(df[name_y][np.isfinite(df[name_y])])}
         return d
@@ -239,28 +239,37 @@ def mikheev(**kwargs):
     def use_moment(a1, a2, a3):
         return a1 + a2 + a3 <= order and a2 % 2 == 1
 
-    dim_mom = 1 * sum(1 for i, j, k in itertools.product(range(order + 1), repeat=3) if use_moment(i, j, k))
-    #    + sum(1 for i, j, k in itertools.product(range(order + 1), repeat=3) if i + j + k <= order)
-    #          + sum(1 for i, j, k in itertools.product(range(order + 1), repeat=3) if use_moment(i, j, k, 1))
-    dim_mom = (order + 1) // 2
+    def zero_moments(ax, ay, az):
+        dims = set()
+        if ay % 2 == 0:
+            dims = dims.union({1, 3})
+        else:
+            dims.add(2)
+        if az % 2 == 0:
+            dims = dims.union({1, 2})
+        else:
+            dims.add(3)
+        if ax % 2 == 0:
+            dims.add(1)
+        else:
+            dims = dims.union({2, 3})
+        return dims
 
-    def get_current_moment(moment_):
+    dim_mom = sum([len({1, 2, 3}.difference(zero_moments(i, j, k)))
+                   for i, j, k in itertools.product(range(order + 1), range(order + 1), range(order + 1))
+                   if i + j + k <= order])
+
+    def get_current_moment(moment):
         current_moment_ = np.zeros(shape_mom)
-        for i in range((order + 1) // 2):
-            current_moment_[2, 0, 2 * i + 1, 0] = moment_[i]
-        return current_moment_
         ind = 0
-        for a1, a2, a3 in itertools.product(range(order + 1), repeat=3):
-            if use_moment(a1, a2, a3):
-                # current_moment_[a1, a2, a3, 0] = moment_[ind]
-                # ind += 1
-                current_moment_[2, a1, a2, a3] = moment_[ind]
-                ind += 1
-            # if a1 + a2 + a3 <= order:
-            #     current_moment_[a1, a2, a3, 1] = moment_[ind]
-            #     ind += 1
+        for a1, a2, a3 in itertools.product(range(order + 1), range(order + 1), range(order + 1)):
+            if a1 + a2 + a3 <= order:
+                dims = {1, 2, 3}.difference(zero_moments(a1, a2, a3))
+                for dim in dims:
+                    current_moment_[dim - 1, a1, a2, a3] = moment[ind] / 10**(a1 + a2 + a3)
+                    ind += 1
 
-        assert ind == moment_.size
+        assert ind == moment.size
         return current_moment_
 
     args = (order + 2, e_true, x1, x2, x3, t, None, get_current_moment, dim_mom)
