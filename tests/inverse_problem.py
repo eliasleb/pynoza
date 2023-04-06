@@ -78,8 +78,8 @@ def get_fields(sol_python, sol_rust, find_center, t, x1, x2, x3, current_moment,
     if find_center:
         if method == "python":
             e_python = sol_python.compute_e_field(x1 - center[0],
-                                                  x2,
-                                                  x3 - center[1],
+                                                  x2 - center[1],
+                                                  x3 - center[2],
                                                   t, h_sym, t_sym, compute_grid=False)
             return e_python
         # else:
@@ -118,6 +118,10 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
     _compute_grid = kwargs.pop("compute_grid", True)
     estimate = kwargs.pop("estimate", None)
     p = kwargs.pop("p", 2)
+    find_center_ignore_axes = kwargs.pop(
+        "find_center_ignore_axes",
+        ()
+    )
 
     if kwargs:
         raise ValueError(f"Unknown keyword arguments: {kwargs}")
@@ -138,7 +142,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
             return np.concatenate((np.ravel(current_moments), np.ravel(h_), np.ravel(center_)))
 
         def unravel_params(params):
-            return params[:dim_moment], params[dim_moment:-2], params[-2:]
+            return params[:dim_moment], params[dim_moment:-3], params[-3:]
     else:
         def ravel_params(current_moments, h_, *_):
             return np.concatenate((np.ravel(current_moments), np.ravel(h_)))
@@ -159,6 +163,10 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
         n_calls += 1
 
         current_moment_, h_, center_ = unravel_params(x)
+        for i_coord, coordinate in enumerate(("x", "y", "z", )):
+            if coordinate in find_center_ignore_axes:
+                center_[i_coord] = 0.
+
         h_ = get_h_num(h_, t)
         current_moment_ = current_moment_callable(current_moment_)
         e_opt = get_fields(sol_python, sol_rust, find_center, t, x1, x2, x3, current_moment_, h_, None, center_,
@@ -196,7 +204,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
                         plt.plot(t, h_ / max_h * max_true, "k-.")
                     if find_center:
                         plt.subplot(2, 3, 2)
-                        plt.title(f"center = ({center_[0]:+.03f}, 0, {center_[1]:+.03f})")
+                        plt.title(f"center = ({center_[0]:+.03f}, {center_[1]:+.03f}, {center_[2]:+.03f})")
 
             os.system("clear")
             print(f"{'#'*np.clip(int(error*50), 0, 50)}{error:.03f}, {n_calls=:}",
