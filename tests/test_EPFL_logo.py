@@ -26,6 +26,7 @@ import pytest
 import matplotlib.pyplot as plt
 from matplotlib.collections import PatchCollection
 from matplotlib.patches import Rectangle
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
 def int_j(x0, sig, m):
@@ -92,7 +93,7 @@ def c_r(a1, a2, _a3, x1, x2, w, h):
 
 
 def plot_current_density(xs: list[float, ...], ys: list[float, ...], ws: list[float, ...], hs: list[float, ...],
-                         length_logo, d1, d2):
+                         length_logo, d1, d2, ax=None, **kwargs):
     """
     Plot a given current density
 
@@ -103,12 +104,16 @@ def plot_current_density(xs: list[float, ...], ys: list[float, ...], ws: list[fl
     :param length_logo: width of the logo in xs/ys units
     :param d1: physical width of logo
     :param d2: physical height of logo
+    :param ax: optional axis to use
+    :param edge_width:
     """
 
     rectangles = [Rectangle((x / length_logo - d1, y / length_logo - d2),
                             w / length_logo, h / length_logo) for x, y, w, h in zip(xs, ys, ws, hs)]
-    pc = PatchCollection(rectangles, facecolor="r")
-    plt.gca().add_collection(pc)
+    pc = PatchCollection(rectangles, facecolor="r", **kwargs)
+    if ax is None:
+        ax = plt.gca()
+    ax.add_collection(pc)
 
 
 def legends_matrix(loc_table_x, loc_table_y, lines, line_colors, markers, marker_colors, marker_sizes, line_length=1):
@@ -181,20 +186,6 @@ def test_solution(test_case, order, method, plot=False, cname="xyz"):
                     ws.append(w0)
                     hs.append(h0)
             t = np.linspace(0, 10 * gamma, 200)
-
-            if plot:
-                plt.figure(figsize=(5, 2.8))
-                plot_current_density(x1s, x2s, ws, hs, length_logo, d1, d2)
-                if cname == "xyz":
-                    plt.xlabel(r"$x/\lambda$")
-                    plt.ylabel(r"$y/\lambda$")
-                else:
-                    plt.xlabel(r"$x_1/\lambda$")
-                    plt.ylabel(r"$x_2/\lambda$")
-                plt.xlim(-.6, .6)
-                plt.ylim(-.3, .3)
-                plt.tight_layout()
-                plt.savefig("tests/data/logo_current_density.pdf")
 
         case ("disc" | "rasc"):
             d1 = a
@@ -316,7 +307,8 @@ def test_solution(test_case, order, method, plot=False, cname="xyz"):
                 norm1 = 160
 
             if plot:
-                plt.figure(figsize=(5, 3))
+                fig, axs = plt.subplots(figsize=(10, 5), ncols=2)
+                plt.subplot(1, 2, 2)
                 c_si = 3e8
                 loc_table_x = (19.5, 21)
                 loc_table_y = (28, 40)
@@ -345,10 +337,66 @@ def test_solution(test_case, order, method, plot=False, cname="xyz"):
 
                 plt.xlim(3, 22)
                 plt.xlabel("Time (ns)")
-                plt.ylabel("Electric field (kV/m)")
 
+                plt.subplot(1, 2, 1)
+                ax = axs[0]
+                logo_limit = .6
+                n = 50
+                x1 = np.concatenate((np.linspace(-3., -logo_limit, n), np.linspace(logo_limit, 3., n)))
+                x2 = x1.copy()
+                x3 = np.array((1e-12, ))
+                e_field = sol.compute_e_field(x1, x2, x3, t, h_sym, t_sym, verbose=False)
+                amplitude = np.sqrt(np.sum(e_field**2, axis=0)).squeeze()
+                mask = np.ones((x1.size, x2.size, 1))
+                mask[n-1:n+1, n-1:n+1, 0] = np.nan
+                # amplitude = amplitude * mask
+                # plt.ion()
+                # for i, t_i in enumerate(t):
+                #     plt.clf()
+                #     plt.contourf(
+                #         x1, x2, amplitude[:, :, i].T,
+                #         np.linspace(0, max_amplitude / 2, 10))
+                #     plt.title(f"{i=}, {t_i=}")
+                #     plot_current_density(x1s, x2s, ws, hs, length_logo, d1, d2)
+                #     plt.waitforbuttonpress()
+                plot_data = amplitude[:, :, 100].T / 1e3
+                heatmap = plt.contourf(
+                    x1, x2, plot_data,
+                    np.linspace(0, 40, 9),
+                    cmap="Blues",
+                )
+
+                plot_current_density(x1s, x2s, ws, hs, length_logo, d1, d2)
+                if cname == "xyz":
+                    plt.xlabel(r"$x/\lambda$")
+                    plt.ylabel(r"$y/\lambda$")
+                else:
+                    plt.xlabel(r"$x_1/\lambda$")
+                    plt.ylabel(r"$x_2/\lambda$")
+
+                divider = make_axes_locatable(ax)
+                cax = divider.append_axes('right', size='5%', pad=0.1)
+                _ = fig.colorbar(heatmap, cax=cax, orientation='vertical')
+                cax.set_ylabel('Electric field (kV/m)')
                 plt.tight_layout()
-                plt.savefig("tests/data/test_analytical_vs_COMSOL.pdf")
+
+                left, bottom, width, height = [.06, .12, .15, .3]
+                ax2 = fig.add_axes([left, bottom, width, height])
+                plot_current_density(x1s, x2s, ws, hs, length_logo, d1, d2, ax=ax2, linewidth=1, edgecolor="k")
+                x_min, x_max, y_min = -.135, .065, -.03
+                ax2.set_xlim(x_min, x_max)
+                ax2.set_ylim(y_min, y_min + x_max - x_min)
+                ax2.tick_params(
+                    axis='both',
+                    which='both',
+                    bottom=False,
+                    left=False,
+                    labelbottom=False,
+                    labelleft=False
+                )
+                ax2.set_facecolor("white")
+
+                plt.savefig("tests/data/logo.pdf")
                 plt.show()
 
             lse_2a = np.linalg.norm(e_comsol_2a / 2 - e_field_x[0, 0, 0, :], ord=2) / t.size
