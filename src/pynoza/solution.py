@@ -14,6 +14,7 @@ import sympy
 import scipy.interpolate
 import numbers
 import cython
+cimport numpy as np
 
 import pynoza.helpers
 
@@ -262,21 +263,25 @@ class Solution:
             self.charge_moment = pynoza.helpers.get_charge_moment(self.current_moment)
 
     @cython.ccall
-    def compute_e_field(self,
-                        x1: ndarray,
-                        x2: ndarray,
-                        x3: ndarray,
-                        t: ndarray,
-                        h_sym,
-                        t_sym,
-                        verbose=False,
-                        delayed=True,
-                        compute_grid=True,
-                        compute_txt=False):
+    def compute_e_field(
+        self,
+        x1: ndarray,
+        x2: ndarray,
+        x3: ndarray,
+        t: ndarray,
+        h_sym,
+        t_sym,
+        verbose=False,
+        delayed=True,
+        compute_grid=True,
+        compute_txt=False
+    ):
         """
         Compute the electric field from the moments. The method `recurse()` and `set_moments(...)` must be run
         beforehand.
 
+        :return: the electric field as a 5-dimensional array. If :compute_grid: is True, the dimensions correspond to
+         (dimension, x1, x2, x3, t), otherwise, (dimension, x, t).
         :param x1: array of the spatial coordinates to evaluate the e_field-field at (aka x)
         :param x2: array of the spatial coordinates to evaluate the e_field-field at (aka y)
         :param x3: array of the spatial coordinates to evaluate the e_field-field at (aka z)

@@ -163,9 +163,10 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
         n_calls += 1
 
         current_moment_, h_, center_ = unravel_params(x)
-        for i_coord, coordinate in enumerate(("x", "y", "z", )):
-            if coordinate in find_center_ignore_axes:
-                center_[i_coord] = 0.
+        if center_ is not None:
+            for i_coord, coordinate in enumerate(("x", "y", "z", )):
+                if coordinate in find_center_ignore_axes:
+                    center_[i_coord] = 0.
 
         h_ = get_h_num(h_, t)
         current_moment_ = current_moment_callable(current_moment_)
@@ -223,7 +224,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
     print(f"There are {x0.size} degrees of freedom.")
 
     x0 = np.random.random(x0.shape) * 2 - 1
-    x0[-2:] = np.array([0, 0])
+    x0[-3:] = np.array([0., 0., 0.])
     n_calls = 0
 
     res = scipy.optimize.minimize(get_error, x0,
