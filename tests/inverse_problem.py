@@ -1,4 +1,3 @@
-import itertools
 import pynoza
 import numpy as np
 import scipy.optimize
@@ -7,8 +6,6 @@ import matplotlib.pyplot as plt
 import os
 from matplotlib import cm
 import speenoza
-import sys
-
 
 METHOD = "python"
 
@@ -70,7 +67,8 @@ def plot_moment(moment):
         plt.title(text + " component")
 
 
-def get_fields(sol_python, sol_rust, find_center, t, x1, x2, x3, current_moment, h_sym, t_sym, center, method="python"):
+def get_fields(sol_python, sol_rust, find_center, t, x1, x2, x3, current_moment, h_sym, t_sym, center, method="python",
+               shift=0):
     if method == "python":
         pass
     c_mom = lambda a1, a2, a3: list(current_moment[:, a1, a2, a3])
@@ -80,7 +78,7 @@ def get_fields(sol_python, sol_rust, find_center, t, x1, x2, x3, current_moment,
             e_python = sol_python.compute_e_field(x1 - center[0],
                                                   x2 - center[1],
                                                   x3 - center[2],
-                                                  t, h_sym, t_sym, compute_grid=False)
+                                                  t, h_sym, t_sym, compute_grid=False, shift=shift)
             return e_python
         # else:
         #     e_rust = sol_rust.par_compute_e_field((x1 - center[0]).reshape(-1),
@@ -99,6 +97,10 @@ def get_fields(sol_python, sol_rust, find_center, t, x1, x2, x3, current_moment,
                                                 x3.reshape(-1),
                                                 t.reshape(-1), h_sym.reshape(-1),
                                                 current_moment).swapaxes(1, 2)
+
+
+def field_energy(x: np.ndarray):
+    return np.sum(x**2)
 
 
 def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callable, dim_moment, **kwargs):
@@ -122,6 +124,10 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
         "find_center_ignore_axes",
         ()
     )
+    shift = kwargs.pop("shift", 0)
+
+    e_true = np.array(e_true)
+    true_energy = field_energy(e_true)
 
     if kwargs:
         raise ValueError(f"Unknown keyword arguments: {kwargs}")
@@ -133,7 +139,8 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
     sol_python.recurse()
     sol_rust = speenoza.Speenoza(order)
 
-    center = np.zeros((2, ))
+    n_center_coordinates = 3 - len(find_center_ignore_axes)
+    center = np.zeros((n_center_coordinates, ))
     current_moment = np.zeros((dim_moment, ))
     h = np.zeros((n_points, ))
 
@@ -142,7 +149,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
             return np.concatenate((np.ravel(current_moments), np.ravel(h_), np.ravel(center_)))
 
         def unravel_params(params):
-            return params[:dim_moment], params[dim_moment:-3], params[-3:]
+            return params[:dim_moment], params[dim_moment:-n_center_coordinates], params[-n_center_coordinates:]
     else:
         def ravel_params(current_moments, h_, *_):
             return np.concatenate((np.ravel(current_moments), np.ravel(h_)))
@@ -163,26 +170,20 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
         n_calls += 1
 
         current_moment_, h_, center_ = unravel_params(x)
+        complete_center = [0., 0., 0.]
         if center_ is not None:
+            ind_center_ = 0
             for i_coord, coordinate in enumerate(("x", "y", "z", )):
-                if coordinate in find_center_ignore_axes:
-                    center_[i_coord] = 0.
+                if coordinate not in find_center_ignore_axes:
+                    complete_center[i_coord] = center_[ind_center_]
+                    ind_center_ += 1
 
         h_ = get_h_num(h_, t)
         current_moment_ = current_moment_callable(current_moment_)
-        e_opt = get_fields(sol_python, sol_rust, find_center, t, x1, x2, x3, current_moment_, h_, None, center_,
-                           method=METHOD)
+        e_opt = get_fields(sol_python, sol_rust, find_center, t, x1, x2, x3, current_moment_, h_, None, complete_center,
+                           method=METHOD, shift=shift)
 
-        total_energy = 0
-
-        component_wise_error = []
-        for c1, c2 in zip(e_true, e_opt):
-            component_wise_error.append(np.sum(np.abs(c1 - c2 * scale)**p))
-            total_energy += np.sum(np.abs(c1) ** p)
-        error = np.sum(component_wise_error) / total_energy
-
-        if coeff_derivative > 0:
-            error += coeff_derivative * np.sum(np.diff(h_)**2)/np.sum(h_**2)*dt
+        error = field_energy(e_true - e_opt * scale) / true_energy
 
         if n_calls % verbose_every == 0:
             if plot:
@@ -205,7 +206,8 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
                         plt.plot(t, h_ / max_h * max_true, "k-.")
                     if find_center:
                         plt.subplot(2, 3, 2)
-                        plt.title(f"center = ({center_[0]:+.03f}, {center_[1]:+.03f}, {center_[2]:+.03f})")
+                        plt.title(f"""center = ({complete_center[0]:+.03f}, {complete_center[1]:+.03f}, """
+                                  f"""{complete_center[2]:+.03f})""")
 
             os.system("clear")
             print(f"{'#'*np.clip(int(error*50), 0, 50)}{error:.03f}, {n_calls=:}",
@@ -224,7 +226,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
     print(f"There are {x0.size} degrees of freedom.")
 
     x0 = np.random.random(x0.shape) * 2 - 1
-    x0[-3:] = np.array([0., 0., 0.])
+    x0[-n_center_coordinates:] = np.zeros((n_center_coordinates, ))
     n_calls = 0
 
     res = scipy.optimize.minimize(get_error, x0,
