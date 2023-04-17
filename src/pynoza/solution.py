@@ -14,7 +14,6 @@ import sympy
 import scipy.interpolate
 import numbers
 import cython
-cimport numpy as np
 
 import pynoza.helpers
 
@@ -274,7 +273,8 @@ class Solution:
         verbose=False,
         delayed=True,
         compute_grid=True,
-        compute_txt=False
+        compute_txt=False,
+        shift=0,
     ):
         """
         Compute the electric field from the moments. The method `recurse()` and `set_moments(...)` must be run
@@ -292,6 +292,7 @@ class Solution:
         :param delayed: whether to evaluate the field at the retarded time t-r/c (default True)
         :param compute_grid: whether to compute all combinations of coordinates
         :param compute_txt: whether to compute a text representation of the solution or not
+        :param shift: experimental
 
         :raises RuntimeError: when any of `recurse` or `set_moments` have not been run.
         :raises ValueError: when `h_sym` does not look like what is described below
@@ -348,7 +349,7 @@ class Solution:
         self._r = np.sqrt(x1 ** 2 + x2 ** 2 + x3 ** 2)
 
         if isinstance(h_sym, ndarray):
-            hs_derivative, hs_integral = self._handle_h_array(h_sym, t)
+            hs_derivative, hs_integral = self._handle_h_array(h_sym, t, shift=shift)
         else:
             hs_derivative, hs_integral = self._handle_h_symbolic(h_sym, t_sym, t)
 
@@ -418,7 +419,7 @@ class Solution:
 
         return hs_derivative, hs_integral
 
-    def _handle_h_array(self, h, t):
+    def _handle_h_array(self, h, t, shift=0):
 
         dt = np.max(np.diff(t))
 
@@ -428,9 +429,11 @@ class Solution:
         def derivative(x):
             return np.gradient(x, dt)
 
-        hs = {-1: integrate_array(h), 0: h}
+        hs = {shift: h}
+        for integral_order in range(shift - 1, -1 - 1, -1):
+            hs[integral_order] = integrate_array(hs[integral_order + 1])
 
-        for i in range(1, self.max_order + 3):
+        for i in range(1 + shift, self.max_order + 3):
             hs[i] = derivative(hs[i - 1])
 
         h_sym_callable = dict()
