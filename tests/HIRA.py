@@ -6,9 +6,6 @@ import itertools
 import scipy.interpolate
 import time
 import pickle
-# import mikheev
-# import pynoza
-import pynoza
 from pynoza.solution import Interpolator
 
 
@@ -93,6 +90,7 @@ def inverse_problem_hira(**kwargs):
     before = kwargs["before"]
     coeff_derivative = kwargs["coeff_derivative"]
     t_max = kwargs.get("t_max", np.inf)
+    shift = kwargs.get("shift", 0)
 
     assert len(obs_x1) == len(obs_x2) == len(obs_x3)
 
@@ -159,8 +157,6 @@ def inverse_problem_hira(**kwargs):
                 t, ez[i_x, :]
             )(t - phase_correction[i_x])
 
-
-
     r = np.sqrt(x1 ** 2 + x2 ** 2 + x3 ** 2)
     print(f"{r=}")
     # t_max = np.max(t)
@@ -218,7 +214,8 @@ def inverse_problem_hira(**kwargs):
               "compute_grid": False,
               "estimate": None,
               "p": 2,
-              "find_center_ignore_axes": ("y", )
+              "find_center_ignore_axes": ("y", ),
+              "shift": shift
               }
     shape_mom = (3, order + 3, order + 3, order + 3)
 
@@ -299,13 +296,13 @@ def inverse_problem_hira(**kwargs):
 def optimization_results():
     import re
 
-    orders = range(1, 3 + 1, 2)
-    n_points_s = range(30, 100 + 1, 10)
+    orders = range(1, 5 + 1, 2)
+    n_points_s = range(25, 35 + 1, 1)
     results = np.nan * np.ones((len(orders), len(n_points_s)))
 
     for i, order in enumerate(orders):
         for j, n_points in enumerate(n_points_s):
-            filename = f"data/order-{order}-ti-hira-{n_points}-v6.txt"
+            filename = f"data/order-{order}-ti-hira-{n_points}-v8.txt"
             with open(filename, "r") as fd:
                 lines = fd.readlines()
                 end = " ".join(lines[-6:])
@@ -351,6 +348,7 @@ if __name__ == "__main__":
     parser.add_argument("--coeff_derivative", required=True, type=float)
     parser.add_argument("--phase_correction", required=False, type=float, nargs="+")
     parser.add_argument("--t_max", required=False, type=float)
+    parser.add_argument("--shift", required=False, type=int)
 
     parsed = parser.parse_args()
     inverse_problem_hira(**vars(parsed))
