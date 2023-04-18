@@ -1,0 +1,12 @@
+kwargs={'down_sample_time': '1', 'x1': ['.8', '.9', '-.4', '.5'], 'x2': ['0', '0', '0', '.6'], 'x3': ['0', '0', '.5', '0'], 'order': '0', 'n_points': '50', 'n_tail': '50', 'verbose_every': '100', 'plot': 'False', 'scale': '1e-8', 'find_center': 'True', 'center_x': '-.5', 'filename': '../../../git_ignore/ti-hira/ti_hira_v2.txt', 'dt': '6.4e-12', 'before': 0.6, 'coeff_derivative': 0.0, 'phase_correction': [0.0, 0.0, 0.0, 0.14], 't_max': 2.8, 'shift': 2}
+Successfully read file
+r=array([1.30030766, 1.38028982, 0.63592452, 1.13894688])
+ex.shape=(4, 1459)
+kwargs={'tol': 1e-15, 'n_points': 50, 'error_tol': 1e-15, 'coeff_derivative': 0.0, 'verbose_every': 100, 'plot': False, 'scale': 1e-08, 'h_num': <function inverse_problem_hira.<locals>.get_h_num at 0x16641fa60>, 'find_center': True, 'max_global_tries': 1, 'compute_grid': False, 'estimate': None, 'p': 2, 'find_center_ignore_axes': ('y',), 'shift': 2}
+There are 52 degrees of freedom.
+Optimization terminated successfully.
+         Current function value: 1.000000
+         Iterations: 0
+         Function evaluations: 53
+         Gradient evaluations: 1
+Saved as '../../../git_ignore/GLOBALEM/opt-result-Tue Apr 18 15:02:01 2023.csv'.
