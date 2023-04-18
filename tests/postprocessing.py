@@ -120,8 +120,6 @@ def postprocessing_mikheev(*args):
 
         plt.tight_layout()
 
-
-
     n = 8
     l = 1
     X, Y, Z = np.meshgrid(np.linspace(-l, l, n),
@@ -222,6 +220,127 @@ def postprocessing_mikheev(*args):
         plt.tight_layout()
 
 
+def postprocessing_book(current_moment, down_sample_time, t, h, center, scale, sol, order):
+    tr = 160e-12 * 3e8
+    t1 = 2 * tr
+    beta = 0.05
+    from scipy.special import erfc
+    original = (t < t1) * np.exp(-beta*((t-t1)/tr)) * .5 * erfc(np.abs(t-t1)*np.sqrt(np.pi)/tr) \
+               + (t >= t1) * np.exp(-beta*(((t-t1)-t1)/tr))*(1-0.5*erfc((t-t1)*np.sqrt(np.pi)/tr))
+
+    plt.figure(figsize=(6.7, 3))
+    h_normalized = h / np.max(np.abs(h))
+    original_normalized = original / np.max(np.abs(original))
+    plt.plot(
+        t / 3e8 * 1e9, h_normalized, "k-",
+        linewidth=2,
+    )
+
+    plt.xlim(0, 5)
+    plt.xlabel("Time (ns)")
+    plt.ylabel("Am$^{-2}$s$^{-2}$")
+    plt.grid()
+
+    plt.gca().annotate(
+        'prepulse', xy=(.6, -2.35), xytext=(.4, -8),
+        arrowprops=dict(
+            arrowstyle="->", connectionstyle="arc3",
+            facecolor='black',
+        )
+    )
+    plt.gca().annotate(
+        'main pulse', xy=(4.05, -1.3), xytext=(3.1, -2.6),
+        arrowprops=dict(
+            arrowstyle="->", connectionstyle="arc3",
+            facecolor='black',
+        )
+    )
+
+    # plt.subplot(2, 1, 2)
+    # h_fd = np.fft.fft(h_normalized)
+    # original_fd = np.fft.fft(original_normalized)
+    # dt = (t[1] - t[0]) / 3e8
+    # f = np.linspace(0, 1/dt, t.size)
+    # plt.loglog(f, np.abs(h_fd), "k", linewidth=2)
+    # plt.loglog(f, np.abs(original_fd), "r--", linewidth=2)
+    # plt.xlim(1e8, np.max(f)/2)
+    # plt.grid()
+    plt.tight_layout()
+
+    plt.savefig("data/excitation.pdf")
+
+    plt.figure(figsize=(6.7, 3))
+    plt.rcParams.update({
+        "font.family": "serif",
+        "font.serif": "Times",
+        'mathtext.fontset': 'custom',
+        'mathtext.rm': 'Times',
+        'mathtext.it': 'Times:italic',
+        'mathtext.bf': 'Times:bold',
+    })
+    truncation_order = range(2, 6 + 2 + 1)
+    residual_error = [
+        1.,
+        0.162114,
+        0.162114,
+        0.106539,
+        0.106539,
+        0.132513,
+        0.133,
+    ]
+    n_dof = [
+        42,
+        44,
+        44,
+        51,
+        51,
+        66,
+        66
+    ]
+    n_dof_h = 40
+    n_dof_center = 2
+
+    ax = plt.gca()
+    ax2 = ax.twinx()
+    cmap = matplotlib.colormaps["Greens"]
+    fill_zorder = 1
+    fill_step = "post"
+    ax2.fill_between(
+        truncation_order, n_dof_center,
+        step=fill_step, color=cmap(.6), zorder=fill_zorder
+    )
+    ax2.fill_between(
+        truncation_order, y1=n_dof_center, y2=n_dof_center + n_dof_h,
+        step=fill_step, color=cmap(.4), zorder=fill_zorder
+    )
+    ax2.fill_between(
+        truncation_order, y1=n_dof_center + n_dof_h, y2=n_dof,
+        step=fill_step, color=cmap(.2), zorder=fill_zorder
+    )
+
+    ax.plot(truncation_order, np.array(residual_error) * 100, "ko-", zorder=1)
+    ax.set_ylim(0, 110)
+    ax.set_xlim(min(truncation_order), max(truncation_order))
+    ax.set_xlabel(r"Truncation order")
+    ax.set_ylabel(r"Residual error $\times 100$")
+    ax2.set_ylabel("Number of degrees of freedom")
+
+    ax2.spines['right'].set_color('green')
+    ax2.tick_params(axis='y', colors='green')
+    ax2.yaxis.label.set_color('green')
+    max_ax2 = 1.1 * np.max(n_dof)
+    ax2.set_ylim(0, max_ax2)
+    ax.set_zorder(ax.get_zorder() + 1)
+    ax.set_frame_on(False)
+    for n in truncation_order:
+        ax2.plot((n, n, ), (0, max_ax2, ), color=(.2, ) * 3, alpha=1, linewidth=.5)
+
+    plt.tight_layout()
+
+    plt.savefig("data/residual_error_and_dof.pdf")
+    plt.show(block=True)
+
+
 def postprocessing(**kwargs):
 
     scale = float(kwargs["scale"])
@@ -276,6 +395,8 @@ def postprocessing(**kwargs):
             postprocessing_globalem(current_moment, down_sample_time, t, h, center, scale, sol, order)
         case "mikheev":
             postprocessing_mikheev(current_moment, t, h, h_true, center, sol, order, kwargs.get("filename"))
+        case "book":
+            postprocessing_book(current_moment, down_sample_time, t, h, center, scale, sol, order)
         case _:
             raise ValueError(f"Unknown --case: `{kwargs['case']}`")
 
@@ -292,6 +413,7 @@ def to_mathematica(expr: str):
 
 if __name__ == "__main__":
     import argparse
+    matplotlib.use("TkAgg")
 
     parser = argparse.ArgumentParser()
 
