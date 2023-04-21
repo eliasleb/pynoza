@@ -54,6 +54,7 @@ def inverse_problem_hira(**kwargs):
     down_sample_time = int(kwargs.get("down_sample_time", 6))
 
     center_x = float(kwargs.get("center_x", 0.))
+    seed = kwargs.get("seed", None)
 
     # mikheev_data = mikheev.read_paper_data()
     # d = .9
@@ -215,7 +216,8 @@ def inverse_problem_hira(**kwargs):
               "estimate": None,
               "p": 2,
               "find_center_ignore_axes": ("y", ),
-              "shift": shift
+              "shift": shift,
+              "seed": seed
               }
     shape_mom = (3, order + 3, order + 3, order + 3)
 
@@ -296,26 +298,37 @@ def inverse_problem_hira(**kwargs):
 def optimization_results():
     import re
 
-    orders = range(1, 5 + 1, 2)
-    n_points_s = range(25, 35 + 1, 1)
-    results = np.nan * np.ones((len(orders), len(n_points_s)))
+    orders = (1, 3, )
+    n_points_s = (35, 40, 45, 50, 55, 60, )
+    phases_str = (".14", ".15", ".16")
+    phases = [float(ph) for ph in phases_str]
+    results = np.nan * np.ones((len(orders), len(n_points_s), len(phases)))
 
     for i, order in enumerate(orders):
         for j, n_points in enumerate(n_points_s):
-            filename = f"data/order-{order}-ti-hira-{n_points}-v8.txt"
-            with open(filename, "r") as fd:
-                lines = fd.readlines()
-                end = " ".join(lines[-6:])
-                matches = re.findall(r"Current function value: \d+\.\d+", end)
-                if matches:
-                    results[i, j] = float(matches[0].split("value: ")[1])
-    print(np.min(results), np.argmin(results))
+            for k, phase in enumerate(phases_str):
+                filename = f"data/v4-ti-hira-order-{order}-n_points-{n_points}-phase-{phase}.txt"
+                with open(filename, "r") as fd:
+                    lines = fd.readlines()
+                    end = " ".join(lines[-6:])
+                    matches = re.findall(r"Current function value: \d+\.\d+", end)
+                    if matches:
+                        results[i, j, k] = float(matches[0].split("value: ")[1])
 
-    plt.figure()
-    plt.contourf(orders, n_points_s, -results.T)
+    best = np.nanmin(results)
+    ind_best = np.unravel_index(
+        np.nanargmin(results), results.shape
+    )
+    print(f"min={best}, order={orders[ind_best[0]]}, n_points={n_points_s[ind_best[1]]}, phase={phases[ind_best[2]]}")
 
-    plt.colorbar()
-    plt.tight_layout()
+    for i, order in enumerate(orders):
+        plt.figure()
+        plt.pcolormesh(n_points_s, phases, -results[i, :, :].T)
+        print(np.nanmin(results, axis=1))
+
+        plt.colorbar()
+        plt.title(f"{order=}")
+        plt.tight_layout()
     plt.show()
 
 
@@ -349,6 +362,7 @@ if __name__ == "__main__":
     parser.add_argument("--phase_correction", required=False, type=float, nargs="+")
     parser.add_argument("--t_max", required=False, type=float)
     parser.add_argument("--shift", required=False, type=int)
+    parser.add_argument("--seed", required=False, type=int)
 
     parsed = parser.parse_args()
     inverse_problem_hira(**vars(parsed))

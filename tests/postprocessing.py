@@ -77,15 +77,15 @@ def postprocessing_globalem(*args):
 
     plt.show()
 
-    def gradient(x, order):
-        if order == 0:
+    def gradient(x, derivative_order):
+        if derivative_order == 0:
             return x
-        return np.gradient(gradient(x, order - 1))
+        return np.gradient(gradient(x, derivative_order - 1))
 
     plt.figure()
     for diff_order in range(order + 3):
         y = gradient(h_full, diff_order)
-        plt.plot(t_full, y / y.max())
+        plt.plot(t_full, y / np.max(y))
 
     plt.show()
 
@@ -220,7 +220,7 @@ def postprocessing_mikheev(*args):
         plt.tight_layout()
 
 
-def postprocessing_book(current_moment, down_sample_time, t, h, center, scale, sol, order):
+def postprocessing_book(current_moment, down_sample_time, t, h, center, scale, sol, order, e_true, e_opt):
     tr = 160e-12 * 3e8
     t1 = 2 * tr
     beta = 0.05
@@ -232,29 +232,29 @@ def postprocessing_book(current_moment, down_sample_time, t, h, center, scale, s
     h_normalized = h / np.max(np.abs(h))
     original_normalized = original / np.max(np.abs(original))
     plt.plot(
-        t / 3e8 * 1e9, h_normalized, "k-",
+        t / 3e8 * 1e9, h, "k-",
         linewidth=2,
     )
 
     plt.xlim(0, 5)
     plt.xlabel("Time (ns)")
-    plt.ylabel("Am$^{-2}$s$^{-2}$")
+    plt.ylabel("s$^{-2}$")
     plt.grid()
 
-    plt.gca().annotate(
-        'prepulse', xy=(.6, -2.35), xytext=(.4, -8),
-        arrowprops=dict(
-            arrowstyle="->", connectionstyle="arc3",
-            facecolor='black',
-        )
-    )
-    plt.gca().annotate(
-        'main pulse', xy=(4.05, -1.3), xytext=(3.1, -2.6),
-        arrowprops=dict(
-            arrowstyle="->", connectionstyle="arc3",
-            facecolor='black',
-        )
-    )
+    # plt.gca().annotate(
+    #     'prepulse', xy=(.6, -2.35), xytext=(.4, -8),
+    #     arrowprops=dict(
+    #         arrowstyle="->", connectionstyle="arc3",
+    #         facecolor='black',
+    #     )
+    # )
+    # plt.gca().annotate(
+    #     'main pulse', xy=(4.05, -1.3), xytext=(3.1, -2.6),
+    #     arrowprops=dict(
+    #         arrowstyle="->", connectionstyle="arc3",
+    #         facecolor='black',
+    #     )
+    # )
 
     # plt.subplot(2, 1, 2)
     # h_fd = np.fft.fft(h_normalized)
@@ -278,26 +278,30 @@ def postprocessing_book(current_moment, down_sample_time, t, h, center, scale, s
         'mathtext.it': 'Times:italic',
         'mathtext.bf': 'Times:bold',
     })
-    truncation_order = range(2, 6 + 2 + 1)
+    truncation_order = range(2, 8 + 2 + 1)
     residual_error = [
         1.,
-        0.162114,
-        0.162114,
-        0.106539,
-        0.106539,
-        0.132513,
-        0.133,
+        0.286,
+        0.286,
+        0.109,
+        0.109,
+        0.099,
+        0.099,
+        0.098,
+        0.098,
     ]
     n_dof = [
-        42,
-        44,
-        44,
-        51,
-        51,
-        66,
-        66
+        47,
+        49,
+        49,
+        56,
+        56,
+        71,
+        71,
+        97,
+        97,
     ]
-    n_dof_h = 40
+    n_dof_h = 45
     n_dof_center = 2
 
     ax = plt.gca()
@@ -338,6 +342,17 @@ def postprocessing_book(current_moment, down_sample_time, t, h, center, scale, s
     plt.tight_layout()
 
     plt.savefig("data/residual_error_and_dof.pdf")
+
+    plt.figure(figsize=(6.7, 3))
+    mu = 4*np.pi*1e-7*scale
+    print(f"Largest moment amplitude: {np.max(np.abs(current_moment))}, {-mu * current_moment[2, 1, 0, 0]=}, "
+          f"{-mu * current_moment[0, 0, 0, 1]=}")
+
+    plt.plot(t / 3e8 * 1e9, e_opt[2, :, :].T/1e3, "k-")
+    plt.plot(t / 3e8 * 1e9, e_true[2, :, :].T/1e3, "r--")
+    plt.xlabel("Time (ns)")
+    plt.ylabel("V/m")
+    plt.tight_layout()
     plt.show(block=True)
 
 
@@ -396,7 +411,7 @@ def postprocessing(**kwargs):
         case "mikheev":
             postprocessing_mikheev(current_moment, t, h, h_true, center, sol, order, kwargs.get("filename"))
         case "book":
-            postprocessing_book(current_moment, down_sample_time, t, h, center, scale, sol, order)
+            postprocessing_book(current_moment, down_sample_time, t, h, center, scale, sol, order, e_true, e_opt)
         case _:
             raise ValueError(f"Unknown --case: `{kwargs['case']}`")
 

@@ -99,7 +99,7 @@ def get_fields(sol_python, sol_rust, find_center, t, x1, x2, x3, current_moment,
                                                 current_moment).swapaxes(1, 2)
 
 
-def field_energy(x: np.ndarray):
+def field_energy(x: np.ndarray) -> np.ndarray:
     return np.sum(x**2)
 
 
@@ -125,6 +125,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
         ()
     )
     shift = kwargs.pop("shift", 0)
+    seed = kwargs.pop("seed", 0)
 
     e_true = np.array(e_true)
     true_energy = field_energy(e_true)
@@ -203,7 +204,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
                     max_h = np.max(np.abs(h_))
                     plt.subplot(2, 3, 5)
                     if max_h > 0:
-                        plt.plot(t, h_ / max_h * max_true, "k-.")
+                        plt.plot(t, h_, "k-.")
                     if find_center:
                         plt.subplot(2, 3, 2)
                         plt.title(f"""center = ({complete_center[0]:+.03f}, {complete_center[1]:+.03f}, """
@@ -222,7 +223,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
                "gtol": tol
                }
 
-    np.random.seed(0)
+    np.random.seed(seed)
     print(f"There are {x0.size} degrees of freedom.")
 
     x0 = np.random.random(x0.shape) * 2 - 1
