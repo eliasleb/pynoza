@@ -232,13 +232,13 @@ def postprocessing_book(current_moment, down_sample_time, t, h, center, scale, s
     h_normalized = h / np.max(np.abs(h))
     original_normalized = original / np.max(np.abs(original))
     plt.plot(
-        t / 3e8 * 1e9, h, "k-",
+        t / 3e8 * 1e9, h * 3e8 / 1e9, "k-",
         linewidth=2,
     )
 
     plt.xlim(0, 5)
     plt.xlabel("Time (ns)")
-    plt.ylabel("s$^{-2}$")
+    plt.ylabel("G/s$^2$")
     plt.grid()
 
     # plt.gca().annotate(
@@ -281,14 +281,14 @@ def postprocessing_book(current_moment, down_sample_time, t, h, center, scale, s
     truncation_order = range(2, 8 + 2 + 1)
     residual_error = [
         1.,
-        0.286,
-        0.286,
-        0.109,
-        0.109,
-        0.099,
-        0.099,
-        0.098,
-        0.098,
+        0.4484,
+        0.4484,
+        0.186843,
+        0.186843,
+        0.137949,
+        0.137949,
+        0.132738,
+        0.132738,
     ]
     n_dof = [
         47,

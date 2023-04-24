@@ -298,34 +298,34 @@ def inverse_problem_hira(**kwargs):
 def optimization_results():
     import re
 
-    orders = (1, 3, )
-    n_points_s = (35, 40, 45, 50, 55, 60, )
-    phases_str = (".14", ".15", ".16")
-    phases = [float(ph) for ph in phases_str]
-    results = np.nan * np.ones((len(orders), len(n_points_s), len(phases)))
+    orders = range(1, 9 + 2, 2)
+    n_points_s = (45, 50, )
+    seeds = range(8)
+    results = np.nan * np.ones((len(orders), len(n_points_s), len(seeds)))
 
     for i, order in enumerate(orders):
         for j, n_points in enumerate(n_points_s):
-            for k, phase in enumerate(phases_str):
-                filename = f"data/v4-ti-hira-order-{order}-n_points-{n_points}-phase-{phase}.txt"
-                with open(filename, "r") as fd:
-                    lines = fd.readlines()
-                    end = " ".join(lines[-6:])
-                    matches = re.findall(r"Current function value: \d+\.\d+", end)
-                    if matches:
-                        results[i, j, k] = float(matches[0].split("value: ")[1])
-
+            for k, seed in enumerate(seeds):
+                filename = f"data/v8-ti-hira-order-{order}-n_points-{n_points}-seed-{seed}.txt"
+                try:
+                    with open(filename, "r") as fd:
+                        lines = fd.readlines()
+                        end = " ".join(lines[-6:])
+                        matches = re.findall(r"Current function value: \d+\.\d+", end)
+                        if matches:
+                            results[i, j, k] = float(matches[0].split("value: ")[1])
+                except FileNotFoundError:
+                    continue
     best = np.nanmin(results)
     ind_best = np.unravel_index(
         np.nanargmin(results), results.shape
     )
-    print(f"min={best}, order={orders[ind_best[0]]}, n_points={n_points_s[ind_best[1]]}, phase={phases[ind_best[2]]}")
+    print(f"min={best}, order={orders[ind_best[0]]}, n_points={n_points_s[ind_best[1]]}, phase={seeds[ind_best[2]]}")
+    print(np.nanmin(results, axis=(1, 2,)))
 
     for i, order in enumerate(orders):
         plt.figure()
-        plt.pcolormesh(n_points_s, phases, -results[i, :, :].T)
-        print(np.nanmin(results, axis=1))
-
+        plt.pcolormesh(n_points_s, seeds, -results[i, :, :].T)
         plt.colorbar()
         plt.title(f"{order=}")
         plt.tight_layout()
