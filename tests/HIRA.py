@@ -7,6 +7,7 @@ import scipy.interpolate
 import time
 import pickle
 from pynoza.solution import Interpolator
+import os
 
 
 def read_comsol_file(filename):
@@ -55,6 +56,10 @@ def inverse_problem_hira(**kwargs):
 
     center_x = float(kwargs.get("center_x", 0.))
     seed = kwargs.get("seed", None)
+    save_filename = kwargs.get(
+        "save_filename",
+        os.path.join("..", "..", "..", "git_ignore", "GLOBALEM")
+    )
 
     # mikheev_data = mikheev.read_paper_data()
     # d = .9
@@ -286,7 +291,10 @@ def inverse_problem_hira(**kwargs):
                                      | {f"ex_true@t={t[i]}": ex[:, i] for i in range(ex.shape[1])}
                                      | {f"ey_true@t={t[i]}": ey[:, i] for i in range(ey.shape[1])}
                                      | {f"ez_true@t={t[i]}": ez[:, i] for i in range(ez.shape[1])})
-            filename = f"../../../git_ignore/GLOBALEM/opt-result-{time.asctime()}.csv"
+            filename = os.path.join(
+                save_filename,
+                f"opt-result-{time.asctime()}.csv"
+            )
             res.to_csv(path_or_buf=filename)
             with open(filename + "_params.pickle", 'wb') as handle:
                 pickle.dump((current_moment, h, center, e_true, e_opt), handle, protocol=pickle.HIGHEST_PROTOCOL)
@@ -363,6 +371,7 @@ if __name__ == "__main__":
     parser.add_argument("--t_max", required=False, type=float)
     parser.add_argument("--shift", required=False, type=int)
     parser.add_argument("--seed", required=False, type=int)
+    parser.add_argument("--save_filename", required=True, type=str)
 
     parsed = parser.parse_args()
     inverse_problem_hira(**vars(parsed))
