@@ -5,9 +5,9 @@ import scipy.interpolate
 import matplotlib.pyplot as plt
 import os
 from matplotlib import cm
-import speenoza
+# import speenoza
 
-METHOD = "python"
+# METHOD = "python"
 
 
 def complement(*args):
@@ -74,12 +74,12 @@ def get_fields(sol_python, sol_rust, find_center, t, x1, x2, x3, current_moment,
     c_mom = lambda a1, a2, a3: list(current_moment[:, a1, a2, a3])
     sol_python.set_moments(c_mom)
     if find_center:
-        if method == "python":
-            e_python = sol_python.compute_e_field(x1 - center[0],
-                                                  x2 - center[1],
-                                                  x3 - center[2],
-                                                  t, h_sym, t_sym, compute_grid=False, shift=shift)
-            return e_python
+        # if method == "python":
+        e_python = sol_python.compute_e_field(x1 - center[0],
+                                              x2 - center[1],
+                                              x3 - center[2],
+                                              t, h_sym, t_sym, compute_grid=False, shift=shift)
+        return e_python
         # else:
         #     e_rust = sol_rust.par_compute_e_field((x1 - center[0]).reshape(-1),
         #                                           (x2 - center[1]).reshape(-1),
@@ -89,14 +89,14 @@ def get_fields(sol_python, sol_rust, find_center, t, x1, x2, x3, current_moment,
 #
         #     return e_rust
     else:
-        if method == "python":
-            return sol_python.compute_e_field(x1, x2, x3, t, h_sym, t_sym, compute_grid=False)
-        else:
-            return sol_rust.par_compute_e_field(x1.reshape(-1),
-                                                x2.reshape(-1),
-                                                x3.reshape(-1),
-                                                t.reshape(-1), h_sym.reshape(-1),
-                                                current_moment).swapaxes(1, 2)
+        # if method == "python":
+        return sol_python.compute_e_field(x1, x2, x3, t, h_sym, t_sym, compute_grid=False)
+        # else:
+        #    return sol_rust.par_compute_e_field(x1.reshape(-1),
+        #                                        x2.reshape(-1),
+        #                                        x3.reshape(-1),
+        #                                        t.reshape(-1), h_sym.reshape(-1),
+        #                                        current_moment).swapaxes(1, 2)
 
 
 def field_energy(x: np.ndarray) -> np.ndarray:
@@ -138,7 +138,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
     sol_python = pynoza.Solution(max_order=order,
                                  wave_speed=1, )
     sol_python.recurse()
-    sol_rust = speenoza.Speenoza(order)
+    # sol_rust = speenoza.Speenoza(order)
 
     n_center_coordinates = 3 - len(find_center_ignore_axes)
     center = np.zeros((n_center_coordinates, ))
@@ -181,8 +181,8 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
 
         h_ = get_h_num(h_, t)
         current_moment_ = current_moment_callable(current_moment_)
-        e_opt = get_fields(sol_python, sol_rust, find_center, t, x1, x2, x3, current_moment_, h_, None, complete_center,
-                           method=METHOD, shift=shift)
+        e_opt = get_fields(sol_python, None, find_center, t, x1, x2, x3, current_moment_, h_, None, complete_center,
+                           method=None, shift=shift)
 
         error = field_energy(e_true - e_opt * scale) / true_energy
 
