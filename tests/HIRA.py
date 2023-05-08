@@ -56,8 +56,8 @@ def inverse_problem_hira(**kwargs):
 
     center_x = float(kwargs.get("center_x", 0.))
     seed = kwargs.get("seed", None)
-    save_filename = kwargs.get(
-        "save_filename",
+    save_path = kwargs.get(
+        "save_path",
         os.path.join("..", "..", "..", "git_ignore", "GLOBALEM")
     )
 
@@ -292,7 +292,7 @@ def inverse_problem_hira(**kwargs):
                                      | {f"ey_true@t={t[i]}": ey[:, i] for i in range(ey.shape[1])}
                                      | {f"ez_true@t={t[i]}": ez[:, i] for i in range(ez.shape[1])})
             filename = os.path.join(
-                save_filename,
+                save_path,
                 f"opt-result-{time.asctime()}.csv"
             )
             res.to_csv(path_or_buf=filename)
@@ -371,7 +371,7 @@ if __name__ == "__main__":
     parser.add_argument("--t_max", required=False, type=float)
     parser.add_argument("--shift", required=False, type=int)
     parser.add_argument("--seed", required=False, type=int)
-    parser.add_argument("--save_filename", required=True, type=str)
+    parser.add_argument("--save_path", required=True, type=str)
 
     parsed = parser.parse_args()
     inverse_problem_hira(**vars(parsed))
