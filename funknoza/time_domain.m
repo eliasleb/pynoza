@@ -1,9 +1,5 @@
 (* ::Package:: *)
 
-(* ::Title::Initialization:: *)
-(*Funknoza*)
-
-
 (* ::Input::Initialization:: *)
 Clear["Global`*"]
 $PlotTheme="Scientific";
@@ -64,7 +60,7 @@ Sum[ElectricField[{ax, ay, az}, CurrentMoment, dim,-1],
       {ax, 0, 2}, {ay, 0, 2 - ax}, {az, 0, 2 - ax - ay}],
      {dim, 1, 3}], R -> {\[Rho], \[Theta], \[Phi]}]E^(\[ImaginaryJ] k \[Rho])/.
 \[Integral]p[t]\[DifferentialD]t->1/\[ImaginaryJ]/\[Omega] p/.
-(p'')[t]->-\[Omega]^2 p/.
+(p^\[Prime]\[Prime])[t]->-\[Omega]^2 p/.
 Derivative[1][p][t]->\[ImaginaryJ] \[Omega] p/.
 p[t]->p/.
 \[Omega]->c k;
@@ -90,7 +86,10 @@ Clear[CurrentMoment, EfieldThis, BfieldThis, P, n, HJackson, EJackson]
 
 
 (* ::Input::Initialization:: *)
-a=4;
+(* Using :ToExpression: on raw input is a huge security threat *)
+parameters=ToExpression[Import[dirName<>"parameters.txt"]];
+a=parameters["a"];
+maxOrder=parameters["maxOrder"];
 length=2a;
 (*    1   2   3   4   5   6   7   8   9   10   11   12   13   14   15   16*)
 x1s={0,  0, 10,   0,    0, 45, 45, 68, 45,  45,    91,   91, 101,   91, 136, 136};
@@ -108,14 +107,6 @@ ws=ws[[slice]];
 hs=hs[[slice]];
 amplitudes=amplitudes[[slice]];
 polarities=polarities[[slice]];*)
-Graphics[Flatten@
-MapThread[
-{{Red,Rectangle[{#1,#2},{#1+#3,#2+#4}]},
-{Black,Text[{#5,#6,#7},{#1,#2}]}
-}&
-,{x1s,x2s,ws,hs,Range[Length@x1s],amplitudes,polarities}],
-ImageSize->Small
-]
 lengthLogo=171;
 d2=a*50/lengthLogo;
 IntJ=Function[{x0,\[Sigma],m},
@@ -131,12 +122,11 @@ CJ[#1,x1s[[i]]/lengthLogo length-d1,x2s[[i]]/lengthLogo length-d2,ws[[i]]/length
 0],
 {i,1,Length@x1s}],
 0]&;
-dirName=ToString@NotebookDirectory[];
-
+dirName=ToString@Directory[];
 
 
 (* ::Input::Initialization:: *)
-ParallelTable[Block[{Efield,norm,plotLimit,nPoints,xd,yd,normd},
+Block[{Efield,norm,plotLimit,nPoints,xd,yd,normd},
 Efield=#1+#2&@@Table[
 Table[
 Sum[
@@ -147,12 +137,12 @@ ElectricField[{ax,ay,0},CurrentMoment,dim,direction]/.t->0-direction r/.z->0,
 ];
 norm=Total[Efield^2];
 plotLimit=6/5a;
-nPoints=15;
+nPoints=parameters["nPoints"];
 xd=Subdivide[-plotLimit,plotLimit,nPoints];
 yd=Subdivide[-plotLimit,plotLimit,nPoints];
 normd=norm/.x->xd/.y->yd;
-Export[dirName<>"/data/order-"<>ToString[maxOrder]<>".mx",
+Export[dirName<>"/data/order-"<>ToString[maxOrder]<>"-a-"<>ToString[a]<>".mx",
 <|"field"->Efield,"norm"->norm,"x"->xd,"y"->yd,"discrete norm"->normd|>];
-],
-{maxOrder,1,10,2}
+ListContourPlot[Transpose@normd,
+PlotRange->Full,PlotLabel->maxOrder]
 ]
