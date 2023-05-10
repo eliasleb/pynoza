@@ -64,7 +64,7 @@ Sum[ElectricField[{ax, ay, az}, CurrentMoment, dim,-1],
       {ax, 0, 2}, {ay, 0, 2 - ax}, {az, 0, 2 - ax - ay}],
      {dim, 1, 3}], R -> {\[Rho], \[Theta], \[Phi]}]E^(\[ImaginaryJ] k \[Rho])/.
 \[Integral]p[t]\[DifferentialD]t->1/\[ImaginaryJ]/\[Omega] p/.
-(p^\[Prime]\[Prime])[t]->-\[Omega]^2 p/.
+(p'')[t]->-\[Omega]^2 p/.
 Derivative[1][p][t]->\[ImaginaryJ] \[Omega] p/.
 p[t]->p/.
 \[Omega]->c k;
@@ -153,26 +153,6 @@ yd=Subdivide[-plotLimit,plotLimit,nPoints];
 normd=norm/.x->xd/.y->yd;
 Export[dirName<>"/data/order-"<>ToString[maxOrder]<>".mx",
 <|"field"->Efield,"norm"->norm,"x"->xd,"y"->yd,"discrete norm"->normd|>];
-ListContourPlot[Transpose@normd,
-PlotRange->Full,PlotLabel->maxOrder]
 ],
 {maxOrder,1,10,2}
-]
-
-
-(* ::Input::Initialization:: *)
-Table[
-imported=Import[dirName<>"/data/order-"<>ToString[order]<>".mx"];
-x=imported["x"];
-y=imported["y"];
-z=imported["discrete norm"];
-ListContourPlot[
-Flatten[
-Table[
-{x[[i]],y[[j]],z[[i,j]]},
-{i,1,Length@x},{j,1,Length@y}],1],
-PlotRange->Full,
-PlotLabel->order
-],
-{order,1,5,2}
 ]
