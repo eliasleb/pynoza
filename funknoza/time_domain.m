@@ -106,21 +106,12 @@ x1s={(*E*)0,0,10,0,0,(*P*)45,45,55,68,55,(*F*)91,91,101,91,(*L*)136,136};
 x2s={(*E*)0,10,20,30,40,(*P*)0,20,20,30,40,(*F*)0,30,20,40,(*L*)10,0};
 ws={(*E*)35,10,23,10,35,(*P*)10,10,23,10,23,(*F*)10,10,23,35,(*L*)10,35};
 hs={(*E*)10,10,10,10,10,(*P*)20,30,10,10,10,(*F*)20,10,10,10,(*L*)40,10};
-amplitudes={1,-4,-3/2,4,1,(*P*)2,1,1,-1,2,(*F*)1,1,1,-1,(*L*)1,-1};
+amplitudes={-2,8,6/2,-8,-2,(*P*)2,1,1,-1,2,(*F*)2,2,2,-2,(*L*)1,-1};
 polarities={1,2,1,2,1,(*P*)2,2,1,2,1,(*F*)2,2,1,1,(*L*)2,1};
 
 d1 = a;
-d1=a 45/100;
-slice=;;10;
-x1s=x1s[[slice]];
-x2s=x2s[[slice]];
-ws=ws[[slice]];
-hs=hs[[slice]];
-amplitudes=amplitudes[[slice]];
-polarities=polarities[[slice]];
-lengthLogo = 171;
-
 d2 = a * 50 / lengthLogo;
+lengthLogo = 171;
 
 IntJ = Function[{x0, \[Sigma], m},
     1 / (m + 1) ((x0 + \[Sigma] / 2) ^ (m + 1) - (x0 - \[Sigma] / 2) ^ (m + 1))
@@ -156,7 +147,7 @@ ElectricField[{ax,ay,0},CurrentMoment,dim,direction]/.t->0-direction r/.z->0,
 {dim,1,2}
 ];
 norm=Total[Efield^2];
-plotLimitX=6/5a/2;
+plotLimitX=6/5a;
 plotLimitY=length 50/lengthLogo;
 nPointsX=21;
 nPointsY=Round[nPointsX plotLimitY/plotLimitX];
@@ -164,7 +155,8 @@ xd=Subdivide[-plotLimitX,plotLimitX,nPointsX];
 yd=Subdivide[-plotLimitY,plotLimitY,nPointsY];
 normd=ParallelTable[
 norm/.x->xd[[i]]/.y->yd[[j]],
-{i,1,Length@xd},{j,1,Length@yd}];
+{i,1,Length@xd},{j,1,Length@yd}
+];
 
 Export[savePath <> "/order-" <> ToString[maxOrder] <> "-a-" <> ToString[
     a] <> ".mx", <|"field" -> Efield, "norm" -> norm, "x" -> xd, "y" -> yd,
