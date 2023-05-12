@@ -1,6 +1,8 @@
 (* ::Package:: *)
 
 (* ::Input::Initialization:: *)
+gCache=<||>;
+
 PositivePart[x_] := If[x >= 0,
     x
     ,
@@ -30,14 +32,22 @@ firstNonzeroDim[\[Alpha]_] := Position[\[Alpha], _ ? (# > 0&), Infinity, 1][[1]]
 
 \[Epsilon] = 1 / \[Mu] / c^2;
 
-g[\[Alpha]_, f_, direction_] := If[\[Alpha] == {0, 0, 0},
-    1 / 4 / \[Pi] / r f
-    ,
-    Block[{j, \[Alpha]1, ga},
-        \[Alpha]1 = \[Alpha]; j = firstNonzeroDim[\[Alpha]]; \[Alpha]1[[j]] = \[Alpha]1[[j]] - 1; ga = g[
-            \[Alpha]1, f, direction]; D[ga, R[[j]]] - direction R[[j]] / r D[ga, t] / c 
-            // Expand
-    ]
+g[\[Alpha]_,f_,direction_] :=If[f===0,0,
+If[\[Alpha] == {0, 0, 0},
+   1/4/\[Pi]/r f,
+Block[{j, \[Alpha]1, ga,gNew},
+If[KeyExistsQ[gCache,{\[Alpha],f,direction}],
+gCache[{\[Alpha],f,direction}],
+\[Alpha]1 = \[Alpha];
+j = firstNonzeroDim[\[Alpha]];
+\[Alpha]1[[j]] = \[Alpha]1[[j]] - 1;
+ga = g[\[Alpha]1,f,direction];
+gNew=D[ga, R[[j]]] -direction R[[j]]/r D[ga,t]/c // Expand;
+gCache[{\[Alpha],f,direction}]=gNew;
+gNew
+]
+]
+]
 ];
 
 h[\[Alpha]_, f_, direction_] := g[\[Alpha], f, direction];
@@ -142,7 +152,7 @@ CurrentMoment = If[#1[[3]] == 0,
 Efield=#1+#2&@@ParallelTable[
 Sum[
 ElectricField[{ax,ay,0},CurrentMoment,dim,direction]/.t->0-direction r/.z->0,
-{ax,0,maxOrder},{ay,0,maxOrder-ax}],
+{ay,0,maxOrder},{ax,0,maxOrder-ay}],
 {direction,-1,1,2},
 {dim,1,2}
 ];
