@@ -1,102 +1,54 @@
 (* ::Package:: *)
 
 (* ::Input::Initialization:: *)
-gCache=<||>;
-
-PositivePart[x_] := If[x >= 0,
-    x
-    ,
-    0
-];
-
-c = 1;
-
-\[Mu] = 1;
-
+PositivePart[x_]:=If[x>=0,x,0];
+c=1;
+\[Mu]=1;
 R = {x, y, z};
-
-$Assumptions = t \[Element] Reals& x \[Element] Reals && y \[Element] Reals && z \[Element] Reals && \[Rho] \[Element] Reals &&
-     \[Rho] > 0 && \[Theta] \[Element] Reals && \[Phi] \[Element] Reals && k \[Element] Reals && k > 0 && \[Omega] > 0 && c \[Element]
-     Reals && c > 0;
-
+$Assumptions = t\[Element]Reals&x \[Element] Reals && y \[Element] Reals && z \[Element] Reals && \[Rho] \[Element] Reals && \[Rho] > 0 && \[Theta] \[Element] Reals && \[Phi] \[Element] Reals && k \[Element] Reals && k > 0 && \[Omega] > 0&&c\[Element]Reals&&c>0;
 r = Sqrt[R . R];
-
 predecessor[\[Alpha]_] := If[\[Alpha] == {0, 0, 0},
-    {0, 0, 0}
-    ,
-    Select[Table[\[Alpha] - UnitVector[3, j], {j, 1, 3}], NonNegative @ Min 
-        @ #&, 1][[1]]
-];
-
-firstNonzeroDim[\[Alpha]_] := Position[\[Alpha], _ ? (# > 0&), Infinity, 1][[1]][[1]];
-
-\[Epsilon] = 1 / \[Mu] / c^2;
-
+   {0, 0, 0},
+   Select[
+     Table[\[Alpha] - UnitVector[3, j], {j, 1, 3}],
+     NonNegative@Min@# &,
+     1
+     ][[1]]
+   ];
+firstNonzeroDim[\[Alpha]_] := Position[
+     \[Alpha],
+     _?(# > 0 &),
+     Infinity, 1
+     ][[1]][[1]];
+\[Epsilon]=1/\[Mu]/c^2;
 g[\[Alpha]_,f_,direction_] :=If[f===0,0,
 If[\[Alpha] == {0, 0, 0},
    1/4/\[Pi]/r f,
-Block[{j, \[Alpha]1, ga,gNew},
-If[KeyExistsQ[gCache,{\[Alpha],f,direction}],
-gCache[{\[Alpha],f,direction}],
+Block[{j, \[Alpha]1, ga},
 \[Alpha]1 = \[Alpha];
 j = firstNonzeroDim[\[Alpha]];
 \[Alpha]1[[j]] = \[Alpha]1[[j]] - 1;
 ga = g[\[Alpha]1,f,direction];
-gNew=D[ga, R[[j]]] -direction R[[j]]/r D[ga,t]/c // Expand;
-gCache[{\[Alpha],f,direction}]=gNew;
-gNew
-]
+D[ga, R[[j]]] -direction R[[j]]/r D[ga,t]/c // Expand
 ]
 ]
 ];
-
-h[\[Alpha]_, f_, direction_] := g[\[Alpha], f, direction];
-
-SimplifiedHeaviside[x_] := If[x >= 0,
-    1
-    ,
-    0
-];
-
-SafeMoment[CurrentMoment_, \[Alpha]_, dim_] := If[AllTrue[\[Alpha], # >= 0&],
-    CurrentMoment[\[Alpha], dim]
-    ,
-    0
-];
-
-ChargeMoment[\[Alpha]_, CurrentMoment_, dim_, direction_] := -direction Sum[
-    If[dim == j,
-        \[Alpha][[j]] SimplifiedHeaviside[\[Alpha][[j]] - 2] (\[Alpha][[j]] - 1) Integrate[
-            SafeMoment[CurrentMoment, (\[Alpha][[j]] - 2) UnitVector[3, j] + Total[\[Alpha][[#]]
-             UnitVector[3, #]& /@ Complement[{1, 2, 3}, {j}]], j], t]
-        ,
-        \[Alpha][[j]] \[Alpha][[dim]] SimplifiedHeaviside[\[Alpha][[j]] - 1] SimplifiedHeaviside[
-            \[Alpha][[dim]] - 1] Integrate[SafeMoment[CurrentMoment, (\[Alpha][[j]] - 1) UnitVector[
-            3, j] + (\[Alpha][[dim]] - 1) UnitVector[3, dim] + Total[\[Alpha][[#]] UnitVector[3,
-             #]& /@ Complement[{1, 2, 3}, {dim, j}]], j], t]
-    ]
-    ,
-    {j, 1, 3}
-]
-
-ElectricMoment[\[Alpha]_, CurrentMoment_, dim_, direction_] := direction \[Mu] D[
-    CurrentMoment[\[Alpha], dim], t] + 1 / \[Epsilon] ChargeMoment[\[Alpha], CurrentMoment, dim,
-     direction]
-
-MagneticMoment[\[Alpha]_, CurrentMoment_, dim_, direction_] := -\[Mu] direction Sum[
-    LeviCivitaTensor[3][[dim]][[i]][[j]] SimplifiedHeaviside[\[Alpha][[i]] - 1] 
-    \[Alpha][[i]] CurrentMoment[(\[Alpha][[i]] - 1) UnitVector[3, i] + Total[\[Alpha][[#]] UnitVector[
-    3, #]& /@ Complement[{1, 2, 3}, {i}]], j], {i, 1, 3}, {j, 1, 3}]
-
-Field[\[Alpha]_, CurrentMoment_, MomentFunction_, dim_, direction_] := (-1) ^
-     Norm[\[Alpha], 1] / (Times @@ (Factorial /@ \[Alpha])) h[\[Alpha], MomentFunction[\[Alpha], CurrentMoment,
-     dim, direction], direction]
-
-ElectricField[\[Alpha]_, CurrentMoment_, dim_, direction_] := Field[\[Alpha], CurrentMoment,
-     ElectricMoment, dim, direction];
-
-MagneticField[\[Alpha]_, CurrentMoment_, dim_, direction_] := Field[\[Alpha], CurrentMoment,
-     MagneticMoment, dim, direction];
+h[\[Alpha]_,f_,direction_] :=g[\[Alpha],f,direction];
+SimplifiedHeaviside[x_] := If[x >= 0, 1, 0];
+SafeMoment[CurrentMoment_,\[Alpha]_,dim_]:=If[AllTrue[\[Alpha],#>=0&],
+CurrentMoment[\[Alpha],dim],
+0];
+ChargeMoment[\[Alpha]_, CurrentMoment_, dim_,direction_] :=-direction  Sum[If[dim == j,
+    \[Alpha][[j]] SimplifiedHeaviside[\[Alpha][[j]] - 2] (\[Alpha][[j]] - 1) Integrate[SafeMoment[CurrentMoment,(\[Alpha][[j]] - 2) UnitVector[3, j] +Total[ \[Alpha][[#]] UnitVector[3, #] & /@ Complement[{1, 2, 3}, {j }]], j],t],
+    \[Alpha][[j]] \[Alpha][[dim]] SimplifiedHeaviside[\[Alpha][[j]] - 1] SimplifiedHeaviside[\[Alpha][[dim]] - 1] Integrate[SafeMoment[CurrentMoment,(\[Alpha][[j]] - 1) UnitVector[3, j] + (\[Alpha][[dim]] - 1) UnitVector[3, dim] + Total[\[Alpha][[#]] UnitVector[3, #] & /@ Complement[{1, 2, 3}, {dim, j}]], j],t]
+    ],
+   {j, 1, 3}]
+ElectricMoment[\[Alpha]_, CurrentMoment_, dim_,direction_] := direction \[Mu] D[CurrentMoment[\[Alpha], dim],t] + 1/\[Epsilon] ChargeMoment[\[Alpha], CurrentMoment, dim,direction]
+MagneticMoment[\[Alpha]_,CurrentMoment_, dim_,direction_] := -\[Mu] direction Sum[LeviCivitaTensor[3][[dim]][[i]][[j]] SimplifiedHeaviside[\[Alpha][[i]] - 1] \[Alpha][[i]] CurrentMoment[(\[Alpha][[i]] - 1) UnitVector[3, i] +Total[ \[Alpha][[#]] UnitVector[3, #] & /@ Complement[{1, 2, 3}, {i}]], j],
+   {i, 1, 3}, {j, 1, 3}]
+Field[\[Alpha]_, CurrentMoment_, MomentFunction_, dim_,direction_] :=(-1)^Norm[\[Alpha], 1]/(Times @@ (Factorial/@ \[Alpha])) h[\[Alpha],MomentFunction[\[Alpha], CurrentMoment, dim,direction],direction]
+ElectricField[\[Alpha]_, CurrentMoment_, dim_,direction_] := Field[\[Alpha], CurrentMoment, ElectricMoment, dim,direction];
+MagneticField[\[Alpha]_, CurrentMoment_, dim_,direction_] := Field[\[Alpha], CurrentMoment, MagneticMoment, dim,direction];
 
 (* Expect a=..., maxOrder=..., nPoints=... savePath *)
 On[Assert];
@@ -164,7 +116,7 @@ nPointsY=Round[nPointsX plotLimitY/plotLimitX];
 xd=Subdivide[-plotLimitX,plotLimitX,nPointsX];
 yd=Subdivide[-plotLimitY,plotLimitY,nPointsY];
 normd=ParallelTable[
-norm/.x->xd[[i]]/.y->yd[[j]],
+N@norm/.x->xd[[i]]/.y->yd[[j]],
 {i,1,Length@xd},{j,1,Length@yd}
 ];
 
