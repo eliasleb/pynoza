@@ -1,7 +1,6 @@
 (* ::Package:: *)
 
 (* ::Input::Initialization:: *)
-(* Expect a=..., maxOrder=..., nPoints=... savePath *)
 If[
 Length@$ScriptCommandLine!=4,
 Print["Expect command line arguments a=..., order=..., nPoints=..."];Throw[_];
@@ -21,7 +20,7 @@ nPointsY=Round[nPointsX plotLimitY/plotLimitX];
 xd=Subdivide[-plotLimitX,plotLimitX,nPointsX];
 yd=Subdivide[-plotLimitY,plotLimitY,nPointsY];
 normd=ParallelTable[
-N[norm/.x->xd[[i]]/.y->yd[[j]]],
+norm/.x->xd[[i]]/.y->yd[[j]],
 {i,1,Length@xd},{j,1,Length@yd}];
 Export[ToString@Directory[]<>"/data/order-"<>ToString[order]<>"-a-"<>ToString[a]<>".mx",
 <|"norm"->norm,"x"->xd,"y"->yd,"discrete norm"->normd|>];

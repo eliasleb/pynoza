@@ -21,7 +21,7 @@ firstNonzeroDim[\[Alpha]_] := Position[
      Infinity, 1
      ][[1]][[1]];
 \[Epsilon]=1/\[Mu]/c^2;
-g[\[Alpha]_,f_,direction_] :=If[f===0,0,
+g[\[Alpha]_,f_,direction_] :=g[\[Alpha],f,direction] =If[f===0,0,
 If[\[Alpha] == {0, 0, 0},
    1/4/\[Pi]/r f,
 Block[{j, \[Alpha]1, ga},
@@ -50,7 +50,7 @@ Field[\[Alpha]_, CurrentMoment_, MomentFunction_, dim_,direction_] :=(-1)^Norm[\
 ElectricField[\[Alpha]_, CurrentMoment_, dim_,direction_] := Field[\[Alpha], CurrentMoment, ElectricMoment, dim,direction];
 MagneticField[\[Alpha]_, CurrentMoment_, dim_,direction_] := Field[\[Alpha], CurrentMoment, MagneticMoment, dim,direction];
 
-(* Expect a=..., maxOrder=..., nPoints=... savePath *)
+(* Expect a=..., maxOrder=..., savePath *)
 On[Assert];
 $AssertFunction = Abort[]&;
 Assert[Length@$ScriptCommandLine==5]
@@ -101,25 +101,19 @@ CurrentMoment = If[#1[[3]] == 0,
 
 
 (* ::Input::Initialization:: *)
-Efield=#1+#2&@@ParallelTable[
+Efield=0;
+Table[
+Monitor[
+Efield+=#1+#2&@@Table[
+Table[
 Sum[
-ElectricField[{ax,ay,0},CurrentMoment,dim,direction]/.t->0-direction r/.z->0,
-{ay,0,maxOrder},{ax,0,maxOrder-ay}],
-{direction,-1,1,2},
+ElectricField[{ax,order-ax,0},CurrentMoment,dim,direction]/.t->0-direction r/.z->0,
+{ax,0,order}],
 {dim,1,2}
+],{direction,-1,1,2}
 ];
-norm=Total[Efield^2];
-plotLimitX=6/5a;
-plotLimitY=length 50/lengthLogo;
-nPointsX=21;
-nPointsY=Round[nPointsX plotLimitY/plotLimitX];
-xd=Subdivide[-plotLimitX,plotLimitX,nPointsX];
-yd=Subdivide[-plotLimitY,plotLimitY,nPointsY];
-normd=ParallelTable[
-N@norm/.x->xd[[i]]/.y->yd[[j]],
-{i,1,Length@xd},{j,1,Length@yd}
-];
-
-Export[savePath <> "/order-" <> ToString[maxOrder] <> "-a-" <> ToString[
-    a] <> ".mx", <|"field" -> Efield, "norm" -> norm, "x" -> xd, "y" -> yd,
-     "discrete norm" -> normd|>];
+Export[dirName<>"/data/field-order-"<>ToString[order]<>"-a-"<>ToString[a]<>".mx",
+Efield],
+order],
+{order,0,maxOrder}
+]

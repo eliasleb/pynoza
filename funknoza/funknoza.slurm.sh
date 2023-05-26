@@ -1,6 +1,6 @@
 #!/bin/bash -l
 
-for order in {1..39..2}
+for order in {1..51..2}
 do
 	echo "#!/bin/bash -l
 #SBATCH --nodes 1
@@ -8,6 +8,9 @@ do
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=10G
+#SBATCH --mail-user=elias.leboudec@epfl.ch 
+#SBATCH --mail-type=ALL
+
 module purge
 module load mathematica
 wolframscript -script time_domain.m a=4 maxOrder=$order nPoints=31 $PWD/data" > .jobs/order-$order.job
