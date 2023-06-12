@@ -1,6 +1,10 @@
 *~
 .DS_Store
 
+funknoza/data
+funknoza/.jobs
+tests/.jobs
+
 src/pynoza/*.so
 src/pynoza/*.c
 
@@ -8,7 +12,7 @@ rust/target/
 target/
 build/
 
-tests/data/order*
+tests/data
 
 venv/
 .ipynb_checkpoints

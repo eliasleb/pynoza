@@ -1,5 +1,5 @@
 #!/bin/zsh
-for order in {1..9..2}
+for order in {1..3..2}
 do
   for n_points in 40
   do
@@ -11,7 +11,7 @@ do
             --x1 .8 .9 -.4 .5 --x2 0 0 0 .6 --x3 0 0 .5 0 --find_center True --coeff_derivative 0 \
             --before .6 --phase_correction 0 0 0 0 --t_max 2.8 \
             --n_points "$n_points" --n_tail "$n_points" \
-            --order "$order" --scale 1e9 --shift 2 --seed $seed \
+            --order "$order" --scale 1e9 --shift 2 --seed $seed --save_path data \
             > data/v8-ti-hira-order-"$order"-n_points-$n_points-seed-$seed.txt &
     done
   done

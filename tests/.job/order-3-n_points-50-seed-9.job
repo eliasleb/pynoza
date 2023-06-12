@@ -1,0 +1,11 @@
+#!/bin/bash -l
+#SBATCH --nodes 1
+#SBATCH --time=32:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=1G
+module purge
+module load gcc/11.3.0 intel/2021.6.0 python/3.10.4
+
+source ../../venv/bin/activate
+python HIRA.py --dt 6.4e-12 --down_sample_time 1            --verbose_every 100 --plot False             --filename ../../../git_ignore/ti-hira/ti_hira_v3.txt --center_x -.5             --x1 .8 .9 -.4 .5 --x2 0 0 0 .6 --x3 0 0 .5 0 --find_center True --coeff_derivative 0             --before .6 --phase_correction 0 0 0 0 --t_max 2.8             --n_points 50 --n_tail 50             --order 3 --scale 1e9 --shift 2 --seed 9 --save_path data             > data/v8-ti-hira-order-3-n_points-50-seed-9.txt
