@@ -1,7 +1,6 @@
 (* ::Package:: *)
 
 (* ::Input::Initialization:: *)
-(* Expect a=..., maxOrder=..., nPoints=... savePath *)
 If[
 Length@$ScriptCommandLine!=4,
 Print["Expect command line arguments a=..., order=..., nPoints=..."];Throw[_];
