@@ -87,6 +87,9 @@ D[antiderivative,{t,i}]
 {i,0,maxOrder+3},{dir,-1,1,2}];
 ParallelTable[CurrentMoment[{ax,ay,0},dim],
 {ax,0,maxOrder},{ay,0,maxOrder-ax},{dim,1,2}];
-Table[Monitor[g[{ax,ay,0},direction],{ax,ay,direction}];,
+Table[Print[ax,ay,direction];g[{ax,ay,0},direction];,
 {ax,0,maxOrder},{ay,0,maxOrder-ax},{direction,-1,1,2}];
 DumpSave[ToString@Directory[];<>"data/g-up-to-order-"<>ToString@maxOrder<>".mx",g];
+
+
+
