@@ -78,7 +78,7 @@ Assert[Simplify[EfieldThis - EJackson] == {0, 0, 0}]
 Clear[CurrentMoment, EfieldThis, BfieldThis, P, n, HJackson, EJackson]
 
 (* Expect a=..., order=..., savePath *)
-If[Length@$ScriptCommandLine!=5,Throw[_],_]
+If[Length@$ScriptCommandLine!=4,Throw[_],_]
 ToExpression@$ScriptCommandLine[[2]]
 ToExpression@$ScriptCommandLine[[3]]
 savePath=$ScriptCommandLine[[4]]
@@ -125,7 +125,7 @@ ParallelTable[CurrentMoment[{ax,ay,0},dim],
 
 
 (* ::Input::Initialization:: *)
-Efield=Import[dirName<>"data/field-v3-order-"<>ToString@order<>"-a-"<>ToString@a<>".mx"];
+Efield=Import[savePath<>"/field-v3-order-"<>ToString[order-1]<>"-a-"<>ToString@a<>".mx"];
 Efield+=#1+#2&@@ParallelTable[
 Table[
 Sum[
@@ -138,7 +138,7 @@ ElectricField[{ax,order-ax,0},CurrentMoment,dim,direction]/.z->0,\[Omega]]],
 ];
 Efield=Expand@Efield;
 Export[
-dirName<>"data/field-v3-order-"<>ToString[order]<>"-a-"<>ToString[a]<>".mx",
+savePath<>"/field-v3-order-"<>ToString[order]<>"-a-"<>ToString[a]<>".mx",
 Efield
 ]
 
