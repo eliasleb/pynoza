@@ -78,13 +78,13 @@ Assert[Simplify[EfieldThis - EJackson] == {0, 0, 0}]
 Clear[CurrentMoment, EfieldThis, BfieldThis, P, n, HJackson, EJackson]
 
 (* Expect a=..., order=..., savePath *)
-On[Assert];
-$AssertFunction = Abort[]&;
-Assert[Length@$ScriptCommandLine==5]
+If[Length@$ScriptCommandLine!=5,Throw[_],_]
 ToExpression@$ScriptCommandLine[[2]]
 ToExpression@$ScriptCommandLine[[3]]
 savePath=$ScriptCommandLine[[4]]
-Print[a,order,savePath]
+Print[a]
+Print[order]
+Print[savePath]
 
 
 (* ::Input::Initialization:: *)
@@ -141,3 +141,6 @@ Export[
 dirName<>"data/field-v3-order-"<>ToString[order]<>"-a-"<>ToString[a]<>".mx",
 Efield
 ]
+
+
+
