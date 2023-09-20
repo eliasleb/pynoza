@@ -70,6 +70,8 @@ class Solution:
     dy: ndarray
     e_field_text: str
     _causal: bool
+    current_moment: callable
+    charge_moment: callable
 
     def __init__(
             self, max_order: int = 0, wave_speed: float = 1., causal=True
@@ -117,7 +119,7 @@ class Solution:
 
         :param known_index: multi-index at which the auxiliary function has already been computed
         :param index: multi-index to compute the auxiliary function"""
-        known_dim: int = np.where(np.array(known_index) - np.array(index))[0][0]
+        known_dim: np.int64 = np.where(np.array(known_index) - np.array(index))[0][0]
         for signature in self._aux_func[known_index]:
             coefficient: float = self._aux_func[known_index][signature]
             # We need to apply the recursion formula to this term.
