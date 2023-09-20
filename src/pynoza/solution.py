@@ -61,8 +61,6 @@ class Solution:
     thresh: float
     ran_recurse: bool
     ran_set_moments: bool
-    current_moment: cython.ccall
-    charge_moment: cython.ccall
     verbose: bool
     delayed: bool
     compute_grid: bool
@@ -71,8 +69,11 @@ class Solution:
     y: ndarray
     dy: ndarray
     e_field_text: str
+    _causal: bool
 
-    def __init__(self, max_order: int = 0, wave_speed: float = 1.) -> None:
+    def __init__(
+            self, max_order: int = 0, wave_speed: float = 1., causal=True
+    ) -> None:
         """
         Initialize the solution class.
         
@@ -108,6 +109,7 @@ class Solution:
         self._r = np.array([0, ])
         self.y = np.array([0, ])
         self.dy = np.array([0, ])
+        self._causal = causal
 
     def _increase_order(self, known_index, index) -> None:
         """
@@ -147,10 +149,10 @@ class Solution:
             identity_third_term[R] += 1  # denominator
             try:
                 self._aux_func[index][tuple(identity_third_term)] -= \
-                    coefficient / self.c
+                    coefficient / self.c * (1 if self._causal else -1)
             except KeyError:
                 self._aux_func[index][tuple(identity_third_term)] = \
-                    -coefficient / self.c
+                    -coefficient / self.c * (1 if self._causal else -1)
 
     def recurse(self, verbose: bool = False) -> None:
         """Compute the auxiliary function up to the max order.
@@ -397,7 +399,11 @@ class Solution:
         hs = dict()
         for order in hs_sym:
             if self.delayed:
-                hs[order] = sympy.lambdify(t_sym, hs_sym[order])(t - self._r / self.c)
+                fun = sympy.lambdify(t_sym, hs_sym[order])
+                if self._causal:
+                    hs[order] = fun(t - self._r / self.c)
+                else:
+                    hs[order] = -fun(t + self._r / self.c)
             else:
                 hs[order] = sympy.lambdify(t_sym, hs_sym[order])(t)
 
