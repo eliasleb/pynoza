@@ -120,8 +120,10 @@ derivatives=Association@Table[
 D[antiderivative,{t,i}]
 ]/.t->-dir rz],
 {i,0,maxOrder+3},{dir,-1,1,2}];
+LaunchKernels[10]
 ParallelTable[CurrentMoment[{ax,ay,0},dim],
 {ax,0,maxOrder},{ay,0,maxOrder-ax},{dim,1,2}];
+CloseKernels[8]
 
 
 (* ::Input::Initialization:: *)

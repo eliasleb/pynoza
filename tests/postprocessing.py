@@ -230,15 +230,17 @@ def postprocessing_book(current_moment, down_sample_time, t, h, center, scale, s
 
     plt.figure(figsize=(6.7, 3))
     h_normalized = h / np.max(np.abs(h))
+    h_scale = np.max(np.abs(h)) * 3e8
     original_normalized = original / np.max(np.abs(original))
     plt.plot(
-        t / 3e8 * 1e9, h * 3e8 / 1e9, "k-",
+        t / 3e8 * 1e9, h_normalized, "k-",
+        t / 3e8 * 1e9, original_normalized, "r--",
         linewidth=2,
     )
 
     plt.xlim(0, 5)
     plt.xlabel("Time (ns)")
-    plt.ylabel("G/s$^2$")
+    plt.ylabel("1/s$^2$")
     plt.grid()
 
     # plt.gca().annotate(
@@ -281,14 +283,14 @@ def postprocessing_book(current_moment, down_sample_time, t, h, center, scale, s
     truncation_order = range(2, 8 + 2 + 1)
     residual_error = [
         1.,
-        0.4484,
-        0.4484,
-        0.186843,
-        0.186843,
-        0.137949,
-        0.137949,
-        0.132738,
-        0.132738,
+        0.4478,
+        0.4478,
+        0.1844,
+        0.1844,
+        0.1357,
+        0.1357,
+        0.1270,
+        0.1270,
     ]
     n_dof = [
         47,
@@ -343,16 +345,23 @@ def postprocessing_book(current_moment, down_sample_time, t, h, center, scale, s
 
     plt.savefig("data/residual_error_and_dof.pdf")
 
-    plt.figure(figsize=(6.7, 3))
     mu = 4*np.pi*1e-7*scale
-    print(f"Largest moment amplitude: {np.max(np.abs(current_moment))}, {-mu * current_moment[2, 1, 0, 0]=}, "
-          f"{-mu * current_moment[0, 0, 0, 1]=}")
-
-    plt.plot(t / 3e8 * 1e9, e_opt[2, :, :].T/1e3, "k-")
-    plt.plot(t / 3e8 * 1e9, e_true[2, :, :].T/1e3, "r--")
-    plt.xlabel("Time (ns)")
-    plt.ylabel("V/m")
+    print(f"Largest moment amplitude: {np.max(np.abs(current_moment))}, {-mu * current_moment[2, 1, 0, 0] * h_scale=}, "
+          f"{-mu * current_moment[0, 0, 0, 1] * h_scale=}")
+    plt.figure(figsize=(6.7, 6))
+    for ind in range(4):
+        plt.subplot(2, 2, ind + 1)
+        plt.plot(t / 3e8 * 1e9, e_opt[2, ind, :].T/1e3, "k-")
+        plt.plot(t / 3e8 * 1e9, e_true[2, ind, :].T/1e3, "r--")
+        plt.xlim(4, 9)
+        plt.ylim(-15, 30)
+        if ind in {2, 3}:
+            plt.xlabel("Time (ns)")
+        if ind in {0, 2}:
+            plt.ylabel("V/m")
+        plt.grid()
     plt.tight_layout()
+    plt.savefig("data/fields.pdf")
     plt.show(block=True)
 
 

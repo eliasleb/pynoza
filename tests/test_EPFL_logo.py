@@ -93,7 +93,7 @@ def c_r(a1, a2, _a3, x1, x2, w, h):
 
 
 def plot_current_density(xs: list[float, ...], ys: list[float, ...], ws: list[float, ...], hs: list[float, ...],
-                         length_logo, d1, d2, ax=None, **kwargs):
+                         length_logo, length, d1, d2, ax=None, **kwargs):
     """
     Plot a given current density
 
@@ -102,14 +102,14 @@ def plot_current_density(xs: list[float, ...], ys: list[float, ...], ws: list[fl
     :param ws: widths of all current rectangle
     :param hs: heights of all current rectangle
     :param length_logo: width of the logo in xs/ys units
+    :param length: width of the logo in true units
     :param d1: physical width of logo
     :param d2: physical height of logo
     :param ax: optional axis to use
-    :param edge_width:
     """
 
-    rectangles = [Rectangle((x / length_logo - d1, y / length_logo - d2),
-                            w / length_logo, h / length_logo) for x, y, w, h in zip(xs, ys, ws, hs)]
+    rectangles = [Rectangle((x / length_logo * length - d1, y / length_logo * length - d2),
+                            w / length_logo * length, h / length_logo * length) for x, y, w, h in zip(xs, ys, ws, hs)]
     pc = PatchCollection(rectangles, facecolor="r", **kwargs)
     if ax is None:
         ax = plt.gca()
@@ -203,7 +203,7 @@ def test_solution(test_case, order, method, plot=False, cname="xyz"):
                     hs.append(h0)
             if plot:
                 plt.figure(figsize=(2.8, 2.8))
-                plot_current_density(x1s, x2s, ws, hs, length_logo, .5, .5)
+                plot_current_density(x1s, x2s, ws, hs, length_logo, length, .5, .5)
                 plt.xlim(-.6, .6)
                 plt.ylim(-.6, .6)
                 if cname == "xyz":
@@ -222,11 +222,11 @@ def test_solution(test_case, order, method, plot=False, cname="xyz"):
         case _:
             t = np.array([0, ])
 
-    def current_moment(ax, ay, az):
+    def current_moment(ax_, ay, az):
         moment = 0
         if az == 0:
             for x_i, y_i, wi, hi in zip(x1s, x2s, ws, hs):
-                moment += c_j(ax, ay, az, x_i / length_logo * length - d1,
+                moment += c_j(ax_, ay, az, x_i / length_logo * length - d1,
                               y_i / length_logo * length - d2, wi / length_logo * length,
                               hi / length_logo * length) / gamma_si
         return [moment, 0, 0]
@@ -366,7 +366,7 @@ def test_solution(test_case, order, method, plot=False, cname="xyz"):
                     cmap="Blues",
                 )
 
-                plot_current_density(x1s, x2s, ws, hs, length_logo, d1, d2)
+                plot_current_density(x1s, x2s, ws, hs, length_logo, length, d1, d2)
                 if cname == "xyz":
                     plt.xlabel(r"$x/\lambda$")
                     plt.ylabel(r"$y/\lambda$")
@@ -382,7 +382,7 @@ def test_solution(test_case, order, method, plot=False, cname="xyz"):
 
                 left, bottom, width, height = [.06, .12, .15, .3]
                 ax2 = fig.add_axes([left, bottom, width, height])
-                plot_current_density(x1s, x2s, ws, hs, length_logo, d1, d2, ax=ax2, linewidth=1, edgecolor="k")
+                plot_current_density(x1s, x2s, ws, hs, length_logo, length, d1, d2, ax=ax2, linewidth=1, edgecolor="k")
                 x_min, x_max, y_min = -.135, .065, -.03
                 ax2.set_xlim(x_min, x_max)
                 ax2.set_ylim(y_min, y_min + x_max - x_min)

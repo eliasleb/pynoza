@@ -77,7 +77,7 @@ Assert[Simplify[BfieldThis - HJackson] == {0, 0, 0}]
 Assert[Simplify[EfieldThis - EJackson] == {0, 0, 0}]
 Clear[CurrentMoment, EfieldThis, BfieldThis, P, n, HJackson, EJackson]
 
-maxOrder=100;
+maxOrder=10;
 rz=Sqrt[x^2+y^2];
 antiderivative=Integrate[Exp[-t^2],t];
 derivatives=Association@Table[
@@ -89,7 +89,7 @@ ParallelTable[CurrentMoment[{ax,ay,0},dim],
 {ax,0,maxOrder},{ay,0,maxOrder-ax},{dim,1,2}];
 Table[Print[ax,ay,direction];g[{ax,ay,0},direction];,
 {ax,0,maxOrder},{ay,0,maxOrder-ax},{direction,-1,1,2}];
-DumpSave[ToString@Directory[];<>"data/g-up-to-order-"<>ToString@maxOrder<>".mx",g];
+DumpSave[ToString@Directory[]<>"/data/g-up-to-order-"<>ToString@maxOrder<>".mx",g];
 
 
 

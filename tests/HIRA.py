@@ -306,9 +306,9 @@ def inverse_problem_hira(**kwargs):
 def optimization_results():
     import re
 
-    orders = range(1, 9 + 2, 2)
-    n_points_s = (45, 50, )
-    seeds = range(8)
+    orders = range(1, 11 + 2, 2)
+    n_points_s = (40, 45, 50, )
+    seeds = range(16)
     results = np.nan * np.ones((len(orders), len(n_points_s), len(seeds)))
 
     for i, order in enumerate(orders):
@@ -335,7 +335,7 @@ def optimization_results():
         plt.figure()
         plt.pcolormesh(n_points_s, seeds, -results[i, :, :].T)
         plt.colorbar()
-        plt.title(f"{order=}")
+        plt.title(f"{order=}, min for 40 = {np.nanmin(results[i, 0, :])}")
         plt.tight_layout()
     plt.show()
 
