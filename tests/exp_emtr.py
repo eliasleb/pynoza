@@ -5,6 +5,8 @@ import numpy as np
 import scipy
 from dataclasses import dataclass
 from enum import Enum
+from multiprocessing import Pool
+from time import time
 
 
 class Polarity(Enum):
@@ -71,15 +73,45 @@ def reflect(all_positions: set[tuple, ...], sources: set[Source, ...], size: tup
     return sources
 
 
+def get_e_field(t, x1, x2, x3, r, c, h):
+    return np.array([0., -1.26e-06, 0])[:, None] * (h[1](t - r / c) / r) / (4 * np.pi) \
+        + np.array([0., 0., 1.13e+17])[:, None] * ((3. * h[-1](t - r / c) * x2 * x3 / r**5) + (
+                    1.00e-11 * h[0](t - r / c) * x2 * x3 / r**4) + (
+                            1.11e-23 * h[1](t - r / c) * x2 * x3 / r**3)) / (4 * np.pi) \
+        + 1 / 2. * np.array([0., 2.26e+17, 0.])[:, None] * (+(-1. * h[-1](t - r / c) / r**3) + (
+                    3. * h[-1](t - r / c) * x2**2 / r**5) + (1.00e-11 * h[0](
+                t - r / c) * x2**2 / r**4) + (-3.33e-12 * h[0](t - r / c) / r**2) + (1.11e-23 * h[1](t - r / c)
+                                                                                 * x2**2 / r**3)) / (4 * np.pi) \
+        + np.array([1.13e+17, 0., 0.])[:, None] * ((3. * h[-1](t - r / c) * x1 * x2 / r**5) + (
+                        1.00e-11 * h[0](t - r / c) * x1 * x2 / r**4) + (
+                                1.11e-23 * h[1](t - r / c) * x1 * x2 / r**3)) / (4 * np.pi)
+
+
+def sum_sources(sources, solution, x1, x2, x3, t, x):
+    e_field = 0.
+    for ind, source in enumerate(sources):
+        if ind % 500 == 0:
+            print(f"{ind/len(sources)*100:.1f}")
+        e_field = solution.compute_e_field(
+            x1 - source.pos[0], x2 - source.pos[1], x3 - source.pos[2], t, source.amplitude * x, None,
+            compute_grid=False
+        ) + e_field
+    return e_field
+
+
 def main():
 
-    solutions = []
+    d_com = np.loadtxt(
+        "../../../git_ignore/image theory/validation_comsol.txt",
+        skiprows=5
+    )
+    t_com, v_com = d_com[:, 0], d_com[:, 1]
+
     solution = Solution(max_order=2, wave_speed=3e11)
     solution.set_moments(
         current_moment=lambda a1, a2, a3: [0., 1., 0.] if (a1, a2, a3) == (0, 0, 0) else [0., 0., 0.]
     )
     solution.recurse()
-    solutions.append(solution)
 
     size_x, size_y, size_z = 1356, 906, 814
     x1, x2, x3 = np.array((size_x - 226, )), np.array((size_y, )), np.array((296, ))
@@ -92,7 +124,7 @@ def main():
     t, h = data[:, 0], data[:, 1]
     dt = t[1] - t[0]
     fs = 1 / dt
-    fc, bw = 2.35e9, 40e6
+    fc, bw = 235e6, 100e6
     sos = scipy.signal.butter(
         2, (fc - bw, fc + bw),
         btype="bandpass",
@@ -101,62 +133,92 @@ def main():
         fs=fs
     )
 
-    # f = np.linspace(0, fs, t.size)
-    # h_fd = np.fft.fft(h)
+    f = np.linspace(0, fs, t.size)
+    h_fd = np.fft.fft(h)
 
     h = scipy.signal.sosfilt(sos, h)
-    # h_f_fd = np.fft.fft(h)
+    h_f_fd = np.fft.fft(h)
     h = h / np.max(h)
-    x = scipy.signal.gausspulse(
-        t - 60e-9, fc, bw/fc
-    )
-    # x_fd = np.fft.fft(x)
+    t0 = 60e-9
+    x = np.exp(-.5 * ((t - t0) * bw)**2) * np.cos(2 * np.pi * fc * (t - t0))
+    x[t < t0/2] = 0.
+    x_fd = np.fft.fft(x)
 
-    # plt.plot(f, np.abs(h_fd)/np.max(np.abs(h_fd)))
-    # plt.plot(f, np.abs(h_f_fd)/np.max(np.abs(h_f_fd)))
-    # plt.plot(f, np.abs(x_fd)/np.max(np.abs(x_fd)))
-    # plt.xlim(2.2e9, 2.5e9)
-    # plt.show()
+    plt.plot(f, np.abs(h_fd)/np.max(np.abs(h_fd)))
+    plt.plot(f, np.abs(h_f_fd)/np.max(np.abs(h_f_fd)))
+    plt.plot(f, np.abs(x_fd)/np.max(np.abs(x_fd)))
+    plt.xlim(2.2e9, 2.5e9)
 
     src = Source(pos=(466, 0, 307), polarity=Polarity.Y)
+    q = 1 - (2 * 8.854e-12 * 2 * np.pi * fc / 3.5e7)**.5
+    print(f"{q=}")
     sources = reflect(
         {src.pos, },
         {src, },
         size=(size_x, size_y, size_z),
-        threshold=.5,
-        q=(1/2) ** (1/(3e8*2.5e-7))
+        threshold=q**(300/3.33),  # .0001
+        q=q
     )
-    if False:
-        plt.hlines([0, size_y], 0, size_x)
-        plt.vlines([0, size_x], 0, size_y)
+    plot_points = False
+    if plot_points:
+        max_line = 10
+        plt.hlines([size_y * ind for ind in range(-max_line, max_line)], -max_line * size_x, max_line * size_x)
+        plt.vlines([size_x * ind for ind in range(-max_line, max_line)], -max_line * size_y, max_line * size_y)
 
         for ind, src in enumerate(sources):
             if 306 < src.pos[2] < 308:
                 print(id(src), src)
-                plt.plot(src.pos[0], src.pos[1], ".")
-                plt.text(src.pos[0], src.pos[1], f"{str(id(src))[-3:]}")
-                plt.waitforbuttonpress()
+                plt.plot(src.pos[0], src.pos[1], ".", color=plt.colormaps["jet"](abs(src.amplitude)))
+                plt.text(src.pos[0], src.pos[1], f"{src.amplitude:.3f}")
+        plt.show()
 
-    t_min, t_max = -.01e-7, .2e-6
+    t_min, t_max = .34e-7, .2e-6
     keep = (t > t_min) & (t < t_max)
-    n_downsample = 3
+    n_downsample = 1
 
     t, x, h = t[keep], x[keep], h[keep]
     t, x, h = t[::n_downsample], x[::n_downsample], h[::n_downsample]
-    print(len(sources))
-    e_field = 0.
-    for ind, source in enumerate(sources):
-        if ind % 500 == 0:
-            print(f"{ind/len(sources)*100:.1f}", source.pos, source.amplitude)
-        e_field = solution.compute_e_field(
-            x1 - source.pos[0], x2 - source.pos[0], x3 - source.pos[0], t, source.amplitude * x, None,
-            compute_grid=False
-        ) + e_field
 
-    plt.figure()
-    plt.plot(t, h / np.max(h))
+    t = t - t[0]
+
+    start = time()
+    use_parallel = True
+    if not use_parallel:
+        e_field = 0.
+        for ind, source in enumerate(sources):
+            if ind % 500 == 0:
+                print(f"{ind/len(sources)*100:.1f}", source.pos, source.amplitude)
+            e_field = solution.compute_e_field(
+                x1 - source.pos[0], x2 - source.pos[0], x3 - source.pos[0], t, source.amplitude * x, None,
+                compute_grid=False
+            ) + e_field
+    else:
+        segment_size = len(sources) // 7
+        n_processes, arguments, sources = 0, [], list(sources)
+        for shift in range(0, len(sources), segment_size):
+            arguments.append(
+                (sources[shift:shift + segment_size], solution, x1, x2, x3, t, x)
+            )
+            n_processes += 1
+
+        print(f"Using {n_processes=}")
+        with Pool(n_processes) as p:
+            result = p.starmap(sum_sources, arguments)
+        e_field = sum(result)
+
+    stop = time()
+
+    print(f"It took {stop - start} s")
+
+    plt.figure(figsize=(8, 8))
+    plt.subplot(2, 1, 1)
+    plt.plot(t, h)
+
+    plt.subplot(2, 1, 2)
     # plt.plot(t, x)
-    plt.plot(t, e_field[1, 0, :] / np.max(e_field), "k--")
+    plt.plot(t_com - 30e-9, v_com/np.max(v_com), "k--")
+    plt.plot(t, e_field[1, :, :].T/np.max(e_field))
+    # plt.xlim(3e-8, 10e-8)
     plt.show()
 
 
