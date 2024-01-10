@@ -191,8 +191,8 @@ def test_solution(test_case, order, method, plot=False, cname="xyz"):
             d1 = a
             d2 = a
             x1s, x2s, ws, hs = [], [], [], []
-            w0 = 4
-            h0 = 4
+            w0 = 2
+            h0 = 2
             x10 = np.arange(0, 171, w0)
             x20 = np.arange(0, 171, h0)
             for xi, yi in itertools.product(x10, x20):
@@ -203,9 +203,9 @@ def test_solution(test_case, order, method, plot=False, cname="xyz"):
                     hs.append(h0)
             if plot:
                 plt.figure(figsize=(2.8, 2.8))
-                plot_current_density(x1s, x2s, ws, hs, length_logo, length, .5, .5)
-                plt.xlim(-.6, .6)
-                plt.ylim(-.6, .6)
+                plot_current_density(x1s, x2s, ws, hs, length_logo, length, a, a)
+                plt.xlim(-1.1 * a, 1.1 * a)
+                plt.ylim(-1.1 * a, 1.1 * a)
                 if cname == "xyz":
                     plt.xlabel(r"$x/\lambda$")
                     plt.ylabel(r"$y/\lambda$")
@@ -417,7 +417,7 @@ def test_solution(test_case, order, method, plot=False, cname="xyz"):
             e_paper3 = scipy.interpolate.interp1d(d["X"] * t_g * gamma_si * 1e9 - delay, d["Y"],
                                                   fill_value="extrapolate")(t * gamma_si * 1e9)
             if plot:
-                plt.figure(figsize=(5, 3))
+                plt.figure(figsize=(18/2.54, 10/2.54))
                 c_si = 3e8
                 n_d_paper = 5
                 dark_red = "#a20000ff"

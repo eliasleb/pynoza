@@ -124,7 +124,7 @@ def main():
     t, h = data[:, 0], data[:, 1]
     dt = t[1] - t[0]
     fs = 1 / dt
-    fc, bw = 235e6, 100e6
+    fc, bw = 2350e6, 100e6
     sos = scipy.signal.butter(
         2, (fc - bw, fc + bw),
         btype="bandpass",
@@ -156,7 +156,7 @@ def main():
         {src.pos, },
         {src, },
         size=(size_x, size_y, size_z),
-        threshold=q**(300/3.33),  # .0001
+        threshold=q**(350/3.33),  # .0001
         q=q
     )
     plot_points = False
@@ -172,7 +172,7 @@ def main():
                 plt.text(src.pos[0], src.pos[1], f"{src.amplitude:.3f}")
         plt.show()
 
-    t_min, t_max = .34e-7, .2e-6
+    t_min, t_max = .34e-7, 1.2e-6
     keep = (t > t_min) & (t < t_max)
     n_downsample = 1
 
@@ -193,7 +193,7 @@ def main():
                 compute_grid=False
             ) + e_field
     else:
-        segment_size = len(sources) // 7
+        segment_size = len(sources) // 8
         n_processes, arguments, sources = 0, [], list(sources)
         for shift in range(0, len(sources), segment_size):
             arguments.append(
@@ -216,8 +216,8 @@ def main():
 
     plt.subplot(2, 1, 2)
     # plt.plot(t, x)
-    plt.plot(t_com - 30e-9, v_com/np.max(v_com), "k--")
-    plt.plot(t, e_field[1, :, :].T/np.max(e_field))
+    # plt.plot(t_com, v_com/np.max(v_com), "k--")
+    plt.plot(t, e_field[1, :, :].T)
     # plt.xlim(3e-8, 10e-8)
     plt.show()
 

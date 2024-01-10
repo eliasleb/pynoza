@@ -220,7 +220,7 @@ def postprocessing_mikheev(*args):
         plt.tight_layout()
 
 
-def postprocessing_book(current_moment, down_sample_time, t, h, center, scale, sol, order, e_true, e_opt):
+def postprocessing_book(current_moment, down_sample_time, t, h, center, scale, sol, order, e_true, e_opt, dashed=False):
     tr = 160e-12 * 3e8
     t1 = 2 * tr
     beta = 0.05
@@ -232,8 +232,12 @@ def postprocessing_book(current_moment, down_sample_time, t, h, center, scale, s
     h_normalized = h / np.max(np.abs(h))
     h_scale = np.max(np.abs(h)) * 3e8
     original_normalized = original / np.max(np.abs(original))
+    if dashed:
+        style = "k--"
+    else:
+        style = "k-"
     plt.plot(
-        t / 3e8 * 1e9, h_normalized, "k-",
+        t / 3e8 * 1e9, h_normalized, style,
         t / 3e8 * 1e9, original_normalized, "r--",
         linewidth=2,
     )
@@ -292,6 +296,17 @@ def postprocessing_book(current_moment, down_sample_time, t, h, center, scale, s
         0.1270,
         0.1270,
     ]
+    residual_error_noisy = [
+        1.,
+        .717,
+        .717,
+        .713,
+        .713,
+        .611,
+        .611,
+        .578,
+        .578
+    ]
     n_dof = [
         47,
         49,
@@ -325,6 +340,7 @@ def postprocessing_book(current_moment, down_sample_time, t, h, center, scale, s
     )
 
     ax.plot(truncation_order, np.array(residual_error) * 100, "ko-", zorder=1)
+    ax.plot(truncation_order, np.array(residual_error_noisy) * 100, "ko--", zorder=1)
     ax.set_ylim(0, 110)
     ax.set_xlim(min(truncation_order), max(truncation_order))
     ax.set_xlabel(r"Truncation order")
@@ -351,14 +367,14 @@ def postprocessing_book(current_moment, down_sample_time, t, h, center, scale, s
     plt.figure(figsize=(6.7, 6))
     for ind in range(4):
         plt.subplot(2, 2, ind + 1)
-        plt.plot(t / 3e8 * 1e9, e_opt[2, ind, :].T/1e3, "k-")
         plt.plot(t / 3e8 * 1e9, e_true[2, ind, :].T/1e3, "r--")
+        plt.plot(t / 3e8 * 1e9, e_opt[2, ind, :].T/1e3, "k-")
         plt.xlim(4, 9)
-        plt.ylim(-15, 30)
+        plt.ylim(-20, 40)
         if ind in {2, 3}:
             plt.xlabel("Time (ns)")
         if ind in {0, 2}:
-            plt.ylabel("V/m")
+            plt.ylabel("kV/m")
         plt.grid()
     plt.tight_layout()
     plt.savefig("data/fields.pdf")
@@ -420,7 +436,8 @@ def postprocessing(**kwargs):
         case "mikheev":
             postprocessing_mikheev(current_moment, t, h, h_true, center, sol, order, kwargs.get("filename"))
         case "book":
-            postprocessing_book(current_moment, down_sample_time, t, h, center, scale, sol, order, e_true, e_opt)
+            postprocessing_book(current_moment, down_sample_time, t, h, center, scale, sol, order, e_true, e_opt,
+                                dashed=kwargs["dashed"])
         case _:
             raise ValueError(f"Unknown --case: `{kwargs['case']}`")
 
@@ -446,6 +463,7 @@ if __name__ == "__main__":
     parser.add_argument("--scale", required=True)
     parser.add_argument("--down_sample_time", required=True)
     parser.add_argument("--case", required=True)
+    parser.add_argument("--dashed", action="store_true")
 
     kwargs_parsed = parser.parse_args()
     postprocessing(**vars(kwargs_parsed))

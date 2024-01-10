@@ -61,6 +61,8 @@ def inverse_problem_hira(**kwargs):
         os.path.join("..", "..", "..", "git_ignore", "GLOBALEM")
     )
 
+    np.random.seed(seed)
+
     # mikheev_data = mikheev.read_paper_data()
     # d = .9
     # x1 = np.array((0, .3, 0, 0, .3, 0, 0, .3, 0, .21,)) * d
@@ -97,6 +99,7 @@ def inverse_problem_hira(**kwargs):
     coeff_derivative = kwargs["coeff_derivative"]
     t_max = kwargs.get("t_max", np.inf)
     shift = kwargs.get("shift", 0)
+    noise_level = kwargs.get("noise_level", 0)
 
     assert len(obs_x1) == len(obs_x2) == len(obs_x3)
 
@@ -150,6 +153,20 @@ def inverse_problem_hira(**kwargs):
     ex = ex[:, t_keep]
     ey = ey[:, t_keep]
     ez = ez[:, t_keep]
+    energy_ex = np.sqrt(np.sum(ex**2))
+    energy_ey = np.sqrt(np.sum(ey**2))
+    energy_ez = np.sqrt(np.sum(ez**2))
+
+    noise_x = np.random.randn(*ex.shape)
+    noise_y = np.random.randn(*ey.shape)
+    noise_z = np.random.randn(*ez.shape)
+    noise_x = noise_x / np.sqrt(np.sum(noise_x**2)) * energy_ex * noise_level
+    noise_y = noise_y / np.sqrt(np.sum(noise_y**2)) * energy_ey * noise_level
+    noise_z = noise_z / np.sqrt(np.sum(noise_z**2)) * energy_ez * noise_level
+
+    ex = ex + noise_x
+    ey = ey + noise_y
+    ez = ez + noise_z
 
     if phase_correction.size == x1.size:
         for i_x in range(x1.size):
@@ -372,6 +389,7 @@ if __name__ == "__main__":
     parser.add_argument("--shift", required=False, type=int)
     parser.add_argument("--seed", required=False, type=int)
     parser.add_argument("--save_path", required=True, type=str)
+    parser.add_argument("--noise_level", required=True, type=float)
 
     parsed = parser.parse_args()
     inverse_problem_hira(**vars(parsed))
