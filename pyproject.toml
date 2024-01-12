@@ -1,7 +1,7 @@
 [project]
 name="pynoza"
-version = "0.1"
-dynamic = ["dependencies"]
+version = "0.21"
+dynamic = ["dependencies", "classifiers", "readme", "urls", "authors", "requires-python"]
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
