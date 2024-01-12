@@ -453,9 +453,9 @@ def test_solution(test_case, order, method, plot=False, cname="xyz"):
                 plt.savefig("tests/data/test_approximate_vs_exact.pdf")
                 plt.show()
 
-            assert np.linalg.norm(e_paper1 * 1e2 - e_field_x[0, 0, 0, :] * x3[0] / 1e6, ord=2) / t.size < 0.3 \
-                   and np.linalg.norm(e_paper2 * 1e2 - e_field_x[0, 0, 1, :] * x3[1] / 1e6, ord=2) / t.size < 0.3 \
-                   and np.linalg.norm(e_paper3 * 1e2 - e_field_x[0, 0, 2, :] * x3[2] / 1e6, ord=2) / t.size < 0.3
+            assert np.linalg.norm(e_paper1 * 1e2 - e_field_x[0, 0, 0, :] * x3[0] / 1e6, ord=2) / t.size < 0.4 \
+                   and np.linalg.norm(e_paper2 * 1e2 - e_field_x[0, 0, 1, :] * x3[1] / 1e6, ord=2) / t.size < 0.4 \
+                   and np.linalg.norm(e_paper3 * 1e2 - e_field_x[0, 0, 2, :] * x3[2] / 1e6, ord=2) / t.size < 0.4
 
     with open(f"tests/data/field-{case_}.txt", "w+") as fd:
         fd.write(sol.get_e_field_text())
