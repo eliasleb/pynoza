@@ -1,13 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import cython
+import multiprocessing
 from dataclasses import dataclass
 import math
 from scipy.special import erf
 from scipy.special import lpmv, lpmn
-from warnings import warn
+import time
+import itertools
 from alive_progress import alive_bar
-from spherical_int import *
 
 
 @dataclass
@@ -15,6 +15,16 @@ class Nu:
     s: bool
     n: int
     m: int
+
+
+@dataclass
+class Parameters:
+    a: float  # 3.
+    max_order: int  # 2
+    eps_z: float  # .03
+    n_rho: int  # 4
+    n_z: int  # 4
+    n_xi: int  # 1000
 
 
 def smooth_step(x):
@@ -78,27 +88,25 @@ def excitation(t, big_t=1.):
 def current_density_x(t, x, y, z, duration=1., a=1., eps_z=.1):
     rho = np.sqrt(x**2 + y**2)
     e_t = excitation(t, duration)
-    if type(t) is not float:
-        max_e, e1, e2 = np.max(np.abs(e_t)), e_t[0], e_t[-1]
-        fom = max(e1/max_e, e2/max_e)
-        if fom > 1e-2:
-            warn(f"Time range too small, end points value {fom*100:.1f}")
+    # if type(t) is not float:
+    #     max_e, e1, e2 = np.max(np.abs(e_t)), e_t[0], e_t[-1]
+    #     fom = max(e1/max_e, e2/max_e)
+    #     if fom > 1e-2:
+    #         warn(f"Time range too small, end points value {fom*100:.1f}")
     return e_t * smooth_step((a - rho)/eps_z) * smooth_step((-np.abs(z) + eps_z)/eps_z)
 
 
-def m_nu_h(s: bool, max_order: int, t, x, y, z, current_density_x_, n_xi=50, method="p"):
+def m_nu_h(s: bool, max_order: int, t, x, y, z, current_density_x_, n_xi=50):
     xi = np.linspace(-1, 1, n_xi)
     dx3 = (x[1] - x[0]) * (y[1] - y[0]) * (z[1] - z[0])
     d_xi = xi[1] - xi[0]
     dt = t[1] - t[0]
-    if method == "c":
-        return integral(t, x, y, z, xi, int(s), max_order)
     moments = np.zeros((max_order + 1, max_order + 1, t.size))
     n = np.array(range(max_order + 1))
-    factorial_n = np.array([math.factorial(n_i) for n_i in n])[:, None, None]
-    n = n[:, None, None]
+    factorial_n = np.array([math.factorial(n_i) for n_i in n])[:, None, None, None]
+    n = n[:, None, None, None]
     n_total = len(x) * len(y) * len(z)
-    with alive_bar(n_total) as bar:
+    with alive_bar(n_total, bar="bubbles", spinner="notes") as bar:
         for i_x, x_i in enumerate(x):
             for i_y, y_i in enumerate(y):
                 rho = (x_i ** 2 + y_i ** 2) ** .5
@@ -111,67 +119,178 @@ def m_nu_h(s: bool, max_order: int, t, x, y, z, current_density_x_, n_xi=50, met
                         max_order=max_order,
                         theta=theta,
                         phi=phi
-                    )[:, :, 0, None]
-                    for i_xi, xi_i in enumerate(xi):
-                        d_moments = 377 / 2 / factorial_n * (r / 2) ** n * (1 - xi_i ** 2) ** n * e_nu_h_\
-                             * current_density_x_(
-                            t + xi_i * r, x_i, y_i, z_i
-                        )[None, None, :]
-                        moments = moments + d_moments * dx3 * d_xi
+                    )[:, :, 0, None, None]
+                    # for i_xi, xi_i in enumerate(xi):
+                    d_moments = 377 / 2 / factorial_n * (r / 2) ** n * (1 - xi[None, None, None, :] ** 2) ** n \
+                         * e_nu_h_ * current_density_x_(
+                        t[:, None] + xi[None, :] * r, x_i, y_i, z_i
+                    )[None, None, ...]
+                    moments = moments + np.sum(d_moments, axis=-1) * dx3 * d_xi
                     bar()
-    # moments = np.diff(moments, axis=-1, prepend=np.zeros((max_order + 1, max_order + 1, 1))) / dt
-    # for ni in range(1, max_order + 1):
-    #     moments[ni:, :, :] = np.diff(
-    #         moments[ni:, :, :], axis=-1, prepend=np.zeros((max_order + 1 - ni, max_order + 1, 1))
-    #     ) / dt
     return moments
 
 
-def main():
-    c0 = 1
-    max_order = 2
-    a = 3 * c0
-    eps_z = .01 * a
-    n_rho, n_z, n_xi = 20, 10, 1000
+def cartesian_moment(alpha: tuple[int, int, int], t, x, y, z, current_density_x_):
+    moment = np.zeros(t.shape)
+    dx3 = (x[1] - x[0]) * (y[1] - y[0]) * (z[1] - z[0])
+    n_total = x.size * y.size * z.size
+    with alive_bar(n_total, bar="bubbles", spinner="notes") as bar:
+        for i_x, x_i in enumerate(x):
+            for i_y, y_i in enumerate(y):
+                for i_z, z_i in enumerate(z):
+                    moment = moment + dx3 * current_density_x_(t, x_i, y_i, z_i) * \
+                        x_i**alpha[0] * y_i**alpha[1] * z_i**alpha[2]
+                    bar()
+    return moment
 
-    cx = lambda t_, x_, y_, z_: current_density_x(t_, x_, y_, z_, duration=1., a=a, eps_z=eps_z)
-    t = np.linspace(-12, 12, n_xi)
-    x = np.linspace(-1.1*a, 1.1*a, n_rho)
-    y = np.linspace(-1.1*a, 1.1*a, n_rho)
-    z = np.linspace(-2 * eps_z, 2 * eps_z, n_z)
 
-    # jx = cx(t[:, None, None, None], x[None, :, None, None], y[None, None, :, None], z[None, None, None, :])
-    # max_jx = np.max(np.abs(jx))
-    # for ind, ti in enumerate(t):
-    #     plt.clf()
-    #     plt.subplot(1, 3, 1)
-    #     plt.contourf(x, y, jx[ind, :, :, z.size//2].T, levels=np.linspace(-max_jx, max_jx, 21), cmap="jet")
-    #     plt.subplot(1, 3, 2)
-    #     plt.contourf(x, z, jx[ind, :, y.size//2, :].T, levels=np.linspace(-max_jx, max_jx, 21), cmap="jet")
-    #     plt.subplot(1, 3, 3)
-    #     plt.contourf(y, z, jx[ind, x.size//2, :, :].T, levels=np.linspace(-max_jx, max_jx, 21), cmap="jet")
-    #     plt.title(f"{ti=:.1f}")
-    #     plt.waitforbuttonpress()
+def diff_moments(moments, dt):
+    max_order = moments.shape[0] - 1
+    moments = np.diff(moments, axis=-1, prepend=np.zeros((max_order + 1, max_order + 1, 1))) / dt
+    for ni in range(1, max_order + 1):
+        moments[ni:, :, :] = np.diff(
+            moments[ni:, :, :], axis=-1, prepend=np.zeros((max_order + 1 - ni, max_order + 1, 1))
+        ) / dt
+    return moments
 
-    plt.plot(t, excitation(t))
 
-    moments_spherical = m_nu_h(s=True, max_order=max_order, t=t, x=x, y=y, z=z, current_density_x_=cx, n_xi=n_xi)
+def get_even(n: int):
+    if n % 2 == 0:
+        return n
+    return n + 1
+
+
+def test_moments():
+    import pickle
+    nx = 10
+
+    p = Parameters(
+        a=3.,
+        eps_z=.03,
+        n_rho=nx,
+        n_z=nx,
+        n_xi=100,
+        max_order=2
+    )
+
+    cx = lambda t_, x_, y_, z_: current_density_x(t_, x_, y_, z_, duration=1., a=p.a, eps_z=p.eps_z)
+    t = np.linspace(-12, 12, p.n_xi)
+    x = np.linspace(-1.1*p.a, 1.1*p.a, p.n_rho)
+    y = np.linspace(-1.1*p.a, 1.1*p.a, p.n_rho)
+    z = np.linspace(-2 * p.eps_z, 2 * p.eps_z, p.n_z)
+
+    try:
+        with open("dump.pickle", "rb") as fd:
+            moments_spherical, moment_cartesian, p_dumped = pickle.load(fd)
+            if p_dumped != p:
+                raise FileNotFoundError
+    except FileNotFoundError:
+        moments_spherical = m_nu_h(s=True, max_order=p.max_order, t=t, x=x, y=y, z=z, current_density_x_=cx,
+                                   n_xi=p.n_xi)
+        moment_cartesian = cartesian_moment((1, 0, 1), t, x, y, z, cx)
+        with open("dump.pickle", "wb") as fd:
+            pickle.dump((moments_spherical, moment_cartesian, p), fd)
+
+    moments_spherical = diff_moments(moments_spherical, t[1] - t[0])
 
     plt.figure()
-    for n in range(max_order + 1):
-        for m in range(0, n + 1):
-            plt.plot(t, moments_spherical[n, m, :].T, label=f"{n=}, {m=}")
+    moment_spherical = moments_spherical[2, 1, :]
+    plt.plot(t, moment_spherical/np.max(np.abs(moment_spherical)), label=f"2, 1")
+    plt.plot(t, moment_cartesian/np.max(np.abs(moment_cartesian)), label="(1, 1, 0)")
 
     plt.legend()
     plt.tight_layout()
     plt.show()
-    # jx = cx(t, x, y, z)
-    # max_jz = np.max(np.abs(jx))
-    # for ind, ti in enumerate(t.squeeze()):
-    #     plt.clf()
-    #     plt.contourf(x.squeeze(), y.squeeze(), jx[ind, :, :, z.size//2].T,
-    #                  levels=np.linspace(-max_jz, max_jz, 11), cmap="jet")
-    #     plt.waitforbuttonpress()
+
+
+def time_function(f: callable, n_times: int = 1):
+    times = np.zeros((n_times, ))
+    for i in range(n_times):
+        start_time = time.process_time()
+        f()
+        stop_time = time.process_time()
+        times[i] = stop_time - start_time
+    return np.mean(times)
+
+
+def permutator(iterator):
+    import random
+    random.seed(0)
+    items = list(iterator)
+    shuffler = list(range(len(items)))
+    random.shuffle(shuffler)
+    return [items[ind] for ind in shuffler], shuffler
+
+
+def time_computation(n_x, n_xi):
+    p = Parameters(
+        a=3.,
+        eps_z=.03,
+        n_rho=n_x,
+        n_z=n_x,
+        n_xi=n_xi,
+        max_order=2
+    )
+
+    cx = lambda t_, x_, y_, z_: current_density_x(t_, x_, y_, z_, duration=1., a=p.a, eps_z=p.eps_z)
+    t = np.linspace(-12, 12, p.n_xi)
+    x = np.linspace(-1.1*p.a, 1.1*p.a, p.n_rho)
+    y = np.linspace(-1.1*p.a, 1.1*p.a, p.n_rho)
+    z = np.linspace(-2 * p.eps_z, 2 * p.eps_z, p.n_z)
+
+    compute_spherical = lambda: m_nu_h(
+        s=True, max_order=p.max_order, t=t, x=x, y=y, z=z, current_density_x_=cx, n_xi=p.n_xi
+    )
+    compute_cartesian = lambda: cartesian_moment((1, 0, 1), t, x, y, z, cx)
+    time_spherical = time_function(compute_spherical)
+    time_cartesian = time_function(compute_cartesian)
+    return time_spherical, time_cartesian
+
+
+def main():
+    import pickle
+
+    n_t_s = np.arange(100, 400, 10)
+    n_x_s = np.arange(10, 100, 2)
+    n_times = 10
+    shuffled, shuffler = permutator(itertools.product(n_x_s, n_t_s))
+
+    try:
+        with open(f"time_result.pickle", "rb") as fd:
+            n_t_s, n_x_s, shuffled, shuffler, parallel_result = pickle.load(fd)
+
+    except FileNotFoundError:
+        with multiprocessing.Pool(8) as pool:
+            parallel_result = pool.starmap(time_computation, [
+                (n_x, n_t) for n_x, n_t in shuffled
+            ] * n_times)
+        # for i_t, n_t in enumerate(n_t_s):
+        #     for i_x, n_x in enumerate(n_x_s):
+        #         sph_times[i_t, i_x], car_times[i_t, i_x] = time_computation(n_x, n_t)
+        with open(f"time_result.pickle", "wb") as fd:
+            pickle.dump((n_t_s, n_x_s, shuffled, shuffler, parallel_result), fd)
+
+    sph_times = np.zeros((n_t_s.size, n_x_s.size))
+    car_times = sph_times.copy()
+
+    for (n_x, n_t), ind, (t_sph, t_car) in zip(
+        shuffled, shuffler, parallel_result
+    ):
+        i_x, i_t = np.where(n_x_s == n_x)[0][0], np.where(n_t_s == n_t)[0][0]
+        sph_times[i_t, i_x] += t_sph
+        car_times[i_t, i_x] += t_car
+
+    sph_times = sph_times / n_times
+    car_times = car_times / n_times
+
+    plt.semilogy(n_t_s, sph_times[:, -1])
+    plt.semilogy(n_t_s, car_times[:, -1], "--")
+
+    plt.figure()
+    plt.semilogy(n_x_s, sph_times[-1, :])
+    plt.semilogy(n_x_s, car_times[-1, :], "--")
+
+    plt.show()
 
 
 if __name__ == "__main__":
