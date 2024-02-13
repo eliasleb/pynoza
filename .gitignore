@@ -60,3 +60,6 @@ meetings
 docs/build/
 docs/source/_*
 docs/source/generated
+
+tests/spherical_int.c
+*.so
