@@ -222,13 +222,13 @@ def permutator(iterator):
     return [items[ind] for ind in shuffler], shuffler
 
 
-def time_computation(n_x, n_xi):
+def time_computation(n_x, _n_xi):
     p = Parameters(
         a=3.,
         eps_z=.03,
         n_rho=n_x,
         n_z=n_x,
-        n_xi=n_xi,
+        n_xi=2 * n_x,
         max_order=2
     )
 
@@ -250,9 +250,9 @@ def time_computation(n_x, n_xi):
 def main():
     import pickle
 
-    n_t_s = np.arange(100, 400, 10)
-    n_x_s = np.arange(10, 100, 2)
-    n_times = 10
+    n_t_s = np.array((100, ))
+    n_x_s = [get_even(int(ni)) for ni in np.logspace(1.3, 2.2, 30)]
+    n_times = 3
     shuffled, shuffler = permutator(itertools.product(n_x_s, n_t_s))
 
     try:
@@ -270,25 +270,53 @@ def main():
         with open(f"time_result.pickle", "wb") as fd:
             pickle.dump((n_t_s, n_x_s, shuffled, shuffler, parallel_result), fd)
 
-    sph_times = np.zeros((n_t_s.size, n_x_s.size))
-    car_times = sph_times.copy()
+    n_x_s = np.array(n_x_s)
 
-    for (n_x, n_t), ind, (t_sph, t_car) in zip(
-        shuffled, shuffler, parallel_result
-    ):
+    sph_times_full = np.zeros((n_t_s.size, n_x_s.size, n_times))
+    car_times_full = sph_times_full.copy()
+
+    for ind, ((n_x, n_t), (t_sph, t_car)) in enumerate(zip(
+        shuffled * n_times, parallel_result
+    )):
         i_x, i_t = np.where(n_x_s == n_x)[0][0], np.where(n_t_s == n_t)[0][0]
-        sph_times[i_t, i_x] += t_sph
-        car_times[i_t, i_x] += t_car
+        sph_times_full[i_t, i_x, ind // (len(shuffled))] = t_sph
+        car_times_full[i_t, i_x, ind // (len(shuffled))] = t_car
 
-    sph_times = sph_times / n_times
-    car_times = car_times / n_times
+    sph_times = np.mean(sph_times_full, axis=-1)
+    car_times = np.mean(car_times_full, axis=-1)
+    n_thresh = 26
+    ind = n_x_s >= n_thresh
 
-    plt.semilogy(n_t_s, sph_times[:, -1])
-    plt.semilogy(n_t_s, car_times[:, -1], "--")
+    x = np.log10(n_x_s)
+    y1 = np.log10(sph_times[-1, :])
+    y2 = np.log10(car_times[-1, :])
 
-    plt.figure()
-    plt.semilogy(n_x_s, sph_times[-1, :])
-    plt.semilogy(n_x_s, car_times[-1, :], "--")
+    poly1, poly2 = np.polyfit(x[ind], y1[ind], 1), np.polyfit(x[ind], y2[ind], 1)
+    y1p, y2p = np.polyval(poly1, x), np.polyval(poly2, x)
+    print(f"{poly1=}, {poly2=}")
+
+    plt.figure(figsize=(5, 3))
+    plt.scatter(x, y1, label="spherical", facecolors='k', marker="+", s=30)
+    plt.plot(x[ind], y1p[ind], "k:", label="spherical, fit")
+    plt.scatter(x, y2, label="Cartesian", facecolors='none', edgecolors='r', s=15)
+    plt.plot(x[ind], y2p[ind], "r--", label="Cartesian, fit",)
+
+    # plt.plot(n_x_s, np.log10((n_x_s/n_x_s[-1])**4 * sph_times[-1, -1]/sph_times[-1, 1]), "r--")
+    # plt.plot(n_x_s, np.log10((n_x_s/n_x_s[-1])**3 * car_times[-1, -1]/car_times[-1, 1]), "k--")
+
+    plt.legend()
+
+    plt.xlim(np.log10(n_thresh), 2.2)
+    # plt.ylim(0, 3.5)
+
+    plt.xlabel("Log10 of number of samples N")
+    plt.ylabel("Log10(s)")
+
+    plt.title("Moments computation time")
+
+    plt.tight_layout()
+
+    plt.savefig("data/moments_time.pdf")
 
     plt.show()
 
