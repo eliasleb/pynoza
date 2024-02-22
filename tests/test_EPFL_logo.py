@@ -26,70 +26,7 @@ import pytest
 import matplotlib.pyplot as plt
 from matplotlib.collections import PatchCollection
 from matplotlib.patches import Rectangle
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-
-
-def int_j(x0, sig, m):
-    """
-    Computes a current space-pulse moment.
-
-    :param x0: center of the pulse
-    :param sig: width of the pulse
-    :param m: order of the moment
-    :return: current moment
-    """
-    return 1 / (m + 1) * ((x0 + sig / 2) ** (m + 1) - (x0 - sig / 2) ** (m + 1))
-
-
-def int_r(x0, sig, m):
-    """
-    Computes a charge space-pulse moment
-
-    :param x0: center of the pulse
-    :param sig: width of the pulse
-    :param m: order of the moment
-    :return: charge moment
-    """
-    if m < 2:
-        return 0
-    else:
-        return -m * ((sig / 2 + x0) ** (m - 1) - (-sig / 2 + x0) ** (m - 1))
-
-
-def c_j(a1, a2, _a3, x1, x2, w, h):
-    """
-    Compute a current moment
-
-    :param a1: multi-index, first dimension
-    :param a2: multi-index, second dimension
-    :param _a3: multi-index, third dimension
-    :param x1: first coordinate of the rectangle center
-    :param x2: second coordinate of the rectangle center
-    :param w: width of the rectangle (first coordinate)
-    :param h: height of the rectangle (second coordinate)
-    :return: the current moment
-    """
-    x1 += w / 2
-    x2 += h / 2
-    return int_j(x1, w, a1) * int_j(x2, h, a2)
-
-
-def c_r(a1, a2, _a3, x1, x2, w, h):
-    """
-    Compute a current moment
-
-    :param a1: multi-index, first dimension
-    :param a2: multi-index, second dimension
-    :param _a3: multi-index, third dimension
-    :param x1: first coordinate of the rectangle center
-    :param x2: second coordinate of the rectangle center
-    :param w: width of the rectangle (first coordinate)
-    :param h: height of the rectangle (second coordinate)
-    :return: the charge moment
-    """
-    x1 += w / 2
-    x2 += h / 2
-    return int_r(x1, w, a1) * int_j(x2, h, a2)
+from pynoza import c_j
 
 
 def plot_current_density(xs: list[float, ...], ys: list[float, ...], ws: list[float, ...], hs: list[float, ...],
@@ -307,11 +244,7 @@ def test_solution(test_case, order, method, plot=False, cname="xyz"):
                 norm1 = 160
 
             if plot:
-                fig, axs = plt.subplots(figsize=(10, 5), ncols=2)
-                plt.subplot(1, 2, 2)
-                c_si = 3e8
-                loc_table_x = (19.5, 21)
-                loc_table_y = (28, 40)
+                plt.subplots(figsize=(5, 3), ncols=1)
                 lines = ["-", ":"]
                 line_colors = ["k", "k"]
                 markers = ["*", "o"]
@@ -320,81 +253,18 @@ def test_solution(test_case, order, method, plot=False, cname="xyz"):
 
                 for ind, (e_comsol, line, line_color, marker, marker_size, marker_color) in enumerate(zip(
                         [e_comsol_2a, e_comsol_3a], lines, line_colors, markers, marker_sizes, marker_colors)):
-                    plt.plot(t / c_si * 1e9, e_field_x[0, 0, ind, :] / 1e3, marker, markersize=marker_size,
+                    plt.plot(t * 4, e_comsol / 2 / 1e3, marker, markersize=marker_size,
                              color=marker_color)
-                    plt.plot(t / c_si * 1e9, e_comsol / 2 / 1e3, line, color=line_color)
-
-                legends_matrix(loc_table_x, loc_table_y, lines, line_colors, markers, marker_colors, marker_sizes)
-
-                text_len_x = 2.5
-                text_len_y = 10
-                text_height_x = 2
-                plt.text(loc_table_x[0] - text_len_x, loc_table_y[0] - text_height_x, fr"${var_name} = \lambda$")
-                plt.text(loc_table_x[0] - text_len_x, loc_table_y[1] - text_height_x,
-                         fr"${var_name} = \frac{3}{2}\lambda$")
-                plt.text(loc_table_x[0] + .1, loc_table_y[1] + text_len_y, r"Multipole", rotation=90)
-                plt.text(loc_table_x[1] - 0.2, loc_table_y[1] + text_len_y, r"Simulation", rotation=90)
-
-                plt.xlim(3, 22)
+                    plt.plot(t * 4, e_field_x[0, 0, ind, :] / 1e3, line, color=line_color)
+                plt.legend((
+                    "multipole, lambda",
+                    "comsol, lambda",
+                    "multipole, 1.5 lambda",
+                    "comsol, 1.5 lambda"
+                ))
+                plt.xlim(2.5, 27.5)
+                plt.ylim(-60, 100)
                 plt.xlabel("Time (ns)")
-
-                plt.subplot(1, 2, 1)
-                ax = axs[0]
-                logo_limit = .6
-                n = 50
-                x1 = np.concatenate((np.linspace(-3., -logo_limit, n), np.linspace(logo_limit, 3., n)))
-                x2 = x1.copy()
-                x3 = np.array((1e-12, ))
-                e_field = sol.compute_e_field(x1, x2, x3, t, h_sym, t_sym, verbose=False)
-                amplitude = np.sqrt(np.sum(e_field**2, axis=0)).squeeze()
-                mask = np.ones((x1.size, x2.size, 1))
-                mask[n-1:n+1, n-1:n+1, 0] = np.nan
-                # amplitude = amplitude * mask
-                # plt.ion()
-                # for i, t_i in enumerate(t):
-                #     plt.clf()
-                #     plt.contourf(
-                #         x1, x2, amplitude[:, :, i].T,
-                #         np.linspace(0, max_amplitude / 2, 10))
-                #     plt.title(f"{i=}, {t_i=}")
-                #     plot_current_density(x1s, x2s, ws, hs, length_logo, d1, d2)
-                #     plt.waitforbuttonpress()
-                plot_data = amplitude[:, :, 100].T / 1e3
-                heatmap = plt.contourf(
-                    x1, x2, plot_data,
-                    np.linspace(0, 40, 9),
-                    cmap="Blues",
-                )
-
-                plot_current_density(x1s, x2s, ws, hs, length_logo, length, d1, d2)
-                if cname == "xyz":
-                    plt.xlabel(r"$x/\lambda$")
-                    plt.ylabel(r"$y/\lambda$")
-                else:
-                    plt.xlabel(r"$x_1/\lambda$")
-                    plt.ylabel(r"$x_2/\lambda$")
-
-                divider = make_axes_locatable(ax)
-                cax = divider.append_axes('right', size='5%', pad=0.1)
-                _ = fig.colorbar(heatmap, cax=cax, orientation='vertical')
-                cax.set_ylabel('Electric field (kV/m)')
-                plt.tight_layout()
-
-                left, bottom, width, height = [.06, .12, .15, .3]
-                ax2 = fig.add_axes([left, bottom, width, height])
-                plot_current_density(x1s, x2s, ws, hs, length_logo, length, d1, d2, ax=ax2, linewidth=1, edgecolor="k")
-                x_min, x_max, y_min = -.135, .065, -.03
-                ax2.set_xlim(x_min, x_max)
-                ax2.set_ylim(y_min, y_min + x_max - x_min)
-                ax2.tick_params(
-                    axis='both',
-                    which='both',
-                    bottom=False,
-                    left=False,
-                    labelbottom=False,
-                    labelleft=False
-                )
-                ax2.set_facecolor("white")
 
                 plt.savefig("tests/data/logo.pdf")
                 plt.show()

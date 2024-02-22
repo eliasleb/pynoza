@@ -52,6 +52,69 @@ def get_charge_moment(current_moment: ndarray) -> ndarray:
     return -charge_moment
 
 
+def int_j(x0, sig, m):
+    """
+    Computes a current space-pulse moment.
+
+    :param x0: center of the pulse
+    :param sig: width of the pulse
+    :param m: order of the moment
+    :return: current moment
+    """
+    return 1 / (m + 1) * ((x0 + sig / 2) ** (m + 1) - (x0 - sig / 2) ** (m + 1))
+
+
+def int_r(x0, sig, m):
+    """
+    Computes a charge space-pulse moment
+
+    :param x0: center of the pulse
+    :param sig: width of the pulse
+    :param m: order of the moment
+    :return: charge moment
+    """
+    if m < 2:
+        return 0
+    else:
+        return -m * ((sig / 2 + x0) ** (m - 1) - (-sig / 2 + x0) ** (m - 1))
+
+
+def c_j(a1, a2, _a3, x1, x2, w, h):
+    """
+    Compute a current moment
+
+    :param a1: multi-index, first dimension
+    :param a2: multi-index, second dimension
+    :param _a3: multi-index, third dimension
+    :param x1: first coordinate of the rectangle center
+    :param x2: second coordinate of the rectangle center
+    :param w: width of the rectangle (first coordinate)
+    :param h: height of the rectangle (second coordinate)
+    :return: the current moment
+    """
+    x1 += w / 2
+    x2 += h / 2
+    return int_j(x1, w, a1) * int_j(x2, h, a2)
+
+
+def c_r(a1, a2, _a3, x1, x2, w, h):
+    """
+    Compute a current moment
+
+    :param a1: multi-index, first dimension
+    :param a2: multi-index, second dimension
+    :param _a3: multi-index, third dimension
+    :param x1: first coordinate of the rectangle center
+    :param x2: second coordinate of the rectangle center
+    :param w: width of the rectangle (first coordinate)
+    :param h: height of the rectangle (second coordinate)
+    :return: the charge moment
+    """
+    x1 += w / 2
+    x2 += h / 2
+    return int_r(x1, w, a1) * int_j(x2, h, a2)
+
+
 if __name__ == "__main__":
     with PlotAndWait() as paw:
         paw.fig.add_subplot(1, 2, 1)
