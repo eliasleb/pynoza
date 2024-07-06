@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy import ndarray
+import itertools
 
 
 class PlotAndWait:
@@ -50,6 +51,30 @@ def get_charge_moment(current_moment: ndarray) -> ndarray:
                     charge_moment[i, a1, a2, a3] += a[j] * a[i] \
                         * current_moment[j, b[0], b[1], b[2]]
     return -charge_moment
+
+
+def get_magnetic_moment(current_moment: ndarray) -> ndarray:
+    """
+    Compute the magnetic moment corresponding to the curl of the current density from the current moments.
+
+    :param current_moment: an array with the current moments
+    :return: the corresponding magnetic moment
+    :rtype: ndarray
+
+    The moment at index `(i, a1, a2, a3)` is the moment of the `i`-th coordinate corresponding to the multi-index
+    `(a1, a2, a3)`
+    """
+    magnetic_moment = np.zeros(current_moment.shape)
+    for ind, _ in np.ndenumerate(magnetic_moment):
+        i, a1, a2, a3 = ind
+        a = [a1, a2, a3]
+        for j, k in itertools.product(range(3), repeat=2):
+            lc = levi_civita(i, j, k)
+            if a[j] > 0 and lc != 0:
+                a[j] -= 1
+                magnetic_moment[i, a1, a2, a3] += a[j] * lc * current_moment[k, a[0], a[1], a[2]]
+
+    return -magnetic_moment
 
 
 def int_j(x0, sig, m):
@@ -113,6 +138,16 @@ def c_r(a1, a2, _a3, x1, x2, w, h):
     x1 += w / 2
     x2 += h / 2
     return int_r(x1, w, a1) * int_j(x2, h, a2)
+
+
+def levi_civita(i: int, j: int, k: int):
+    match (i, j, k):
+        case (1, 2, 3) | (2, 3, 1) | (3, 1, 2):
+            return 1
+        case (3, 2, 1) | (1, 3, 2) | (2, 1, 3):
+            return -1
+        case _:
+            return 0
 
 
 if __name__ == "__main__":

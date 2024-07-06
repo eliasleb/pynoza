@@ -12,6 +12,7 @@ from numpy import sum as np_sum
 import sys
 import sympy
 import scipy.interpolate
+from scipy.special import factorial
 import numbers
 import cython
 
@@ -65,13 +66,16 @@ class Solution:
     delayed: bool
     compute_grid: bool
     e_field: ndarray
+    b_field: ndarray
     _r: ndarray
     y: ndarray
     dy: ndarray
     e_field_text: str
+    b_field_text: str
     _causal: bool
-    current_moment: callable
-    charge_moment: callable
+    current_moment: ndarray
+    magnetic_moment: ndarray
+    charge_moment: ndarray
 
     def __init__(
             self, max_order: int = 0, wave_speed: float = 1., causal=True
@@ -100,14 +104,17 @@ class Solution:
         self.ran_recurse = False
         self.ran_set_moments = False
         self.current_moment = None
+        self.magnetic_moment = None
         self.charge_moment = None
         self.verbose = False
         self.delayed = True
         self.compute_grid = True
 
         self.e_field: ndarray = np.array([])
+        self.b_field: ndarray = np.array([])
 
         self.e_field_text = ""
+        self.b_field_text = ""
         self._r = np.array([0, ])
         self.y = np.array([0, ])
         self.dy = np.array([0, ])
@@ -180,7 +187,7 @@ class Solution:
                   x2: ndarray,
                   x3: ndarray,
                   r: ndarray,
-                  hs):
+                  hs: list | dict):
         """
         Evaluate the auxiliary function.
 
@@ -189,8 +196,8 @@ class Solution:
         :param x2: evaluated second coordinate (aka y)
         :param x3: evaluated third coordinate (aka z)
         :param r: equal to X1**2+X2**2+X3**2. Passed to avoid computing it repeatedly.
-        :param hs: dictionary of the derivatives of the time-dependent excitation function. Must be in the form
-        {order:derivative of order} for order=-1..max_order+2
+        :param hs: derivatives of the time-dependent excitation function. Must be in the form
+        {order: derivative of order} for order=-1..max_order+2
         """
         self.y = zeros(x1.shape)
         for signature in self._aux_func[ind]:
@@ -257,6 +264,7 @@ class Solution:
         self.ran_set_moments = True
         self.current_moment = np.zeros((3, self.max_order + 1, self.max_order + 1, self.max_order + 1))
         self.charge_moment = self.current_moment.copy()
+        self.magnetic_moment = self.current_moment.copy()
 
         for ind, _ in np.ndenumerate(zeros(self._shape)):
             self.current_moment[:, ind[0], ind[1], ind[2]] = current_moment(*ind)
@@ -264,6 +272,80 @@ class Solution:
                 self.charge_moment[:, ind[0], ind[1], ind[2]] = charge_moment(*ind)
         if charge_moment is None:
             self.charge_moment = pynoza.helpers.get_charge_moment(self.current_moment)
+
+        self.magnetic_moment = pynoza.helpers.get_magnetic_moment(self.current_moment)
+
+    @cython.ccall
+    def _prepare_arguments(
+            self,
+            x1: ndarray,
+            x2: ndarray,
+            x3: ndarray,
+            t: ndarray,
+            h_sym,
+            t_sym,
+            verbose,
+            delayed,
+            compute_grid,
+            shift,
+            magnetic
+    ):
+        if not self.ran_recurse or not self.ran_set_moments:
+            raise RuntimeError("You must first run the `recurse' and `set_moments' methods.")
+
+        if isinstance(h_sym, dict):
+            if not set(h_sym.keys()).issuperset(set(range(-1, self.max_order + 3))):
+                raise ValueError("When h_sym is a dictionary, the keys must contain"
+                                 " the indices -1..max_order + 2")
+
+        self.verbose = verbose
+        self.delayed = delayed
+        self.compute_grid = compute_grid
+
+        if self.verbose:
+            np.seterr(divide="raise",
+                      over="raise",
+                      under="warn",
+                      invalid="raise")
+        else:
+            np.seterr(divide="raise",
+                      over="raise",
+                      under="ignore",
+                      invalid="raise")
+
+        if magnetic:
+            self.b_field_text = ""
+        else:
+            self.e_field_text = ""
+
+        if self.compute_grid:
+            x1 = x1.reshape((x1.size, 1, 1, 1))
+            x2 = x2.reshape((1, x2.size, 1, 1))
+            x3 = x3.reshape((1, 1, x3.size, 1))
+            t = t.reshape((1, 1, 1, t.size))
+            moment_shape = (3, 1, 1, 1, 1)
+            _array = zeros((3, x1.size, x2.size, x3.size, t.size))
+        else:
+            x1 = x1.reshape((x1.size, 1))
+            x2 = x2.reshape((x2.size, 1))
+            x3 = x3.reshape((x3.size, 1))
+            t = t.reshape((1, t.size))
+            moment_shape = (3, 1, 1)
+            _array = zeros((3, x1.size, t.size))
+
+        if magnetic:
+            self.b_field = _array
+        else:
+            self.e_field = _array
+
+        self._r = np.sqrt(x1 ** 2 + x2 ** 2 + x3 ** 2)
+        if isinstance(h_sym, ndarray):
+            hs_0, hs_derivative, hs_integral = self._handle_h_array(h_sym, t, shift=shift)
+        else:
+            hs_0, hs_derivative, hs_integral = self._handle_h_symbolic(h_sym, t_sym, t)
+        if magnetic:
+            return x1, x2, x3, t, moment_shape, hs_0
+        return x1, x2, x3, t, moment_shape, hs_derivative, hs_integral
 
     @cython.ccall
     def compute_e_field(
@@ -308,54 +390,14 @@ class Solution:
         of the nth order derivative of the time-dependent function. The keys of the dictionary must be the integers in
         the range -1..max_order+2.
         """
-        if not self.ran_recurse or not self.ran_set_moments:
-            raise RuntimeError("You must first run the `recurse' and `set_moments' methods.")
-
-        if isinstance(h_sym, dict):
-            if not set(h_sym.keys()).issuperset(set(range(-1, self.max_order + 3))):
-                raise ValueError("When h_sym is a dictionary, the keys must contain"
-                                 " the indices -1..max_order + 2")
-
-        self.verbose = verbose
-        self.delayed = delayed
-        self.compute_grid = compute_grid
-
-        compute_txt = compute_txt
-
-        if self.verbose:
-            np.seterr(divide="raise",
-                      over="raise",
-                      under="warn",
-                      invalid="raise")
-        else:
-            np.seterr(divide="raise",
-                      over="raise",
-                      under="ignore",
-                      invalid="raise")
-
-        self.e_field_text = ""
-
-        if self.compute_grid:
-            x1 = x1.reshape((x1.size, 1, 1, 1))
-            x2 = x2.reshape((1, x2.size, 1, 1))
-            x3 = x3.reshape((1, 1, x3.size, 1))
-            t = t.reshape((1, 1, 1, t.size))
-            moment_shape = (3, 1, 1, 1, 1)
-            self.e_field = zeros((3, x1.size, x2.size, x3.size, t.size))
-        else:
-            x1 = x1.reshape((x1.size, 1))
-            x2 = x2.reshape((x2.size, 1))
-            x3 = x3.reshape((x3.size, 1))
-            t = t.reshape((1, t.size))
-            moment_shape = (3, 1, 1)
-            self.e_field = zeros((3, x1.size, t.size))
-
-        self._r = np.sqrt(x1 ** 2 + x2 ** 2 + x3 ** 2)
-
-        if isinstance(h_sym, ndarray):
-            hs_derivative, hs_integral = self._handle_h_array(h_sym, t, shift=shift)
-        else:
-            hs_derivative, hs_integral = self._handle_h_symbolic(h_sym, t_sym, t)
+        x1, x2, x3, t, moment_shape, hs_derivative, hs_integral = self._prepare_arguments(
+            x1, x2, x3, t, h_sym, t_sym,
+            verbose=verbose,
+            delayed=delayed,
+            compute_grid=compute_grid,
+            shift=shift,
+            magnetic=False
+        )
 
         for ind, _ in np.ndenumerate(zeros(self._shape)):
             ind = np.array(ind)
@@ -389,6 +431,61 @@ class Solution:
 
         return self.e_field
 
+    @cython.ccall
+    def compute_b_field(
+        self,
+        x1: ndarray,
+        x2: ndarray,
+        x3: ndarray,
+        t: ndarray,
+        h_sym,
+        t_sym,
+        verbose=False,
+        delayed=True,
+        compute_grid=True,
+        compute_txt=False,
+        shift=0,
+    ):
+        """
+        Compute the magnetic field B from the moments. The method `recurse()` and `set_moments(...)` must be run
+        beforehand.
+
+        :return: the magnetic field as a 5-dimensional array. If :compute_grid: is True, the dimensions correspond to
+         (dimension, x1, x2, x3, t), otherwise, (dimension, x, t).
+
+        See the method :compute_e_field: for a full description of the arguments.
+        """
+        x1, x2, x3, t, moment_shape, hs_0 = self._prepare_arguments(
+            x1, x2, x3, t, h_sym, t_sym,
+            verbose=verbose,
+            delayed=delayed,
+            compute_grid=compute_grid,
+            shift=shift,
+            magnetic=True
+        )
+
+        for ind, _ in np.ndenumerate(zeros(self._shape)):
+            ind = np.array(ind)
+            if np_sum(ind) <= self.max_order:
+                a1, a2, a3 = ind
+                if self.verbose:
+                    sys.stdout.write("\rComputing index {}...".format(ind))
+                magnetic_moment = self.mu * self.magnetic_moment[:, a1, a2, a3].reshape(moment_shape)
+                if np.any(magnetic_moment) > self.thresh:
+                    self.b_field += self._single_term_multipole(ind,
+                                                                magnetic_moment,
+                                                                hs_0,
+                                                                x1, x2, x3, self._r)
+                    if compute_txt:
+                        self.b_field_text += self._single_term_multipole_txt(ind,
+                                                                             magnetic_moment,
+                                                                             "dh_dt")
+
+        if self.verbose:
+            print("Done.")
+
+        return self.b_field
+
     def _handle_h_symbolic(self, h_sym, t_sym, t):
         h_0_sym = h_sym.integrate(t_sym)
         hs_sym = {-1: h_0_sym, 0: h_sym}
@@ -414,6 +511,7 @@ class Solution:
     def _repack_hs(self, hs):
         hs_integral = list()
         hs_derivative = list()
+        hs_0 = [hs[order] for order in range(0, self.max_order + 3)]
         for order in range(-1, self.max_order + 3):
             if order > 0:
                 if order <= self.max_order:
@@ -425,7 +523,7 @@ class Solution:
             else:
                 hs_integral.append(hs[order])
 
-        return hs_derivative, hs_integral
+        return hs_0, hs_derivative, hs_integral
 
     def _handle_h_array(self, h, t, shift=0):
 
@@ -456,7 +554,7 @@ class Solution:
     def _single_term_multipole(self,
                                ind: ndarray,
                                moment: ndarray,
-                               hs: ndarray,
+                               hs: list | dict,
                                *args):
         return (-1) ** np_sum(ind) / fact(ind) \
                * moment * self._evaluate(tuple(ind), *args, hs) / 4 / np.pi
@@ -480,6 +578,15 @@ class Solution:
         """
         return self.e_field_text
 
+    def get_b_field_text(self) -> str:
+        """
+        Get a text description of the magnetic field. Returns an empty string if the method :compute_b_field: has not
+        yet been called.
+
+        :return: a human-readable description of the magnetic field
+        """
+        return self.b_field_text
+
 
 def fact(a) -> numbers.Number:
     """
@@ -490,7 +597,7 @@ def fact(a) -> numbers.Number:
     """
     res: numbers.Number = 1
     for i in a:
-        res *= np.math.factorial(i)
+        res *= factorial(i)
     return res
 
 
