@@ -71,8 +71,9 @@ def get_magnetic_moment(current_moment: ndarray) -> ndarray:
         for j, k in itertools.product(range(3), repeat=2):
             lc = levi_civita(i, j, k)
             if a[j] > 0 and lc != 0:
-                a[j] -= 1
-                magnetic_moment[i, a1, a2, a3] += a[j] * lc * current_moment[k, a[0], a[1], a[2]]
+                a_copy = [a1, a2, a3]
+                a_copy[j] -= 1
+                magnetic_moment[i, a1, a2, a3] += a[j] * lc * current_moment[k, a_copy[0], a_copy[1], a_copy[2]]
 
     return -magnetic_moment
 
@@ -140,7 +141,9 @@ def c_r(a1, a2, _a3, x1, x2, w, h):
     return int_r(x1, w, a1) * int_j(x2, h, a2)
 
 
-def levi_civita(i: int, j: int, k: int):
+def levi_civita(i: int, j: int, k: int, start_at_0=True):
+    if start_at_0:
+        i, j, k = i + 1, j + 1, k + 1
     match (i, j, k):
         case (1, 2, 3) | (2, 3, 1) | (3, 1, 2):
             return 1

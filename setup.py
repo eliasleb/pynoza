@@ -37,7 +37,7 @@ setuptools.setup(
     version="0.3",
     author="Elias Le Boudec",
     author_email="elias.leboudec@epfl.ch",
-    description="Computation of time-domain solutions of Maxwell's equations using the cartesian multipole expansion",
+    description="Computation of time-domain solutions of Maxwell's equations using the Cartesian multipole expansion",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/eliasleb/pynoza",

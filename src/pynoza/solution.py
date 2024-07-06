@@ -163,6 +163,9 @@ class Solution:
                 self._aux_func[index][tuple(identity_third_term)] = \
                     -coefficient / self.c * (1 if self._causal else -1)
 
+    def get_mu(self):
+        return self.mu
+
     def recurse(self, verbose: bool = False) -> None:
         """Compute the auxiliary function up to the max order.
         

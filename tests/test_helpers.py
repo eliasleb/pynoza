@@ -14,13 +14,14 @@
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 
-from pynoza.helpers import levi_civita
+from pynoza.helpers import levi_civita, get_magnetic_moment
 import itertools
+import numpy as np
 
 
 def test_levi_civita():
     for i, j, k in itertools.product(range(1, 3 + 1), repeat=3):
-        l = levi_civita(i, j, k)
+        l = levi_civita(i, j, k, start_at_0=False)
         match (i, j, k):
             case (1, 2, 3):
                 assert l == 1
@@ -36,3 +37,22 @@ def test_levi_civita():
                 assert l == -1
             case _:
                 assert l == 0
+
+
+def test_magnetic_moment():
+    max_order = 0
+    current_moment = np.zeros((3, ) + (max_order + 2, ) * 3)
+    current_moment[2, 0, 0, 0] = 1.
+    magnetic_moment = get_magnetic_moment(current_moment)
+    magnetic_moment_ref = np.zeros(current_moment.shape)
+    magnetic_moment_ref[0, 0, 1, 0] = -1.
+    magnetic_moment_ref[1, 1, 0, 0] = 1.
+    assert np.allclose(magnetic_moment, magnetic_moment_ref)
+
+
+def main():
+    test_magnetic_moment()
+
+
+if __name__ == "__main__":
+    main()
