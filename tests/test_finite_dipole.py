@@ -24,6 +24,7 @@ import inverse_problem
 import time
 import pickle
 
+
 def import_data(filename):
     with open(filename) as fd:
         for _ in range(8):
@@ -59,7 +60,6 @@ def main(filename, n_tail, tol, n_points, verbose_every, plot, scale, order, ):
                                          ez_sim[wanted_indices, ::n_t]
 
     print(f"{ex_sim.shape=}")
-
 
     def get_h_num(h, t_):
         return scipy.interpolate.interp1d(np.linspace(t_.min(), t_.max(), 1 + h.size + tail),
@@ -148,7 +148,6 @@ if __name__ == "__main__":
     parser.add_argument("--plot", required=True, type=bool)
     parser.add_argument("--scale", required=True, type=float)
     parser.add_argument("--order", required=True, type=int)
-
 
     kwargs = parser.parse_args()
     main(**vars(kwargs))

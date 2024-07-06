@@ -55,16 +55,16 @@ def test_simple_example():
     h = np.exp(-(t - 1)**2 * 100)
 
     e_field = sol.compute_e_field(x1, x2, x3, t, h, None)
+    b_field = sol.compute_b_field(x1, x2, x3, t, h, None)
 
-    return t, h, e_field
+    return t, h, e_field, b_field
 
 
 def show_results():
     import matplotlib
     import matplotlib.pyplot as plt
     matplotlib.use("TkAgg")
-
-    t, h, e_field = test_simple_example()
+    t, h, e_field, b_field = test_simple_example()
 
     plt.plot(t, h)
     plt.xlabel("Time")
@@ -72,20 +72,24 @@ def show_results():
     plt.tight_layout()
     plt.xlim(np.min(t), np.max(t))
 
-    plt.figure(figsize=(9, 6))
+    def plot(_t, field):
+        plt.figure(figsize=(9, 6))
 
-    overall_max = np.max(np.abs(e_field))
+        overall_max = np.max(np.abs(field))
 
-    for component in range(3):
-        plt.subplot(3, 1, component + 1)
-        plt.plot(t, e_field[component, :, 0, :, :].reshape(4, t.size).T)
-        plt.ylim(-overall_max, overall_max)
-        plt.xlim(np.min(t), np.max(t))
-        plt.xlabel("Time")
-        plt.ylabel("E-field")
-        plt.title(f"E-field, component #{component + 1} at each point")
+        for component in range(3):
+            plt.subplot(3, 1, component + 1)
+            plt.plot(_t, field[component, :, 0, :, :].reshape(4, _t.size).T)
+            plt.ylim(-overall_max, overall_max)
+            plt.xlim(np.min(t), np.max(t))
+            plt.xlabel("Time")
+            plt.title(f"Field component #{component + 1} at each point")
 
-    plt.tight_layout()
+        plt.tight_layout()
+
+    plot(t, e_field)
+    plot(t, b_field)
+
     plt.show()
 
 

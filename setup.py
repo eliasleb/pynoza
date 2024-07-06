@@ -34,7 +34,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="pynoza",
-    version="0.1",
+    version="0.3",
     author="Elias Le Boudec",
     author_email="elias.leboudec@epfl.ch",
     description="Computation of time-domain solutions of Maxwell's equations using the cartesian multipole expansion",
