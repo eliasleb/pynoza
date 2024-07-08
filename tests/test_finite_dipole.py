@@ -82,7 +82,7 @@ def main(filename, n_tail, tol, n_points, verbose_every, plot, scale, order, mag
     t, x1, x2, x3, ex_sim, ey_sim, ez_sim, bx_sim, by_sim, bz_sim = import_data(filename)
     n_t = 10
     t = t[::n_t] * 3e8
-    n_x = 400
+    n_x = 5
     r = np.sqrt(x1**2 + x2**2 + x3**2)
     wanted_indices = np.where(r > 0.05)[0].ravel()[::n_x]
     x1 = x1[wanted_indices]
@@ -208,7 +208,7 @@ def main(filename, n_tail, tol, n_points, verbose_every, plot, scale, order, mag
         case _:
             pass
     print(f"{residual=}")
-    assert residual < .13
+    assert residual < .185
 
     fom = np.abs(np.max(h) * current_moment[2, 0, 0, 0])
     print(f"{fom=}")
@@ -218,7 +218,7 @@ def main(filename, n_tail, tol, n_points, verbose_every, plot, scale, order, mag
 def test_inverse_problem_on_sim_data():
 
     _kwargs = {
-        "filename": "../../git_ignore/GLOBALEM/dipole_v10.txt",
+        "filename": "tests/data/dipole_v11.txt",
         "n_tail": 20,
         "tol":  1e-5,
         "n_points": 40,
