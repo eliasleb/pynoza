@@ -5,7 +5,7 @@
 
 Python implementation of time-domain solutions of Maxwell's equations using the cartesian multipole expansion. In homogeneous and isotropic media, these solutions can be computed thanks to an explicit knowledge of the Green’s function.
 
-Currently, only the electric field computation is supported, and the current density must be time-separable, i.e., $\mathbf{J}(t,\mathbf{x})=h(t)\mathbf{j}(\mathbf{x})$
+Currently, the current density must be time-separable, i.e., $\mathbf{J}(t,\mathbf{x})=h(t)\mathbf{j}(\mathbf{x})$
 
 The documentation is [available here](https://pynoza.readthedocs.io/en/latest/).
 
@@ -39,7 +39,7 @@ The Python `>= 3.10` script `tests/test_EPFL_logo.py` shows some examples. A Jup
    t = np.linspace(-T, T, 100)
    ```
 
-4. Define a function for the time-dependence, for example a sympy symbolic expression
+4. Define a function for the time-dependence, for example, a sympy symbolic expression
 
    ```python
    t_sym = sympy.Symbol("t", real=True)
@@ -52,18 +52,16 @@ The Python `>= 3.10` script `tests/test_EPFL_logo.py` shows some examples. A Jup
    t = np.linspace(0, T, dt)
    h = np.cos(2 * np.pi * f * t)
    ````
- 
-   In the latter case, it is up you to ensure that the sampling time `dt` is small enough to compute the highest order 
-   derivative. We use `np.gradient` to compute the derivative, see the relevant numpy documentation.
+
+   In the latter case, it is up to you to ensure that the sampling time `dt` is small enough to compute the highest-order 
+   derivative. We use `np.gradient` to compute the derivative; see the relevant numpy documentation.
 
 5. Create a `pynoza.Solution` object with the given medium light speed (in natural units) and given multipole expansion order.
 
 6. Run the `recurse` method to initialize the Green’s function approximation (this gets slower for high orders), 
    and the `set_moments` method to pass the current and charge moments that you computed above.
 
-7. Run the `compute_e_field` method to compute the electric field from the Green’s functions approximation and the 
-   charge and current moments. Under the hood, this method will integrate and differentiate the time-dependent function 
-   to the needed order.
+7. Run the `compute_e_field` method to compute the electric field (or `compute_b_field` for the magnetic field) from Green’s functions approximations and the current moments. Under the hood, this method will integrate and differentiate the time-dependent function to the needed order.
 
 ### Complete example
-See `tests/simple_example.py`
+See `tests/test_simple_example.py`.
