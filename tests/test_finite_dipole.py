@@ -190,7 +190,7 @@ def main(filename, n_tail, tol, n_points, verbose_every, plot, scale, order, mag
     if plot:
         answer = input("Save? [y/*] ")
     else:
-        answer = "y"
+        answer = ""
     match answer:
         case ("y" | "Y"):
             res = pd.DataFrame(data={"x1": x1.squeeze(), "x2": x2.squeeze(), "x3": x3.squeeze()}
