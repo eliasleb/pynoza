@@ -30,7 +30,7 @@ def import_data(filename):
         for _ in range(8):
             fd.readline()
         header = fd.readline()
-    t = np.array([float(ti) for ti in re.split("temw.E[xyz]\s*\(V/m\) @ t=", header.split("Z")[1])[1:]])[::3]
+    t = np.array([float(s.split(" temw")[0]) for s in re.split(r"@ t=", header.split("Z")[1])[1:]][::6])
     assert np.all(np.diff(t) > 1e-18)
 
     data = np.array(pd.read_csv(filename,
@@ -38,28 +38,93 @@ def import_data(filename):
                                 header=None,
                                 delim_whitespace=True))
     x1, x2, x3 = data[:, 0], data[:, 1], data[:, 2]
-    ex, ey, ez = data[:, 3::3], data[:, 4::3], data[:, 5::3]
+    ex, ey, ez = data[:, 3::6], data[:, 4::6], data[:, 5::6]
+    bx, by, bz = data[:, 6::6], data[:, 7::6], data[:, 8::6]
     shape = (x1.size, t.size)
     assert x1.size == x2.size and x2.size == x3.size
-    assert ex.shape == shape and ey.shape == shape and ez.shape
-    return t, x1, x2, x3, ex, ey, ez
+    assert ex.shape == shape and ey.shape == shape and ez.shape == shape
+    assert bx.shape == shape and by.shape == shape and bz.shape == shape
+    return t, x1, x2, x3, ex, ey, ez, bx, by, bz
 
 
-def main(filename, n_tail, tol, n_points, verbose_every, plot, scale, order, ):
+def add_symmetry(x1, x2, x3, ex, ey, ez, direction: 0 | 1 | 2, symmetry: str, pos_axis=0):
+    match direction:
+        case 0:
+            x1, x2, x3 = np.concatenate((x1, -x1)), np.concatenate((x2, x2)), np.concatenate((x3, x3))
+            match symmetry:
+                case "PEC":
+                    ex, ey, ez = np.concatenate((ex, ex), axis=pos_axis), np.concatenate((ey, -ey), axis=pos_axis), \
+                                 np.concatenate((ez, -ez), axis=pos_axis)
+                case "PMC":
+                    ex, ey, ez = np.concatenate((ex, -ex)), np.concatenate((ey, ey)), np.concatenate((ez, ez))
+        case 1:
+            x1, x2, x3 = np.concatenate((x1, x1)), np.concatenate((x2, -x2)), np.concatenate((x3, x3))
+            match symmetry:
+                case "PEC":
+                    ex, ey, ez = np.concatenate((ex, -ex)), np.concatenate((ey, ey)), np.concatenate((ez, -ez))
+                case "PMC":
+                    ex, ey, ez = np.concatenate((ex, ex)), np.concatenate((ey, -ey)), np.concatenate((ez, ez))
+        case 2:
+            x1, x2, x3 = np.concatenate((x1, x1)), np.concatenate((x2, x2)), np.concatenate((x3, -x3))
+            match symmetry:
+                case "PEC":
+                    ex, ey, ez = np.concatenate((ex, -ex)), np.concatenate((ey, -ey)), np.concatenate((ez, ez))
+                case "PMC":
+                    ex, ey, ez = np.concatenate((ex, ex)), np.concatenate((ey, ey)), np.concatenate((ez, -ez))
+
+    return x1, x2, x3, ex, ey, ez
+
+
+def main(filename, n_tail, tol, n_points, verbose_every, plot, scale, order, magnetic=False):
     find_center = False
     tail = n_tail
 
-    t, x1, x2, x3, ex_sim, ey_sim, ez_sim = import_data(filename)
+    t, x1, x2, x3, ex_sim, ey_sim, ez_sim, bx_sim, by_sim, bz_sim = import_data(filename)
     n_t = 10
     t = t[::n_t] * 3e8
-    n_x = 100
+    n_x = 400
     r = np.sqrt(x1**2 + x2**2 + x3**2)
     wanted_indices = np.where(r > 0.05)[0].ravel()[::n_x]
-    x1, x2, x3, ex_sim, ey_sim, ez_sim = x1[wanted_indices], x2[wanted_indices], x3[wanted_indices],\
-                                         ex_sim[wanted_indices, ::n_t], ey_sim[wanted_indices, ::n_t], \
-                                         ez_sim[wanted_indices, ::n_t]
+    x1 = x1[wanted_indices]
+    x2 = x2[wanted_indices]
+    x3 = x3[wanted_indices]
+    ex_sim = ex_sim[wanted_indices, ::n_t]
+    ey_sim = ey_sim[wanted_indices, ::n_t]
+    ez_sim = ez_sim[wanted_indices, ::n_t]
+    bx_sim = bx_sim[wanted_indices, ::n_t]
+    by_sim = by_sim[wanted_indices, ::n_t]
+    bz_sim = bz_sim[wanted_indices, ::n_t]
 
     print(f"{ex_sim.shape=}")
+    # # ax = plt.figure().add_subplot(projection='3d')
+    # # ind_plot = 20
+    # # p_scale = 5e3
+    # # ax.quiver(x1, x2, x3, ex_sim[:, ind_plot]/p_scale, ey_sim[:, ind_plot]/p_scale, ez_sim[:, ind_plot]/p_scale, )
+    # x1, x2, x3, ex_sim, ey_sim, ez_sim = add_symmetry(
+    #     x1, x2, x3, ex_sim, ey_sim, ez_sim, 0, "PMC", pos_axis=0
+    # )
+    # _, _, _, bx_sim, by_sim, bz_sim = add_symmetry(
+    #     x1, x2, x3, bx_sim, by_sim, bz_sim, 0, "PEC", pos_axis=0
+    # )
+    # # ax = plt.figure().add_subplot(projection='3d')
+    # # ax.quiver(x1, x2, x3, ex_sim[:, ind_plot]/p_scale, ey_sim[:, ind_plot]/p_scale, ez_sim[:, ind_plot]/p_scale, )
+    # x1, x2, x3, ex_sim, ey_sim, ez_sim = add_symmetry(
+    #     x1, x2, x3, ex_sim, ey_sim, ez_sim, 1, "PMC", pos_axis=0
+    # )
+    # _, _, _, bx_sim, by_sim, bz_sim = add_symmetry(
+    #     x1, x2, x3, bx_sim, by_sim, bz_sim, 1, "PEC", pos_axis=0
+    # )
+    # # ax = plt.figure().add_subplot(projection='3d')
+    # # ax.quiver(x1, x2, x3, ex_sim[:, ind_plot]/p_scale, ey_sim[:, ind_plot]/p_scale, ez_sim[:, ind_plot]/p_scale, )
+    # x1, x2, x3, ex_sim, ey_sim, ez_sim = add_symmetry(
+    #     x1, x2, x3, ex_sim, ey_sim, ez_sim, 2, "PEC", pos_axis=0
+    # )
+    # _, _, _, bx_sim, by_sim, bz_sim = add_symmetry(
+    #     x1, x2, x3, bx_sim, by_sim, bz_sim, 2, "PMC", pos_axis=0
+    # )
+    # # ax = plt.figure().add_subplot(projection='3d')
+    # # ax.quiver(x1, x2, x3, ex_sim[:, ind_plot]/p_scale, ey_sim[:, ind_plot]/p_scale, ez_sim[:, ind_plot]/p_scale, )
+    # # plt.show()
 
     def get_h_num(h, t_):
         return scipy.interpolate.interp1d(np.linspace(t_.min(), t_.max(), 1 + h.size + tail),
@@ -68,19 +133,26 @@ def main(filename, n_tail, tol, n_points, verbose_every, plot, scale, order, ):
 
     estimate = None
 
-    kwargs = {"tol": tol,
-              "n_points": n_points,
-              "error_tol": tol,
-              "coeff_derivative": 0,
-              "verbose_every":verbose_every,
-              "plot": plot,
-              "scale": scale,
-              "h_num": get_h_num,
-              "find_center": find_center,
-              "max_global_tries": 1,
-              "compute_grid": False,
-              "estimate": estimate,
-              "p": 2}
+    kwargs = {
+        "tol": tol,
+        "n_points": n_points,
+        "error_tol": tol,
+        "coeff_derivative": 0,
+        "verbose_every":verbose_every,
+        "plot": plot,
+        "scale": scale,
+        "h_num": get_h_num,
+        "find_center": find_center,
+        "max_global_tries": 1,
+        "compute_grid": False,
+        "estimate": estimate,
+        "p": 2,
+        "seed": 1,
+        "fit_on_magnetic_field": magnetic,
+        "b_true": (bx_sim, by_sim, bz_sim),
+        "shift": 0,
+        "return_residual_error": True
+    }
 
     shape_mom = (3, order + 3, order + 3, order + 3)
 
@@ -98,7 +170,7 @@ def main(filename, n_tail, tol, n_points, verbose_every, plot, scale, order, ):
         return current_moment_
     e_true = (ex_sim, ey_sim, ez_sim)
     args = (order + 2, e_true, x1, x2, x3, t, None, get_current_moment, dim_mom)
-    current_moment, h, center, e_opt = inverse_problem.inverse_problem(*args, **kwargs)
+    current_moment, h, center, e_opt, residual = inverse_problem.inverse_problem(*args, **kwargs)
 
     if plot:
         plt.ion()
@@ -128,13 +200,36 @@ def main(filename, n_tail, tol, n_points, verbose_every, plot, scale, order, ):
                                      | {f"ex_true@t={t[i]}": ex_sim[:, i] for i in range(ex_sim.shape[1])}
                                      | {f"ey_true@t={t[i]}": ey_sim[:, i] for i in range(ey_sim.shape[1])}
                                      | {f"ez_true@t={t[i]}": ez_sim[:, i] for i in range(ez_sim.shape[1])})
-            filename = f"../../../git_ignore/GLOBALEM/opt-result-{time.asctime()}.csv"
+            filename = f"../../git_ignore/GLOBALEM/opt-result-{time.asctime()}.csv"
             res.to_csv(path_or_buf=filename)
             with open(filename + "_params.pickle", 'wb') as handle:
                 pickle.dump((current_moment, h, center, e_true, e_opt), handle, protocol=pickle.HIGHEST_PROTOCOL)
             print(f"Saved as '{filename}'.")
         case _:
             pass
+    print(f"{residual=}")
+    assert residual < .13
+
+    fom = np.abs(np.max(h) * current_moment[2, 0, 0, 0])
+    print(f"{fom=}")
+    return fom
+
+
+def test_inverse_problem_on_sim_data():
+
+    _kwargs = {
+        "filename": "../../git_ignore/GLOBALEM/dipole_v10.txt",
+        "n_tail": 20,
+        "tol":  1e-5,
+        "n_points": 40,
+        "verbose_every": 100,
+        "plot": False,
+        "scale": 1e10,
+        "order":  0,
+    }
+    fom_electric = main(magnetic=False, **_kwargs)
+    fom_magnetic = main(magnetic=True, **_kwargs)
+    assert abs(fom_electric - fom_magnetic) < .2
 
 
 if __name__ == "__main__":

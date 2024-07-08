@@ -166,6 +166,9 @@ class Solution:
     def get_mu(self):
         return self.mu
 
+    def get_magnetic_moment(self):
+        return self.magnetic_moment
+
     def recurse(self, verbose: bool = False) -> None:
         """Compute the auxiliary function up to the max order.
         

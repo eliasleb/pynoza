@@ -43,7 +43,7 @@ def plot_moment(moment):
     x1 = np.arange(order)
     x2 = np.arange(order)
     x3 = np.arange(order)
-    x1, x2, x3 = np.meshgrid(x1, x2, x3, indexing='ij')
+    _x1, _x2, _x3 = np.meshgrid(x1, x2, x3, indexing='ij')
     colormap = cm.get_cmap('RdBu')
 
     m_max = np.abs(moment).max()
@@ -67,59 +67,50 @@ def plot_moment(moment):
         plt.title(text + " component")
 
 
-def get_fields(sol_python, sol_rust, find_center, t, x1, x2, x3, current_moment, h_sym, t_sym, center, method="python",
-               shift=0):
-    if method == "python":
-        pass
+def get_fields(sol, _sol_rust, find_center, t, x1, x2, x3, current_moment, h_sym, t_sym, center,
+               shift=0, magnetic=False):
     c_mom = lambda a1, a2, a3: list(current_moment[:, a1, a2, a3])
-    sol_python.set_moments(c_mom)
+    sol.set_moments(c_mom)
+    kwargs = dict(compute_grid=False, shift=shift)
+
     if find_center:
-        # if method == "python":
-        e_python = sol_python.compute_e_field(x1 - center[0],
-                                              x2 - center[1],
-                                              x3 - center[2],
-                                              t, h_sym, t_sym, compute_grid=False, shift=shift)
-        return e_python
-        # else:
-        #     e_rust = sol_rust.par_compute_e_field((x1 - center[0]).reshape(-1),
-        #                                           (x2 - center[1]).reshape(-1),
-        #                                           (x3 - center[2]).reshape(-1),
-        #                                           t.reshape(-1), h_sym.reshape(-1),
-        #                                           current_moment).swapaxes(1, 2)
-#
-        #     return e_rust
+        args = (x1 - center[0], x2 - center[1], x3 - center[2], t, h_sym, t_sym)
     else:
-        # if method == "python":
-        return sol_python.compute_e_field(x1, x2, x3, t, h_sym, t_sym, compute_grid=False)
-        # else:
-        #    return sol_rust.par_compute_e_field(x1.reshape(-1),
-        #                                        x2.reshape(-1),
-        #                                        x3.reshape(-1),
-        #                                        t.reshape(-1), h_sym.reshape(-1),
-        #                                        current_moment).swapaxes(1, 2)
+        args = (x1, x2, x3, t, h_sym, t_sym)
+    if not magnetic:
+        return sol.compute_e_field(*args, **kwargs)
+    return sol.compute_b_field(*args, **kwargs)
 
 
 def field_energy(x: np.ndarray) -> np.ndarray:
     return np.sum(x**2)
 
 
-def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callable, dim_moment, **kwargs):
+def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callable, dim_moment,
+                    return_residual_error=False, **kwargs):
 
     print(f"{kwargs=}")
 
     tol = kwargs.pop("tol", 1e-1)
     n_points = kwargs.pop("n_points", 3)
-    error_tol = kwargs.pop("error_tol", 1e-1)
-    coeff_derivative = kwargs.pop("coeff_derivative", 0)
+    _error_tol = kwargs.pop("error_tol", 1e-1)
+    _coeff_derivative = kwargs.pop("coeff_derivative", 0)
     verbose_every = kwargs.pop("verbose_every", 1)
     plot = kwargs.pop("plot", False)
     scale = kwargs.pop("scale", 1)
-    get_h_num = kwargs.pop("h_num", lambda h, t: h)
+    get_h_num = kwargs.pop("h_num", lambda _h, _t: _h)
     find_center = kwargs.pop("find_center", True)
-    max_global_tries = kwargs.pop("max_global_tries", 10)
+    _max_global_tries = kwargs.pop("max_global_tries", 10)
     _compute_grid = kwargs.pop("compute_grid", True)
-    estimate = kwargs.pop("estimate", None)
-    p = kwargs.pop("p", 2)
+    _estimate = kwargs.pop("estimate", None)
+    _p = kwargs.pop("p", 2)
+    fit_on_magnetic_field = kwargs.pop("fit_on_magnetic_field", False)
+    b_true = kwargs.pop("b_true", None)
+    if fit_on_magnetic_field and b_true is None:
+        raise ValueError("Must provide :b_true: when :fit_on_magnetic_field: is true")
+    if fit_on_magnetic_field:
+        scale /= 3e8
+
     find_center_ignore_axes = kwargs.pop(
         "find_center_ignore_axes",
         ()
@@ -127,13 +118,13 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
     shift = kwargs.pop("shift", 0)
     seed = kwargs.pop("seed", 0)
 
-    e_true = np.array(e_true)
-    true_energy = field_energy(e_true)
+    field_true = np.array(e_true if not fit_on_magnetic_field else b_true)
+    true_energy = field_energy(field_true)
 
     if kwargs:
         raise ValueError(f"Unknown keyword arguments: {kwargs}")
 
-    dt = np.max(np.diff(t))
+    _dt = np.max(np.diff(t))
 
     sol_python = pynoza.Solution(max_order=order,
                                  wave_speed=1, )
@@ -161,12 +152,12 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
     x0 = ravel_params(current_moment, h, center)
 
     n_calls = 0
-    e_opt = None
+    field_opt = None
 
-    old_error = 100
+    _old_error = 100
 
     def get_error(x):
-        nonlocal n_calls, e_opt, old_error
+        nonlocal n_calls, field_opt, _old_error
 
         n_calls += 1
 
@@ -181,25 +172,25 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
 
         h_ = get_h_num(h_, t)
         current_moment_ = current_moment_callable(current_moment_)
-        e_opt = get_fields(sol_python, None, find_center, t, x1, x2, x3, current_moment_, h_, None, complete_center,
-                           method=None, shift=shift)
+        field_opt = get_fields(sol_python, None, find_center, t, x1, x2, x3, current_moment_, h_, None,
+                               complete_center, shift=shift, magnetic=fit_on_magnetic_field)
 
-        error = field_energy(e_true - e_opt * scale) / true_energy
+        error = field_energy(field_true - field_opt * scale) / true_energy
 
         if n_calls % verbose_every == 0:
             if plot:
                 plt.clf()
-                max_true = np.max(np.abs(e_true))
+                max_true = np.max(np.abs(field_true))
                 with pynoza.PlotAndWait(wait_for_enter_keypress=False):
                     for i in range(3):
                         plt.subplot(2, 3, i + 1)
-                        plt.plot(t, e_true[i].reshape(-1, t.size).T, f"b--")
-                        plt.plot(t, e_true[i].reshape(-1, t.size).T, f"b--")
-                        plt.plot(t, e_true[i].reshape(-1, t.size).T, f"b--")
+                        plt.plot(t, field_true[i].reshape(-1, t.size).T, f"b--")
+                        plt.plot(t, field_true[i].reshape(-1, t.size).T, f"b--")
+                        plt.plot(t, field_true[i].reshape(-1, t.size).T, f"b--")
 
-                        plt.plot(t, e_opt[i].reshape(-1, t.size).T*scale, f"k-")
-                        plt.plot(t, e_opt[i].reshape(-1, t.size).T*scale, f"k-")
-                        plt.plot(t, e_opt[i].reshape(-1, t.size).T*scale, f"k-")
+                        plt.plot(t, field_opt[i].reshape(-1, t.size).T*scale, f"k-")
+                        plt.plot(t, field_opt[i].reshape(-1, t.size).T*scale, f"k-")
+                        plt.plot(t, field_opt[i].reshape(-1, t.size).T*scale, f"k-")
                         plt.ylim((-1.1 * max_true, 1.1 * max_true))
                     max_h = np.max(np.abs(h_))
                     plt.subplot(2, 3, 5)
@@ -214,7 +205,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
             print(f"{'#'*np.clip(int(error*50), 0, 50)}{error:.03f}, {n_calls=:}",
                   end='\r')
 
-        old_error = error
+        _old_error = error
 
         return error
 
@@ -243,4 +234,6 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
     # )
     current_moment, h, center = unravel_params(res.x)
 
-    return current_moment_callable(current_moment), get_h_num(h, t), center, e_opt.squeeze() * scale
+    if return_residual_error:
+        return current_moment_callable(current_moment), get_h_num(h, t), center, field_opt.squeeze() * scale, res.fun
+    return current_moment_callable(current_moment), get_h_num(h, t), center, field_opt.squeeze() * scale
