@@ -9,6 +9,9 @@ Currently, the current density must be time-separable, i.e., $\mathbf{J}(t,\math
 
 The documentation is [available here](https://pynoza.readthedocs.io/en/latest/).
 
+The theory behind the code can be found in E. Le Boudec et al., “The time-domain Cartesian multipole expansion of electromagnetic fields,” Sci Rep, vol. 14, no. 1, p. 8084, Apr. 2024, doi: [10.1038/s41598-024-58570-1](https://doi.org/10.1038/s41598-024-58570-1).
+
+
 ## Installation
 To install directly from git, use
 ``pip install "git+https://github.com/eliasleb/pynoza"``.
