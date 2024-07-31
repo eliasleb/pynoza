@@ -49,6 +49,11 @@ def read_all_data(window_us=1000):
 def lightning_inverse_problem(**kwargs):
     max_order = kwargs.pop("max_order", 0)
     plot = kwargs.pop("plot", False)
+    verbose_every = kwargs.pop("verbose_every", 100)
+    scale = kwargs.pop("scale", 1e0)
+    tol = kwargs.pop("tol", 1e-4)
+    n_points = kwargs.pop("n_points", 50)
+    find_center = kwargs.pop("find_center", False)
 
     x, y, z, t, e_field, h_field = read_all_data()
     e_field /= 1e2
@@ -91,11 +96,11 @@ def lightning_inverse_problem(**kwargs):
         dim_moment=dim_moment,
         h_num=get_h_num,
         plot=plot,
-        verbose_every=100,
-        scale=1e12,   # shift, scale: 0, 14 -- -1 22
-        tol=1e-5,
-        n_points=40,
-        find_center=False,
+        verbose_every=verbose_every,
+        scale=scale,   # shift, scale: 0, 14 -- -1 22
+        tol=tol,
+        n_points=n_points,
+        find_center=find_center,
         shift=0,
         rescale_at_points=True
     )
@@ -113,6 +118,9 @@ def lightning_inverse_problem(**kwargs):
         plt.xlabel("Time (relative)")
         plt.ylabel("Amplitude (normalized)")
         plt.title("Current vs time")
+
+        print(np.max(np.abs(current_moment)))
+
         plt.pause(0.1)
         plt.show(block=True)
 

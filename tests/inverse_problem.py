@@ -182,7 +182,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
         assert field_opt.shape == field_true.shape
         if rescale_at_points:
             opt_max = np.max(np.abs(field_opt), axis=2)[:, :, None]
-            opt_max[np.isclose(opt_max, 0)] = 1.
+            opt_max[opt_max == 0.] = 1.
             field_opt /= opt_max
 
         error = field_energy(field_true - field_opt * scale) / true_energy
