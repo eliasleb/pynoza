@@ -14,8 +14,6 @@
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 
-from abc import ABC
-
 import setuptools
 from Cython.Build import cythonize
 import os
@@ -54,7 +52,7 @@ setuptools.setup(
     ],
     package_dir={"": "src"},
     packages=setuptools.find_packages(where="src"),
-    python_requires=">=3.10",
+    python_requires=">=3.10, <4",
     ext_modules=cythonize("src/pynoza/solution.py",
                           compiler_directives={'language_level': "3"}),
     cmdclass={

@@ -5,9 +5,6 @@ import scipy.interpolate
 import matplotlib.pyplot as plt
 import os
 from matplotlib import cm
-# import speenoza
-
-# METHOD = "python"
 
 
 def complement(*args):
@@ -91,6 +88,9 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
 
     print(f"{kwargs=}")
 
+    if x1.size != x2.size or x2.size != x3.size or x1.size != x3.size:
+        raise ValueError("Must provide a list of points, not a grid (i.e., :xi:, i=1,2,3 must have the same length)")
+
     tol = kwargs.pop("tol", 1e-1)
     n_points = kwargs.pop("n_points", 3)
     _error_tol = kwargs.pop("error_tol", 1e-1)
@@ -110,6 +110,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
         raise ValueError("Must provide :b_true: when :fit_on_magnetic_field: is true")
     if fit_on_magnetic_field:
         scale /= 3e8
+    rescale_at_points = kwargs.pop("rescale_at_points", False)
 
     find_center_ignore_axes = kwargs.pop(
         "find_center_ignore_axes",
@@ -119,6 +120,10 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
     seed = kwargs.pop("seed", 0)
 
     field_true = np.array(e_true if not fit_on_magnetic_field else b_true)
+    if rescale_at_points:
+        true_max = np.max(np.abs(field_true), axis=2)[:, :, None]
+        true_max[np.isclose(true_max, 0)] = 1.
+        field_true /= true_max
     true_energy = field_energy(field_true)
 
     if kwargs:
@@ -174,6 +179,11 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
         current_moment_ = current_moment_callable(current_moment_)
         field_opt = get_fields(sol_python, None, find_center, t, x1, x2, x3, current_moment_, h_, None,
                                complete_center, shift=shift, magnetic=fit_on_magnetic_field)
+        assert field_opt.shape == field_true.shape
+        if rescale_at_points:
+            opt_max = np.max(np.abs(field_opt), axis=2)[:, :, None]
+            opt_max[np.isclose(opt_max, 0)] = 1.
+            field_opt /= opt_max
 
         error = field_energy(field_true - field_opt * scale) / true_energy
 
