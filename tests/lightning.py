@@ -99,6 +99,10 @@ def lightning_inverse_problem(**kwargs):
     center_scale = kwargs.pop("center_scale", 2e3/3e8)
     plot_recall = kwargs.pop("plot_recall", plot)
 
+    if plot:
+        import matplotlib
+        matplotlib.use("TkAgg")
+
     x, y, z, t, e_field, h_field = read_all_data()
 
     n = 200
@@ -195,7 +199,7 @@ def from_command_line():
 
 
 def sweep_results():
-    for order in range(6, 16, 2):
+    for order in range(0, 16, 2):
         for seed in (0, ):
             kwargs = dict(
                 max_order=order,
@@ -213,8 +217,5 @@ def sweep_results():
 
 
 if __name__ == "__main__":
-    import matplotlib
-    matplotlib.use("TkAgg")
-
     from_command_line()
     # sweep_results()
