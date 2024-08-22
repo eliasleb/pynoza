@@ -2,6 +2,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy import ndarray
 import itertools
+import os
+import pickle
+import hashlib
 
 
 class PlotAndWait:
@@ -153,9 +156,63 @@ def levi_civita(i: int, j: int, k: int, start_at_0=True):
             return 0
 
 
+def cache_function_call(func, *args, cache_dir="function_cache", **kwargs):
+    """
+    Caches the result of a function call and retrieves it from the cache if the same call is made again.
+
+    Args:
+    :func (function): The function to call.
+    :*args: Positional arguments of the function.
+    :cache_dir: Directory used to cache function calls
+    :**kwargs: Keyword arguments of the function.
+
+    Returns:
+    The result of the function call.
+    """
+
+    if not os.path.exists(cache_dir):
+        os.makedirs(cache_dir)
+
+    # Create a hash key from the function name and arguments
+    args_hash = pickle.dumps((func.__name__, args, kwargs))
+    hash_key = hashlib.sha256(args_hash).hexdigest()
+    print(f"Function call with hash {hash_key}")
+    cache_path = os.path.join(cache_dir, hash_key + '.pkl')
+
+    # Check if the result is cached
+    if os.path.exists(cache_path):
+        with open(cache_path, 'rb') as f:
+            result = pickle.load(f)
+        print("Retrieved from cache.")
+        return result
+
+    # Compute the result and cache it
+    result = func(*args, **kwargs)
+    with open(cache_path, 'wb') as f:
+        pickle.dump(result, f)
+
+    return result
+
+
 if __name__ == "__main__":
-    with PlotAndWait() as paw:
+    import matplotlib
+    matplotlib.use("TkAgg")
+    with PlotAndWait(new_figure=True) as paw:
         paw.fig.add_subplot(1, 2, 1)
         plt.plot(1, 1, "x")
         paw.fig.add_subplot(1, 2, 2)
         plt.plot(1, 1, "o")
+
+    import time
+
+    def f(_x):
+        time.sleep(2)
+        return _x**2
+
+    x = 2
+
+    def call():
+        return cache_function_call(f, x)
+
+    print(call())
+    print(call())
