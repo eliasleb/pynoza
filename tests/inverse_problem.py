@@ -79,8 +79,12 @@ def get_fields(sol, _sol_rust, find_center, t, x1, x2, x3, current_moment, h_sym
     return sol.compute_b_field(*args, **kwargs)
 
 
-def field_energy(x: np.ndarray) -> np.ndarray:
-    return np.sum(x**2)
+def field_energy(x: np.ndarray, log=False) -> np.ndarray:
+    if not log:
+        return np.sum(x**2)
+    e = x**2
+    e[np.isclose(e, 0)] = np.nan
+    return np.nansum(np.log10(e))
 
 
 def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callable, dim_moment,
@@ -97,7 +101,8 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
     _coeff_derivative = kwargs.pop("coeff_derivative", 0)
     verbose_every = kwargs.pop("verbose_every", 1)
     plot = kwargs.pop("plot", False)
-    scale = kwargs.pop("scale", 1)
+    scale = kwargs.pop("scale", 1.)
+    center_scale = kwargs.pop("center_scale", 1.)
     get_h_num = kwargs.pop("h_num", lambda _h, _t: _h)
     find_center = kwargs.pop("find_center", True)
     _max_global_tries = kwargs.pop("max_global_tries", 10)
@@ -120,11 +125,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
     seed = kwargs.pop("seed", 0)
 
     field_true = np.array(e_true if not fit_on_magnetic_field else b_true)
-    if rescale_at_points:
-        true_max = np.max(np.abs(field_true), axis=2)[:, :, None]
-        true_max[np.isclose(true_max, 0)] = 1.
-        field_true /= true_max
-    true_energy = field_energy(field_true)
+    true_energy = field_energy(field_true, log=rescale_at_points)
 
     if kwargs:
         raise ValueError(f"Unknown keyword arguments: {kwargs}")
@@ -172,7 +173,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
             ind_center_ = 0
             for i_coord, coordinate in enumerate(("x", "y", "z", )):
                 if coordinate not in find_center_ignore_axes:
-                    complete_center[i_coord] = center_[ind_center_]
+                    complete_center[i_coord] = center_[ind_center_] * center_scale
                     ind_center_ += 1
 
         h_ = get_h_num(h_, t)
@@ -180,12 +181,8 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
         field_opt = get_fields(sol_python, None, find_center, t, x1, x2, x3, current_moment_, h_, None,
                                complete_center, shift=shift, magnetic=fit_on_magnetic_field)
         assert field_opt.shape == field_true.shape
-        if rescale_at_points:
-            opt_max = np.max(np.abs(field_opt), axis=2)[:, :, None]
-            opt_max[opt_max == 0.] = 1.
-            field_opt /= opt_max
 
-        error = field_energy(field_true - field_opt * scale) / true_energy
+        error = field_energy(field_true - field_opt * scale, log=rescale_at_points) / true_energy
 
         if n_calls % verbose_every == 0:
             if plot:
@@ -208,8 +205,9 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
                         plt.plot(t, h_, "k-.")
                     if find_center:
                         plt.subplot(2, 3, 2)
-                        plt.title(f"""center = ({complete_center[0]:+.03f}, {complete_center[1]:+.03f}, """
-                                  f"""{complete_center[2]:+.03f})""")
+                        plt.title(f"""center = ({complete_center[0]/center_scale:+.03f}, """
+                                  f"""{complete_center[1]/center_scale:+.03f}, """
+                                  f"""{complete_center[2]/center_scale:+.03f})""")
 
             os.system("clear")
             print(f"{'#'*np.clip(int(error*50), 0, 50)}{error:.03f}, {n_calls=:}",
