@@ -6,3 +6,4 @@ scipy>=1.7.3
 pytest>=7.1.2
 sympy>=1.10.1
 maturin>=0.13.2
+setuptools>=50
