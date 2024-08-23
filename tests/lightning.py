@@ -25,8 +25,8 @@ def read_all_data(window_us=1000):
     # r <> x, y <> not used, z <> z
     r_km = np.array((1., 5., 10.))
     z_km = np.array((0., 2., 4.))
-    # r_km = np.array((1., ))
-    # z_km = np.array((2., ))
+    r_km = np.array((10., ))
+    z_km = np.array((2., ))
 
     t, e_field, h_field, n_t = None, None, None, None
     ind_x = 0
@@ -99,7 +99,7 @@ def lightning_inverse_problem(**kwargs):
     center_scale = kwargs.pop("center_scale", 2e3/3e8)
     plot_recall = kwargs.pop("plot_recall", plot)
 
-    if plot:
+    if plot or plot_recall:
         import matplotlib
         matplotlib.use("TkAgg")
 
@@ -109,7 +109,7 @@ def lightning_inverse_problem(**kwargs):
     dt = t[1] - t[0]
     t = np.concatenate((np.linspace(-n * dt, -dt, n) + t[0], t))
     e_field = np.concatenate((np.zeros((3, e_field.shape[1], n)), e_field), axis=-1)
-    n_d = 10
+    n_d = 1
     n_t = t.size
     t = t[:n_t//2:n_d]
     e_field = e_field[:, :, :n_t//2:n_d]
@@ -199,12 +199,12 @@ def from_command_line():
 
 
 def sweep_results():
-    for order in range(0, 16, 2):
-        for seed in (0, ):
+    for order in range(0, 22, 2):
+        for seed in range(10):
             kwargs = dict(
                 max_order=order,
                 verbose_every=100,
-                plot=False,
+                plot=True,
                 plot_recall=True,
                 n_tail=10,
                 n_points=100,
