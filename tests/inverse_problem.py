@@ -208,10 +208,13 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
                         plt.title(f"""center = ({complete_center[0]/center_scale:+.03f}, """
                                   f"""{complete_center[1]/center_scale:+.03f}, """
                                   f"""{complete_center[2]/center_scale:+.03f})""")
-
-            os.system("clear")
-            print(f"{'#'*np.clip(int(error*50), 0, 50)}{error:.03f}, {n_calls=:}",
-                  end='\r')
+            if plot:
+                os.system("clear")
+                end = "\r"
+            else:
+                end = "\n"
+            print(f"{'#'*np.clip(int(error*50), 0, 50)}{error**.5:.03f}, {n_calls=:}",
+                  end=end)
 
         _old_error = error
 

@@ -25,8 +25,8 @@ def read_all_data(window_us=1000):
     # r <> x, y <> not used, z <> z
     r_km = np.array((1., 5., 10.))
     z_km = np.array((0., 2., 4.))
-    r_km = np.array((10., ))
-    z_km = np.array((2., ))
+    # r_km = np.array((10., ))
+    # z_km = np.array((2., ))
 
     t, e_field, h_field, n_t = None, None, None, None
     ind_x = 0
@@ -199,18 +199,18 @@ def from_command_line():
 
 
 def sweep_results():
-    for order in range(0, 22, 2):
+    for order in range(14, 22, 2):
         for seed in range(10):
             kwargs = dict(
                 max_order=order,
                 verbose_every=100,
-                plot=True,
+                plot=False,
                 plot_recall=True,
                 n_tail=10,
                 n_points=100,
                 order_scale=1e6,
                 center_scale=2e3/3e8,
-                find_center=True,
+                find_center=False,
                 seed=seed
             )
             lightning_inverse_problem(**kwargs)
