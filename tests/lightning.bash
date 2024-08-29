@@ -3,7 +3,7 @@ scale=1e6
 for n_points in 100
 do
   n_tail=10
-  for order in $(seq 0 16 2)
+  for order in $(seq 0 2 16)
   do
     for seed in $(seq 0 9)
     do
