@@ -123,10 +123,13 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
     )
     shift = kwargs.pop("shift", 0)
     seed = kwargs.pop("seed", 0)
+    test_indices = set(kwargs.pop("test_indices", {}))
+    train_indices = set(range(x1.size)) - test_indices
+    train_indices, test_indices = list(sorted(train_indices)), list(sorted(test_indices))
 
     field_true = np.array(e_true if not fit_on_magnetic_field else b_true)
-    true_energy = field_energy(field_true, log=rescale_at_points)
-
+    true_energy_train = field_energy(field_true[:, train_indices, ...], log=rescale_at_points)
+    true_energy_test = field_energy(field_true[:, test_indices, ...], log=rescale_at_points)
     if kwargs:
         raise ValueError(f"Unknown keyword arguments: {kwargs}")
 
@@ -182,8 +185,13 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
                                complete_center, shift=shift, magnetic=fit_on_magnetic_field)
         assert field_opt.shape == field_true.shape
 
-        error = field_energy(field_true - field_opt * scale, log=rescale_at_points) / true_energy
-
+        train_error = field_energy(field_true[:, train_indices, :] - field_opt[:, train_indices, :] * scale,
+                                   log=rescale_at_points) / true_energy_train
+        if true_energy_test > 1e-18:
+            test_error = field_energy(field_true[:, test_indices, :] - field_opt[:, test_indices, :] * scale,
+                                       log=rescale_at_points) / true_energy_test
+        else:
+            test_error = 1
         if n_calls % verbose_every == 0:
             if plot:
                 plt.clf()
@@ -213,12 +221,13 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
                 end = "\r"
             else:
                 end = "\n"
-            print(f"{'#'*np.clip(int(error*50), 0, 50)}{error**.5:.03f}, {n_calls=:}",
+            print(f"{'#'*np.clip(int(train_error**.5*50), 0, 50)}{train_error**.5:.03f}, {n_calls=:},"
+                  f" test: {test_error**.5:.03f}",
                   end=end)
 
-        _old_error = error
+        _old_error = train_error
 
-        return error
+        return train_error
 
     options = {'maxiter': 1_000_000_000,
                "disp": True,
