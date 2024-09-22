@@ -5,6 +5,7 @@ import itertools
 import os
 import pickle
 import hashlib
+import re
 
 
 class PlotAndWait:
@@ -173,8 +174,14 @@ def cache_function_call(func, *args, cache_dir="function_cache", **kwargs):
     if not os.path.exists(cache_dir):
         os.makedirs(cache_dir)
 
-    # Create a hash key from the function name and arguments
-    args_hash = pickle.dumps((func.__name__, args, kwargs))
+    args_txt = str(args)
+    kwargs_txt = str(kwargs)
+    pattern = r' at 0x[0-9a-fA-F]+>'
+    replacement = ' at 0x***>'
+    args_txt = re.sub(pattern, replacement, args_txt)
+    kwargs_txt = re.sub(pattern, replacement, kwargs_txt)
+
+    args_hash = pickle.dumps((func.__name__, args_txt, kwargs_txt))
     hash_key = hashlib.sha256(args_hash).hexdigest()
     print(f"Function call with hash {hash_key}")
     cache_path = os.path.join(cache_dir, hash_key + '.pkl')
