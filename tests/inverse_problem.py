@@ -28,6 +28,25 @@ def complement(*args):
             return 0
 
 
+def plot_moment_2d(moment):
+    plt.figure(figsize=(15, 8))
+    max_order = moment.shape[1] - 3
+    m_max = np.abs(moment).max()
+    cmap = plt.get_cmap("RdBu")
+    for dim, dim_name in enumerate(("x", "y", "z")):
+        for order in range(max_order + 1):
+            fig_num = order + (max_order + 1) * dim + 1
+            plt.subplot(3, max_order + 1, fig_num)
+            if dim == 0:
+                plt.title(f"{order}")
+            if fig_num % (max_order + 1) == 1:
+                plt.ylabel(dim_name)
+            for ax in range(order + 1):
+                for ay in range(order + 1 - ax):
+                    az = order - ax - ay
+                    plt.scatter(ax, ay, color=cmap(moment[dim, ax, ay, az]/m_max/2+.5))
+
+
 def plot_moment(moment):
     moment = moment.swapaxes(0, 1).swapaxes(1, 2).swapaxes(2, 3)
     fig = plt.figure()
