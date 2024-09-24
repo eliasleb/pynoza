@@ -18,6 +18,7 @@
 
 
 import pynoza
+import pynoza.helpers
 import numpy as np
 
 
@@ -35,7 +36,7 @@ def toy_current_density(_a1: int, a2: int, a3: int) -> list[float, float, float]
     return [0, 0, 0]
 
 
-def test_simple_example():
+def test_simple_example(return_result=False, do_assert=True):
     max_order = 2
 
     current_moment_array = np.zeros((3, max_order + 2, max_order + 2, max_order + 2))
@@ -77,21 +78,23 @@ def test_simple_example():
     # plt.plot(e_field[2, 0, :])
     # plt.plot(e_theta[0, :])
     # plt.show()
-    assert np.allclose(e_field[2, 0, :], e_theta[0, :], atol=5)
-    assert np.allclose(e_field[2, 1, :], e_theta[1, :], atol=5)
-    assert np.allclose(e_field[2, 2, :], e_theta[2, :], atol=10)
-    assert np.allclose(b_field[1, 0, :], -b_phi[0, :], atol=2e-8)
-    assert np.allclose(b_field[0, 1, :], b_phi[1, :], atol=2e-8)
-    assert np.allclose(b_field[2, 2, :], b_phi[2, :], atol=1e-8)
+    if do_assert:
+        assert np.allclose(e_field[2, 0, :], e_theta[0, :], atol=5)
+        assert np.allclose(e_field[2, 1, :], e_theta[1, :], atol=5)
+        assert np.allclose(e_field[2, 2, :], e_theta[2, :], atol=10)
+        assert np.allclose(b_field[1, 0, :], -b_phi[0, :], atol=2e-8)
+        assert np.allclose(b_field[0, 1, :], b_phi[1, :], atol=2e-8)
+        assert np.allclose(b_field[2, 2, :], b_phi[2, :], atol=1e-8)
 
-    return t, h, e_field, b_field, poynting, e_theta, b_phi
+    if return_result:
+        return t, h, e_field, b_field, poynting, e_theta, b_phi
 
 
 def show_results():
     import matplotlib
     import matplotlib.pyplot as plt
     matplotlib.use("TkAgg")
-    t, h, e_field, b_field, _poynting, e_theta, b_phi = test_simple_example()
+    t, h, e_field, b_field, _poynting, e_theta, b_phi = test_simple_example(return_result=True, do_assert=False)
 
     plt.plot(t, h)
     plt.xlabel("Time")
@@ -125,5 +128,19 @@ def show_results():
     plt.show()
 
 
+def test_charge_inversion():
+    max_order = 2
+
+    current_moment_array = np.zeros((3, max_order + 2, max_order + 2, max_order + 2))
+    for ind, _ in np.ndenumerate(np.zeros(current_moment_array.shape[1:])):
+        if np.sum(ind) <= max_order:
+            current_moment_array[:, ind[0], ind[1], ind[2]] = toy_current_density(ind[0], ind[1], ind[2])
+
+    _, mapping = pynoza.helpers.get_charge_moment(current_moment_array, return_mapping=True)
+    for _, b in mapping.items():
+        assert len(b) == 1
+
+
 if __name__ == "__main__":
     show_results()
+    # test_charge_inversion()
