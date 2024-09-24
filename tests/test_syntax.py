@@ -50,6 +50,21 @@ def test_inputs():
     s.compute_e_field(x, x, x, x, h_sym, t_sym)
 
 
+def test_multi_time_dependent_moments():
+    s = pynoza.Solution()
+    s.recurse()
+    s.set_moments(
+        current_moment=lambda a1, a2, a3: [1., 0., 0.] if a1 == a2 == a3 == 0 or a1 == 1 and a2 == a3 == 0
+        else [0., 0., 0.])
+    t = np.linspace(0, 10, 100)
+    x1 = np.array([1., ])
+    x2, x3 = x1.copy(), x1.copy()
+    h = {(0, 0, 0): np.exp(-t), (1, 0, 0): -2 * np.exp(-t)}
+    _e = s.compute_e_field(x1, x2, x3, t, h, None)
+    h = {(0, 0, 0): [np.exp(-t), 0, 0], (1, 0, 0): [-2 * np.exp(-t), 0, 0]}
+    _e = s.compute_e_field(x1, x2, x3, t, h, None)
+
+
 if __name__ == "__main__":
     sol = pynoza.Solution(max_order=2)
     print(sol)
