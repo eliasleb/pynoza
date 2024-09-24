@@ -12,6 +12,7 @@ from numpy import sum as np_sum
 import sys
 import sympy
 import scipy.interpolate
+from scipy.interpolate import interp1d
 from scipy.special import factorial
 import numbers
 import cython
@@ -76,15 +77,17 @@ class Solution:
     current_moment: ndarray
     magnetic_moment: ndarray
     charge_moment: ndarray
+    _rho_to_j_mapping: dict
 
     def __init__(
-            self, max_order: int = 0, wave_speed: float = 1., causal=True
+            self, max_order: int = 0, wave_speed: float = 1., causal=True, threshold=1e-14
     ) -> None:
         """
         Initialize the solution class.
         
         :param max_order: The maximum order to which multipole moments will be computed (default 0)
-        :param wave_speed: The Wave speed `c` used to compute the retarded time t-r/c, in natural units (default 1)
+        :param wave_speed: The wave speed `c` used to compute the retarded time t-r/c, in natural units (default 1)
+        :param threshold: Minimum moment absolute value to be considered for computations
         """""
         if not isinstance(max_order, int):
             raise TypeError(":max_order: must be of integer type")
@@ -99,7 +102,7 @@ class Solution:
             self._aux_func[tuple(ind)] = dict()
         self._aux_func[(0, 0, 0)] = {(0, 0, 0, 0, 1): 1.}
         self.mu: float = 4 * np.pi * 1e-7
-        self.thresh: float = 1e-14
+        self.thresh: float = threshold
 
         self.ran_recurse = False
         self.ran_set_moments = False
@@ -109,6 +112,7 @@ class Solution:
         self.verbose = False
         self.delayed = True
         self.compute_grid = True
+        self._rho_to_j_mapping = {}
 
         self.e_field: ndarray = np.array([])
         self.b_field: ndarray = np.array([])
@@ -277,8 +281,12 @@ class Solution:
             if charge_moment is not None:
                 self.charge_moment[:, ind[0], ind[1], ind[2]] = charge_moment(*ind)
         if charge_moment is None:
-            self.charge_moment = pynoza.helpers.get_charge_moment(self.current_moment)
-
+            self.charge_moment, _rho_to_j_mapping = pynoza.helpers.get_charge_moment(
+                self.current_moment, return_mapping=True)
+            self._rho_to_j_mapping = dict()
+            for k, v in _rho_to_j_mapping.items():
+                assert len(v) == 1
+                self._rho_to_j_mapping[k] = v.pop()
         self.magnetic_moment = pynoza.helpers.get_magnetic_moment(self.current_moment)
 
     @cython.ccall
@@ -300,9 +308,18 @@ class Solution:
             raise RuntimeError("You must first run the `recurse' and `set_moments' methods.")
 
         if isinstance(h_sym, dict):
-            if not set(h_sym.keys()).issuperset(set(range(-1, self.max_order + 3))):
-                raise ValueError("When h_sym is a dictionary, the keys must contain"
-                                 " the indices -1..max_order + 2")
+            if isinstance(list(h_sym.keys())[0], int):
+                if not set(h_sym.keys()).issuperset(set(range(-1, self.max_order + 3))):
+                    raise ValueError("When h_sym is a dictionary with integer keys, the keys must contain"
+                                     " the indices -1..max_order + 2")
+            elif isinstance(list(h_sym.keys())[0], tuple):
+                if len(list(h_sym.keys())[0]) != 3:
+                    raise ValueError("When h_sym is a dictionary with tuple keys, the keys must have length 3")
+                # if len(list(h_sym.values())[0]) != 3:
+                #     raise ValueError("When h_sym is a dictionary with tuple keys, the values must have length 3")
+            else:
+                raise ValueError("When h_sym is a dictionary, the keys must either be integers (derivative orders)"
+                                 " or tuples (dim, ax, ay, az)")
 
         self.verbose = verbose
         self.delayed = delayed
@@ -347,8 +364,15 @@ class Solution:
         self._r = np.sqrt(x1 ** 2 + x2 ** 2 + x3 ** 2)
         if isinstance(h_sym, ndarray):
             hs_0, hs_derivative, hs_integral = self._handle_h_array(h_sym, t, shift=shift)
+            hs_0, hs_derivative, hs_integral = {None: hs_0}, {None: hs_derivative}, {None: hs_integral}
+        elif isinstance(h_sym, dict):
+            hs_0, hs_derivative, hs_integral = self._handle_h_dict(h_sym, t, shift=shift)
+            hs_0[None] = None
+            hs_derivative[None] = None
+            hs_integral[None] = None
         else:
             hs_0, hs_derivative, hs_integral = self._handle_h_symbolic(h_sym, t_sym, t)
+            hs_0, hs_derivative, hs_integral = {None: hs_0}, {None: hs_derivative}, {None: hs_integral}
         if magnetic:
             return x1, x2, x3, t, moment_shape, hs_0
         return x1, x2, x3, t, moment_shape, hs_derivative, hs_integral
@@ -413,20 +437,31 @@ class Solution:
                     sys.stdout.write("\rComputing index {}...".format(ind))
                 charge_moment = -self.mu * self.c ** 2 * self.charge_moment[:, a1, a2, a3].reshape(moment_shape)
                 current_moment = -self.mu * self.current_moment[:, a1, a2, a3].reshape(moment_shape)
-                if np.any(charge_moment) > self.thresh:
+                if np.any(np.abs(charge_moment) > self.thresh):
+                    hs_charge = None
+                    for dim, charge_moment_i in enumerate(charge_moment):
+                        if np.abs(charge_moment_i) < self.thresh:
+                            continue
+                        current_index = self._rho_to_j_mapping.get((dim, ) + tuple(ind), None)
+                        hi = hs_integral.get(
+                            current_index[1:], hs_integral[None]
+                        )
+                        if hs_charge is None:
+                            shape = (3, ) + hi[0].shape
+                            hs_charge = [np.zeros(shape) for _ in range(len(hi))]
+                        for ind_hij, hij in enumerate(hi):
+                            hs_charge[ind_hij][dim, ...] = hij
                     self.e_field += self._single_term_multipole(ind,
                                                                 charge_moment,
-                                                                hs_integral,
+                                                                hs_charge,
                                                                 x1, x2, x3, self._r)
                     if compute_txt:
-                        self.e_field_text += self._single_term_multipole_txt(ind,
-                                                                             charge_moment,
-                                                                             "int_h")
-                if np.any(current_moment) > self.thresh:
-                    self.e_field += self._single_term_multipole(ind,
-                                                                current_moment,
-                                                                hs_derivative,
-                                                                x1, x2, x3, self._r)
+                        self.e_field_text += self._single_term_multipole_txt(
+                            ind, charge_moment, "int_h")
+                if np.any(np.abs(current_moment) > self.thresh):
+                    self.e_field += self._single_term_multipole(
+                        ind, current_moment, hs_derivative.get(
+                            tuple(ind), hs_derivative[None]), x1, x2, x3, self._r)
                     if compute_txt:
                         self.e_field_text += self._single_term_multipole_txt(ind,
                                                                              current_moment,
@@ -480,7 +515,7 @@ class Solution:
                 if np.any(magnetic_moment) > self.thresh:
                     self.b_field += self._single_term_multipole(ind,
                                                                 magnetic_moment,
-                                                                hs_0,
+                                                                hs_0.get(tuple(ind), hs_0[None]),
                                                                 x1, x2, x3, self._r)
                     if compute_txt:
                         self.b_field_text += self._single_term_multipole_txt(ind,
@@ -531,15 +566,29 @@ class Solution:
 
         return hs_0, hs_derivative, hs_integral
 
+    def _handle_h_dict(self, h, t, shift=0):
+        hs_0, hs_derivative, hs_integral = (dict(), ) * 3
+        for key in h:
+            hs_0[key], hs_derivative[key], hs_integral[key] = self._handle_h_array(h[key], t, shift=shift)
+        return hs_0, hs_derivative, hs_integral
+
     def _handle_h_array(self, h, t, shift=0):
 
         dt = np.max(np.diff(t))
 
+        try:
+            h = np.array(h)
+        except ValueError:
+            h_np = np.zeros((3, t.size))
+            for dim in range(3):
+                h_np[dim, :] = h[dim]
+            h = h_np
+
         def integrate_array(x):
-            return np.cumsum(x) * dt
+            return np.cumsum(x, axis=-1) * dt
 
         def derivative(x):
-            return np.gradient(x, dt)
+            return np.gradient(x, dt, axis=-1)
 
         hs = {shift: h}
         for integral_order in range(shift - 1, -1 - 1, -1):
@@ -549,11 +598,14 @@ class Solution:
             hs[i] = derivative(hs[i - 1])
 
         h_sym_callable = dict()
+        kwargs = {"bounds_error": False, "fill_value": 0.}
         for order in hs:
             if self.delayed:
-                h_sym_callable[order] = Interpolator(t.squeeze(), hs[order])(t - self._r / self.c)
+                h_sym_callable[order] = interp1d(
+                    t.squeeze(), hs[order], **kwargs
+                )(t - self._r / self.c)
             else:
-                h_sym_callable[order] = Interpolator(t.squeeze(), hs[order])(t)
+                h_sym_callable[order] = interp1d(t.squeeze(), hs[order], **kwargs)(t)
 
         return self._repack_hs(h_sym_callable)
 
@@ -637,4 +689,19 @@ def set_extremities(x: np.ndarray, ratio: float, dim: int = 0, val: float = 0) -
 
 
 if __name__ == "__main__":
-    pass
+    s = Solution(max_order=3)
+    s.recurse()
+    s.set_moments(
+        current_moment=lambda a1, a2, a3: [1., 0., 0.] if a1 == a2 == a3 == 0 or a1 == 1 and a2 == a3 == 0
+        else [0., 0., 0.])
+    t = np.linspace(0, 10, 100)
+    x1 = np.array([.6, ])
+    x2, x3 = x1.copy(), x1.copy()
+    h = {(0, 0, 0): 1 * np.exp(-t), (1, 0, 0): -2 * np.exp(-t)}
+    # h = np.exp(-t)
+    e = s.compute_e_field(x1, x2, x3, t, h, None, delayed=False)
+    import matplotlib
+    matplotlib.use("TkAgg")
+    import matplotlib.pyplot as plt
+    plt.plot(t, e[0, 0, 0, 0, :])
+    plt.show()
