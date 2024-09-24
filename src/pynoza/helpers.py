@@ -26,18 +26,19 @@ class PlotAndWait:
             input("[Enter] to continue...")
 
 
-def get_charge_moment(current_moment: ndarray) -> ndarray:
+def get_charge_moment(current_moment: ndarray, return_mapping=False) -> ndarray:
     """
     Compute a charge moment that is compatible with the conservation of charge
 
     :param current_moment: an array with the current moments
-    :return: the corresponding charge moment
-    :rtype: ndarray
+    :param return_mapping: return a dict to keep a track of which charge moments correspond to which current moments
+    :return: the corresponding charge moment (+ eventually the charge-current mapping)
 
     The moment at index `(i, a1, a2, a3)` is the moment of the `i`-th coordinate corresponding to the multi-index
     `(a1, a2, a3)`
     """
     charge_moment = np.zeros(current_moment.shape)
+    mapping = {}
     for ind, _ in np.ndenumerate(charge_moment):
         i, a1, a2, a3 = ind
         a = (a1, a2, a3)
@@ -48,13 +49,22 @@ def get_charge_moment(current_moment: ndarray) -> ndarray:
                     b[j] = a[j] - 2
                     charge_moment[i, a1, a2, a3] += a[j] * (a[j] - 1) \
                         * current_moment[j, b[0], b[1], b[2]]
+                    if a not in mapping:
+                        mapping[tuple(ind)] = set()
+                    mapping[tuple(ind)].add((j, ) + tuple(b))
             else:
                 b[i] -= 1
                 b[j] -= 1
                 if a[j] >= 1 and a[i] >= 1:
                     charge_moment[i, a1, a2, a3] += a[j] * a[i] \
                         * current_moment[j, b[0], b[1], b[2]]
-    return -charge_moment
+                    if a not in mapping:
+                        mapping[tuple(ind)] = set()
+                    mapping[tuple(ind)].add((j, ) + tuple(b))
+    charge_moment = -charge_moment
+    if return_mapping:
+        return charge_moment, mapping
+    return charge_moment
 
 
 def get_magnetic_moment(current_moment: ndarray) -> ndarray:
