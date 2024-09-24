@@ -155,7 +155,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
     _dt = np.max(np.diff(t))
 
     sol_python = pynoza.Solution(max_order=order,
-                                 wave_speed=1, )
+                                 wave_speed=1, threshold=1e-28, )
     sol_python.recurse()
     # sol_rust = speenoza.Speenoza(order)
 
@@ -226,10 +226,14 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
                         plt.plot(t, field_opt[i].reshape(-1, t.size).T*scale, f"k-")
                         plt.plot(t, field_opt[i].reshape(-1, t.size).T*scale, f"k-")
                         plt.ylim((-1.1 * max_true, 1.1 * max_true))
-                    max_h = np.max(np.abs(h_))
+                    if isinstance(h_, dict):
+                        h_plot = np.array(list(h_.values()))
+                    else:
+                        h_plot = np.array(h_)
+                    max_h = np.max(np.abs(h_plot))
                     plt.subplot(2, 3, 5)
                     if max_h > 0:
-                        plt.plot(t, h_, "k-.")
+                        plt.plot(t, h_plot.T)
                     if find_center:
                         plt.subplot(2, 3, 2)
                         plt.title(f"""center = ({complete_center[0]/center_scale:+.03f}, """

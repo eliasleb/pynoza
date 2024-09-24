@@ -5,8 +5,8 @@ from itertools import product
 import inverse_problem
 from scipy.interpolate import interp1d
 from pynoza.helpers import cache_function_call
-
-global moments_shape, max_order, order_scale, n_tail
+from from_mathematica import SPHERICAL_TO_CARTESIAN
+global moments_shape, max_order, order_scale, n_tail, dim_moment, n_points
 
 
 def heidler(t, max_current, tau1, tau2, n):
@@ -55,6 +55,26 @@ def read_all_data(window_us=1000):
     return x, y, z, t, e_field, h_field
 
 
+def re_or_im(x):
+    if np.abs(np.real(x)) > 1e-18:
+        return np.real(x)
+    return np.imag(x)
+
+
+def get_current_moment_spherical(moment):
+    _current_moment = np.zeros(moments_shape)
+    ind = 0
+    for l in range(0, max_order + 1, 2):
+        sph_to_cart = SPHERICAL_TO_CARTESIAN[(l, 0)]
+        for alpha in sph_to_cart:
+            _current_moment[2, alpha[0], alpha[1], alpha[2]] += moment[ind] * re_or_im(sph_to_cart[alpha]) \
+                                                                / order_scale**np.sum(alpha)
+        ind += 1
+
+    assert ind == moment.size
+    return _current_moment
+
+
 def get_current_moment(moment):
     _current_moment = np.zeros(moments_shape)
     ind = 0
@@ -69,13 +89,20 @@ def get_current_moment(moment):
 
 
 def get_h_num(h_, t_):
-    y = np.zeros(t_.shape)
+    h_dict = dict()
     delta_t0 = (np.max(t_) - np.min(t_)) / (h_.size - 1)
-    sigma = delta_t0 / 2
+    sigma = delta_t0 / 1
     t_max = h_.size / (n_tail + h_.size) * (np.max(t_) - np.min(t_)) + np.min(t_)
-    for ind, t0 in enumerate(np.linspace(np.min(t_), t_max, h_.size)):
-        y = y + h_[ind] * np.exp(-1/2*(t_ - t0)**2 / sigma**2)
-    return y
+    ind = 0
+    for az in range(max_order + 1):
+        if az % 2 == 1:
+            continue
+        y = np.zeros(t_.shape)
+        for t0 in np.linspace(np.min(t_), t_max, n_points):
+            y = y + h_[ind] * np.exp(-1 / 2 * (t_ - t0) ** 2 / sigma ** 2)
+            ind += 1
+        h_dict[(0, 0, az)] = y - y[0]
+    return h_dict
     #
     # if n_tail > 0:
     #     h_interpolated = interp1d(
@@ -93,7 +120,7 @@ def get_h_num(h_, t_):
 
 
 def lightning_inverse_problem(**kwargs):
-    global max_order, order_scale, moments_shape, n_tail
+    global max_order, order_scale, moments_shape, n_points, n_tail, dim_moment
     max_order = kwargs.pop("max_order", 0)
     plot = kwargs.pop("plot", False)
     verbose_every = kwargs.pop("verbose_every", 100)
@@ -132,6 +159,7 @@ def lightning_inverse_problem(**kwargs):
 
     moments_shape = (3, ) + (max_order + 3, ) * 3
     dim_moment = sum(1 for az in range(max_order + 1) if az % 2 == 0)
+    # dim_moment = max_order // 2 + 1
 
     kwargs = dict(
         order=max_order + 2,
@@ -148,7 +176,7 @@ def lightning_inverse_problem(**kwargs):
         verbose_every=verbose_every,
         scale=scale,  # shift, scale: 0, 14 -- -1 22
         tol=tol,
-        n_points=n_points,
+        n_points=n_points * dim_moment,
         find_center=find_center,
         shift=0,
         rescale_at_points=rescale_at_points,
@@ -167,10 +195,16 @@ def lightning_inverse_problem(**kwargs):
 
         # if error**.5*100 > 31:
         #     raise ValueError()
+        if isinstance(h, dict):
+            h = np.array(list(h.values()))
+            arg_max = np.argmax(np.abs(h), axis=-1)
+            h_max = h[0, arg_max[0]]
+        else:
+            h_max = h[np.argmax(np.abs(h))]
+
         plt.figure()
-        i_max = h[np.argmax(np.abs(h))]
-        plt.plot(t, heidler(t, i_max, tau1=1.8e-6, tau2=95e-6, n=2), "r--")
-        plt.plot(t, h, "k-")
+        plt.plot(t, heidler(t, h_max, tau1=1.8e-6, tau2=95e-6, n=2), "r--")
+        plt.plot(t, h.T, "k-")
         plt.xlabel("Time")
 
         plt.figure(figsize=(10, 10))
@@ -185,7 +219,7 @@ def lightning_inverse_problem(**kwargs):
 
         print(f"{center=}")
         current_moment[-1, 0, 0, :] *= order_scale**np.linspace(0, max_order + 2, max_order + 3)
-        inverse_problem.plot_moment(current_moment)
+        inverse_problem.plot_moment_2d(current_moment)
         # plt.figure()
         # max_h = np.max(np.abs(h))
         # if max_h > 0:
