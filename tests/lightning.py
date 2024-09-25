@@ -1,3 +1,4 @@
+from numpy.random import normal
 import numpy as np
 from scipy.io import loadmat
 import matplotlib.pyplot as plt
@@ -25,7 +26,7 @@ def read_all_data(window_us=1000):
     # r <> x, y <> not used, z <> z
     r_km = np.array((1., 5., 10.))
     z_km = np.array((0., 2., 4.))
-    # r_km = np.array((1., 5., 10., ))
+    r_km = np.array((5., 10., ))
     # z_km = np.array((0., ))
 
     t, e_field, h_field, n_t = None, None, None, None
@@ -94,15 +95,15 @@ def get_h_num(h_, t_):
     sigma = delta_t0 / 2
     t_max = h_.size / (n_tail + h_.size) * (np.max(t_) - np.min(t_)) + np.min(t_)
     ind = 0
-    for az in range(max_order + 1):
-        if az % 2 == 1:
-            continue
-        y = np.zeros(t_.shape)
-        for t0 in np.linspace(np.min(t_), t_max, n_points):
-            y = y + h_[ind] * np.exp(-1 / 2 * (t_ - t0) ** 2 / sigma ** 2)
-            ind += 1
-        h_dict[(0, 0, az)] = y - y[0]
-    return h_dict
+    # for az in range(max_order + 1):
+    #     if az % 2 == 1:
+    #         continue
+    y = np.zeros(t_.shape)
+    for t0 in np.linspace(np.min(t_), t_max, n_points):
+        y = y + h_[ind] * np.exp(-1 / 2 * (t_ - t0) ** 2 / sigma ** 2)
+        ind += 1
+        # h_dict[(0, 0, az)] = y - y[0]
+    return y - y[0]
     #
     # if n_tail > 0:
     #     h_interpolated = interp1d(
@@ -134,6 +135,7 @@ def lightning_inverse_problem(**kwargs):
     center_scale = kwargs.pop("center_scale", 2e3/3e8)
     plot_recall = kwargs.pop("plot_recall", plot)
     rescale_at_points = kwargs.pop("rescale_at_points", False)
+    noise_level = kwargs.pop("noise_level", 0.)
 
     if plot or plot_recall:
         import matplotlib
@@ -149,6 +151,13 @@ def lightning_inverse_problem(**kwargs):
     n_t = t.size
     t = t[:n_t//2:n_d]
     e_field = e_field[:, :, :n_t//2:n_d]
+
+    # Add noise
+    if noise_level > 0.:
+        noise = normal(size=e_field.shape)
+        noise = noise / np.sqrt(np.sum(noise**2)) * np.sqrt(np.sum(e_field**2)) * noise_level
+        plt.hist(noise[0, 0, :])
+        e_field = e_field + noise
 
     # e_field /= 1e2
     c0 = 3e8
@@ -176,14 +185,14 @@ def lightning_inverse_problem(**kwargs):
         verbose_every=verbose_every,
         scale=scale,  # shift, scale: 0, 14 -- -1 22
         tol=tol,
-        n_points=n_points * dim_moment,
+        n_points=n_points * 1,
         find_center=find_center,
         shift=0,
         rescale_at_points=rescale_at_points,
         find_center_ignore_axes=("x", "y"),
         center_scale=center_scale,
         seed=seed,
-        # test_indices=()
+        test_indices=(1, 5, )
     )
     current_moment, h, center, e_opt = cache_function_call(
         inverse_problem.inverse_problem,
@@ -254,6 +263,7 @@ def from_command_line():
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--plot_recall", type=bool, default=False)
     parser.add_argument("--rescale_at_points", type=bool, default=False)
+    parser.add_argument("--noise_level", type=float, default=0.)
 
     parsed = parser.parse_args()
     lightning_inverse_problem(**vars(parsed))
