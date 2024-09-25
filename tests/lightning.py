@@ -147,7 +147,7 @@ def lightning_inverse_problem(**kwargs):
     dt = t[1] - t[0]
     t = np.concatenate((np.linspace(-n * dt, -dt, n) + t[0], t))
     e_field = np.concatenate((np.zeros((3, e_field.shape[1], n)), e_field), axis=-1)
-    n_d = 10
+    n_d = 1
     n_t = t.size
     t = t[:n_t//2:n_d]
     e_field = e_field[:, :, :n_t//2:n_d]
@@ -209,25 +209,32 @@ def lightning_inverse_problem(**kwargs):
             arg_max = np.argmax(np.abs(h), axis=-1)
             h_max = h[0, arg_max[0]]
         else:
-            h_max = h[np.argmax(np.abs(h))]
+            arg_max = np.argmax(np.abs(h))
+            h_max = h[arg_max]
 
         plt.figure()
-        plt.plot(t, heidler(t, h_max, tau1=1.8e-6, tau2=95e-6, n=2), "r--", label="Heidler")
+        heidler_scaled = heidler(t, h_max/.85, tau1=1.8e-6, tau2=95e-6, n=2)
+        plt.plot(t - t[np.argmax(np.abs(heidler_scaled))] + t[arg_max], heidler_scaled, "r--", label="Heidler")
         if len(h.shape) > 1 and h.shape[0] > 1:
             for f_ind in range(h.shape[0]):
                 plt.plot(t, h[f_ind, :], color=plt.get_cmap("jet")(f_ind/(h.shape[0]-1)), label=f"{f_ind}")
             plt.legend()
         else:
             plt.plot(t, h.T, "k")
-        plt.xlabel("Time")
+        plt.xlabel("Normalized time")
+        plt.ylabel("Excitation function (1)")
 
-        plt.figure(figsize=(10, 10))
+        plt.figure(figsize=(15, 10))
         omin, omax = np.min(e_field), np.max(e_field)
         for i, (xi, yi, zi) in enumerate(zip(x, y, z)):
-            plt.subplot(3, 3, i+1)
+            plt.subplot(3, 2, i+1)
             plt.plot(t, e_field[:, i, :].T, "r--")
             plt.plot(t, e_opt[:, i, :].T, "k-")
-            plt.title(f"{xi*c0/1e3:.1f}, {yi*c0/1e3:.1f}, {zi*c0/1e3:.1f}")
+            plt.title(f"x = {xi*c0/1e3:.1f} km, z = {zi*c0/1e3:.1f} km")
+            if i % 2 == 0:
+                plt.ylabel("Electric field (V/m)")
+            if i > 3:
+                plt.xlabel("Normalized time")
             # plt.ylim(1.1*omin, 1.1*omax)
         plt.tight_layout()
 
