@@ -91,7 +91,7 @@ def get_current_moment(moment):
 def get_h_num(h_, t_):
     h_dict = dict()
     delta_t0 = (np.max(t_) - np.min(t_)) / (h_.size - 1)
-    sigma = delta_t0 / 1
+    sigma = delta_t0 / 2
     t_max = h_.size / (n_tail + h_.size) * (np.max(t_) - np.min(t_)) + np.min(t_)
     ind = 0
     for az in range(max_order + 1):
@@ -203,8 +203,13 @@ def lightning_inverse_problem(**kwargs):
             h_max = h[np.argmax(np.abs(h))]
 
         plt.figure()
-        plt.plot(t, heidler(t, h_max, tau1=1.8e-6, tau2=95e-6, n=2), "r--")
-        plt.plot(t, h.T, "k-")
+        plt.plot(t, heidler(t, h_max, tau1=1.8e-6, tau2=95e-6, n=2), "r--", label="Heidler")
+        if len(h.shape) > 1 and h.shape[0] > 1:
+            for f_ind in range(h.shape[0]):
+                plt.plot(t, h[f_ind, :], color=plt.get_cmap("jet")(f_ind/(h.shape[0]-1)), label=f"{f_ind}")
+            plt.legend()
+        else:
+            plt.plot(t, h.T, "k")
         plt.xlabel("Time")
 
         plt.figure(figsize=(10, 10))
