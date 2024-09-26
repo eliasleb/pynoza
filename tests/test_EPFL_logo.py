@@ -24,33 +24,8 @@ import scipy.interpolate
 import pynoza
 import pytest
 import matplotlib.pyplot as plt
-from matplotlib.collections import PatchCollection
-from matplotlib.patches import Rectangle
 from pynoza import c_j
-
-
-def plot_current_density(xs: list[float, ...], ys: list[float, ...], ws: list[float, ...], hs: list[float, ...],
-                         length_logo, length, d1, d2, ax=None, **kwargs):
-    """
-    Plot a given current density
-
-    :param xs: x-coordinates of all current rectangle lower right corner
-    :param ys: y-coordinates of all current rectangle lower right corner
-    :param ws: widths of all current rectangle
-    :param hs: heights of all current rectangle
-    :param length_logo: width of the logo in xs/ys units
-    :param length: width of the logo in true units
-    :param d1: physical width of logo
-    :param d2: physical height of logo
-    :param ax: optional axis to use
-    """
-
-    rectangles = [Rectangle((x / length_logo * length - d1, y / length_logo * length - d2),
-                            w / length_logo * length, h / length_logo * length) for x, y, w, h in zip(xs, ys, ws, hs)]
-    pc = PatchCollection(rectangles, facecolor="r", **kwargs)
-    if ax is None:
-        ax = plt.gca()
-    ax.add_collection(pc)
+from pynoza.helpers import plot_current_density
 
 
 def legends_matrix(loc_table_x, loc_table_y, lines, line_colors, markers, marker_colors, marker_sizes, line_length=1):

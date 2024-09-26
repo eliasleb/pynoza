@@ -3,10 +3,10 @@ import numpy as np
 from scipy.io import loadmat
 import matplotlib.pyplot as plt
 from itertools import product
-import inverse_problem
+from pynoza.inverse_problem import inverse_problem
 from scipy.interpolate import interp1d
 from pynoza.helpers import cache_function_call
-from from_mathematica import SPHERICAL_TO_CARTESIAN
+from pynoza.from_mathematica import SPHERICAL_TO_CARTESIAN
 global moments_shape, max_order, order_scale, n_tail, dim_moment, n_points
 
 
@@ -35,7 +35,7 @@ def read_all_data(window_us=1000):
     for r in r_km:
         for zi in z_km:
             _t, e_r, e_z, h_phi = read_data(
-                f"data/lightning_data/20240730/EMF_T={window_us}_r={int(r)}_z={int(zi)}.mat"
+                f"data/20240730/EMF_T={window_us}_r={int(r)}_z={int(zi)}.mat"
             )
             if e_field is None:
                 e_field = np.zeros((3, r_km.size * z_km.size, _t.size))
@@ -204,7 +204,7 @@ def lightning_inverse_problem(**kwargs):
         test_indices=test_indices
     )
     current_moment, h, center, e_opt = cache_function_call(
-        inverse_problem.inverse_problem,
+        inverse_problem,
         **kwargs
     )
     train_indices = set(range(x.size)) - set(test_indices)

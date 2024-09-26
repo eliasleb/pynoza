@@ -2,8 +2,7 @@ import pynoza
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-import itertools
-from test_EPFL_logo import c_j, plot_current_density
+from pynoza.helpers import c_j, plot_current_density
 import sympy
 import time
 

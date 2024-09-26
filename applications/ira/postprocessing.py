@@ -18,7 +18,7 @@ import pickle
 
 import pandas as pd
 
-import inverse_problem
+from pynoza.inverse_problem import inverse_problem
 import matplotlib.pyplot as plt
 import numpy as np
 import pynoza
@@ -182,10 +182,6 @@ def postprocessing_mikheev(*args):
 
     n_added = 0
     r = 2 * x2.max()
-    #t = np.concatenate((t, np.linspace(t[-1], t[-1] + n_added * t[-1], int(n_added * t.size))))
-    #h = np.concatenate((h, np.zeros(t.size - h.size)))
-    import synthetic
-    synthetic.plot_directivity(sol, r, h_true, t, phi_min=3.2, phi_max=6.1)
 
     print(f"{current_moment[2, 0, 1, 0] / current_moment[1, 0, 0, 1]=}")
 

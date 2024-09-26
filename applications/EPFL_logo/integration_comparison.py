@@ -180,7 +180,7 @@ def test_moments():
     z = np.linspace(-2 * p.eps_z, 2 * p.eps_z, p.n_z)
 
     try:
-        with open("dump.pickle", "rb") as fd:
+        with open("data/dump.pickle", "rb") as fd:
             moments_spherical, moment_cartesian, p_dumped = pickle.load(fd)
             if p_dumped != p:
                 raise FileNotFoundError
@@ -188,7 +188,7 @@ def test_moments():
         moments_spherical = m_nu_h(s=True, max_order=p.max_order, t=t, x=x, y=y, z=z, current_density_x_=cx,
                                    n_xi=p.n_xi)
         moment_cartesian = cartesian_moment((1, 0, 1), t, x, y, z, cx)
-        with open("dump.pickle", "wb") as fd:
+        with open("data/dump.pickle", "wb") as fd:
             pickle.dump((moments_spherical, moment_cartesian, p), fd)
 
     moments_spherical = diff_moments(moments_spherical, t[1] - t[0])

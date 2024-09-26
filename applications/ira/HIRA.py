@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import inverse_problem
+from pynoza.inverse_problem import inverse_problem, plot_moment
 import itertools
 import scipy.interpolate
 import time
@@ -22,7 +22,7 @@ def read_comsol_file(filename):
         t += 1
 
     names = names[:len(data.columns)]
-    data.set_axis(names, axis=1, inplace=True)
+    data = data.set_axis(names, axis=1)
     n_times = 1
     while not np.isnan(data.iloc[0, 3 + 3 * n_times]):
         n_times += 1
@@ -277,14 +277,14 @@ def inverse_problem_hira(**kwargs):
         return current_moment_
 
     args = (order + 2, e_true, x1, x2, x3, t, None, get_current_moment, dim_mom)
-    current_moment, h, center, e_opt = inverse_problem.inverse_problem(*args, **kwargs)
+    current_moment, h, center, e_opt = inverse_problem(*args, **kwargs)
 
     if kwargs["plot"]:
         plt.ion()
 
         print(f"{center=}")
 
-        inverse_problem.plot_moment(current_moment)
+        plot_moment(current_moment)
 
         plt.figure()
         max_h = np.max(np.abs(h))

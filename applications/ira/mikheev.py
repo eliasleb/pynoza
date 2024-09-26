@@ -3,7 +3,7 @@ import pynoza
 import pynoza.solution
 import matplotlib.pyplot as plt
 import itertools
-import inverse_problem
+from pynoza.inverse_problem import inverse_problem, plot_moment
 import pandas as pd
 import scipy.interpolate
 import time
@@ -273,14 +273,14 @@ def mikheev(**kwargs):
         return current_moment_
 
     args = (order + 2, e_true, x1, x2, x3, t, None, get_current_moment, dim_mom)
-    current_moment, h, center, e_opt = inverse_problem.inverse_problem(*args, **kwargs)
+    current_moment, h, center, e_opt = inverse_problem(*args, **kwargs)
 
     if plot:
         plt.ion()
 
         print(f"{center=}")
 
-        inverse_problem.plot_moment(current_moment)
+        plot_moment(current_moment)
 
         plt.figure()
         plt.plot(t, h / np.max(np.abs(h)))
@@ -303,7 +303,7 @@ def mikheev(**kwargs):
                                      | {f"ex_true@t={t[i]}": ex[:, i] for i in range(ex.shape[1])}
                                      | {f"ey_true@t={t[i]}": ey[:, i] for i in range(ey.shape[1])}
                                      | {f"ez_true@t={t[i]}": ez[:, i] for i in range(ez.shape[1])})
-            filename = f"../../../git_ignore/GLOBALEM/opt-result-{time.asctime()}.csv"
+            filename = f"../../../../git_ignore/GLOBALEM/opt-result-{time.asctime()}.csv"
             res.to_csv(path_or_buf=filename)
             with open(filename + "_params.pickle", 'wb') as handle:
                 pickle.dump((current_moment, h, center, e_true, e_opt), handle, protocol=pickle.HIGHEST_PROTOCOL)

@@ -13,10 +13,10 @@
 #    You should have received a copy of the GNU Affero General Public License
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-for order in 0 1 2 3 4 5 6 7 8 9 10
+for order in 0 1
 do
- python mikheev.py --down_sample_time 1 --tol 1e-8 \
+ python mikheev.py --tol 1e-8 \
     --n_points 10 --n_tail 10 --verbose_every 10 --plot False --scale 1e4 --find_center False \
     --order $order --norm 2 \
-    > data/order-$order-mikheev_v5.txt &
+    > ../../../../git_ignore/ira/opt_results/order-$order-mikheev_v5.txt &
 done
