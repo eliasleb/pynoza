@@ -2,7 +2,7 @@ import numpy as np
 
 
 def cartesian_from_real_spherical(l, m):
-    """Return a dictionary to find the Cartesian moments corresponding to the given real spherical harmonic l, m"""
+    """Returns a dictionary to find the Cartesian moments corresponding to the given real spherical harmonic l, m"""
     result = dict()
     if m < 0:
         for k, v in SPHERICAL_TO_CARTESIAN[(l, -m)].items():
