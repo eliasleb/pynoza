@@ -244,7 +244,7 @@ def test_solution(test_case, order, method, plot=False, cname="xyz"):
 
     match case_:
         case "logo":
-            filename = "tests/data/Efield_at_2a_and_3a_lambdaOver2_v3.txt"
+            filename = "applications/EPFL_logo/data/Efield_at_2a_and_3a_lambdaOver2_v3.txt"
             data_comsol = pd.read_csv(filename,
                                       skiprows=range(10),
                                       names=("t", "absE2a", "E2a", "absE3a", "E3a"),
@@ -293,7 +293,7 @@ def test_solution(test_case, order, method, plot=False, cname="xyz"):
             assert np.linalg.norm(e_comsol_2a / 2 - e_field_x[0, 0, 0, :], ord=2) / t.size < norm1 \
                    and np.linalg.norm(e_comsol_3a / 2 - e_field_x[0, 0, 1, :], ord=2) / t.size < 170
         case "disc":
-            d = pd.read_csv("tests/data/shlivinski.csv",
+            d = pd.read_csv("applications/EPFL_logo/data/shlivinski.csv",
                             skiprows=1)
             delay = -3 * gamma_si * 1e9
             e_paper1 = scipy.interpolate.interp1d(d["X.2"] * t_g * gamma_si * 1e9 - delay, d["Y.2"],

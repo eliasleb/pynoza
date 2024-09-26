@@ -18,8 +18,6 @@ import speenoza
 import numpy as np
 import pynoza
 import matplotlib.pyplot as plt
-import inverse_problem
-import itertools
 
 
 def test_syntax():

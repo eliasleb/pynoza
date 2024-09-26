@@ -14,10 +14,10 @@
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 
+from pynoza.inverse_problem import inverse_problem, plot_moment
 import pynoza
 import numpy as np
 import matplotlib.pyplot as plt
-import inverse_problem
 import scipy
 import scipy.interpolate
 import itertools
@@ -99,8 +99,8 @@ def test_inverse_problem_simple():
         return current_moment
 
     e_true = direct_problem_simple(x1, x2, x3, t, h_true, order=order).swapaxes(1, 2)
-    current_moment, h, center, e_opt = inverse_problem.inverse_problem(order, e_true, x1, x2, x3, t, dim_mom,
-                                                                       get_current_moment, dim_mom, **kwargs)
+    current_moment, h, center, e_opt = inverse_problem(order, e_true, x1, x2, x3, t, dim_mom,
+                                                       get_current_moment, dim_mom, **kwargs)
     assert np.sum((e_true - e_opt)**2)/np.sum(e_opt**2) < 1e-2
 
 

@@ -67,4 +67,4 @@ The Python `>= 3.10` script `tests/test_EPFL_logo.py` shows some examples. A Jup
 7. Run the `compute_e_field` method to compute the electric field (or `compute_b_field` for the magnetic field) from Green’s functions approximations and the current moments. Under the hood, this method will integrate and differentiate the time-dependent function to the needed order.
 
 ### Complete example
-See `tests/test_simple_example.py`.
+See `applications/demos/demo_EPFL_logo.py` or `tests/test_simple_example.py`.

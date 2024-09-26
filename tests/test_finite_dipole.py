@@ -13,14 +13,13 @@
 #    You should have received a copy of the GNU Affero General Public License
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import pynoza
+from pynoza.inverse_problem import inverse_problem, plot_moment
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import re
 import scipy
 import itertools
-import inverse_problem
 import time
 import pickle
 
@@ -170,14 +169,14 @@ def main(filename, n_tail, tol, n_points, verbose_every, plot, scale, order, mag
         return current_moment_
     e_true = (ex_sim, ey_sim, ez_sim)
     args = (order + 2, e_true, x1, x2, x3, t, None, get_current_moment, dim_mom)
-    current_moment, h, center, e_opt, residual = inverse_problem.inverse_problem(*args, **kwargs)
+    current_moment, h, center, e_opt, residual = inverse_problem(*args, **kwargs)
 
     if plot:
         plt.ion()
 
         print(f"{center=}")
 
-        inverse_problem.plot_moment(current_moment)
+        plot_moment(current_moment)
 
         plt.figure()
         plt.plot(t, h / np.max(np.abs(h)))
@@ -218,7 +217,7 @@ def main(filename, n_tail, tol, n_points, verbose_every, plot, scale, order, mag
 def test_inverse_problem_on_sim_data():
 
     _kwargs = {
-        "filename": "tests/data/dipole_v11.txt",
+        "filename": "applications/finite_dipole/data/dipole_v11.txt",
         "n_tail": 20,
         "tol":  1e-5,
         "n_points": 40,
