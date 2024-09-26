@@ -1,5 +1,26 @@
 import numpy as np
 
+
+def cartesian_from_real_spherical(l, m):
+    """Return a dictionary to find the Cartesian moments corresponding to the given real spherical harmonic l, m"""
+    result = dict()
+    if m < 0:
+        for k, v in SPHERICAL_TO_CARTESIAN[(l, -m)].items():
+            coeff = np.sqrt(2) * (-1)**m * np.real(v)
+            if np.abs(coeff) > 1e-30:
+                result[k] = coeff
+        return result
+    if m == 0:
+        for k, v in SPHERICAL_TO_CARTESIAN[(l, m)].items():
+            result[k] = np.imag(v)
+        return result
+    for k, v in SPHERICAL_TO_CARTESIAN[(l, -m)].items():
+        coeff = np.sqrt(2) * (-1) ** m * np.imag(v)
+        if np.abs(coeff) > 1e-30:
+            result[k] = coeff
+    return result
+
+
 # {(?<a1>d+?), (?<a2>-?d+?)}  -->  (${a1}, ${a2})
 # {(?<a1>d+?),s(?<a2>-?d+?),s(?<a3>-?d+?)}  -->  (${a1}, ${a2}, ${a3})
 
@@ -1770,5 +1791,10 @@ SPHERICAL_TO_CARTESIAN = {(0, 0):
                                }}
 
 if __name__ == "__main__":
-    print(SPHERICAL_TO_CARTESIAN[(10, 0)])
+    res = cartesian_from_real_spherical(2, -1)
+    print(res)
+    res = cartesian_from_real_spherical(2, 0)
+    print(res)
+    res = cartesian_from_real_spherical(2, 1)
+    print(res)
 

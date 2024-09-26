@@ -237,6 +237,17 @@ def plot_current_density(xs: list[float, ...], ys: list[float, ...], ws: list[fl
     ax.add_collection(pc)
 
 
+def get_poynting(e, h):
+    """Returns the Poynting vector E x H
+    #TODO the usual checks
+    """
+    p = np.zeros(e.shape)
+    p[0, ...] = e[1, ...] * h[2, ...] - e[2, ...] * h[1, ...]
+    p[1, ...] = e[2, ...] * h[0, ...] - e[0, ...] * h[2, ...]
+    p[2, ...] = e[0, ...] * h[1, ...] - e[1, ...] * h[0, ...]
+    return p
+
+
 if __name__ == "__main__":
     import matplotlib
     matplotlib.use("TkAgg")
