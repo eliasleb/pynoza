@@ -13,8 +13,7 @@ The theory behind the code can be found in E. Le Boudec et al., “The time-doma
 
 
 ## Installation
-To install directly from git, use
-``pip install "git+https://github.com/eliasleb/pynoza"``.
+`pip install pynoza`
 
 ## Tutorial
 
