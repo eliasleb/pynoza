@@ -99,10 +99,16 @@ def get_h_num(h_, t_):
     #     if az % 2 == 1:
     #         continue
     y = np.zeros(t_.shape)
+    # plt.figure()
     for t0 in np.linspace(np.min(t_), t_max, n_points):
         y = y + h_[ind] * np.exp(-1 / 2 * (t_ - t0) ** 2 / sigma ** 2)
+        # plt.plot(t_, np.exp(-1 / 2 * (t_ - t0) ** 2 / sigma ** 2), "k--")
         ind += 1
         # h_dict[(0, 0, az)] = y - y[0]
+    # plt.xlabel("Normalized time")
+    # plt.title("Current basis functions")
+    # plt.tight_layout()
+    # plt.show()
     return y - y[0]
     #
     # if n_tail > 0:
@@ -154,6 +160,7 @@ def lightning_inverse_problem(**kwargs):
 
     # Add noise
     if noise_level > 0.:
+        np.random.seed(seed)
         noise = normal(size=e_field.shape)
         noise = noise / np.sqrt(np.sum(noise**2)) * np.sqrt(np.sum(e_field**2)) * noise_level
         plt.hist(noise[0, 0, :])
@@ -162,6 +169,7 @@ def lightning_inverse_problem(**kwargs):
     # e_field /= 1e2
     c0 = 3e8
     # t *= c0
+    print(x, y, z)
     x = x / c0
     y = y / c0
     z = z / c0
@@ -169,6 +177,7 @@ def lightning_inverse_problem(**kwargs):
     moments_shape = (3, ) + (max_order + 3, ) * 3
     dim_moment = sum(1 for az in range(max_order + 1) if az % 2 == 0)
     # dim_moment = max_order // 2 + 1
+    test_indices = (1, 5,)
 
     kwargs = dict(
         order=max_order + 2,
@@ -192,15 +201,21 @@ def lightning_inverse_problem(**kwargs):
         find_center_ignore_axes=("x", "y"),
         center_scale=center_scale,
         seed=seed,
-        test_indices=(1, 5, )
+        test_indices=test_indices
     )
     current_moment, h, center, e_opt = cache_function_call(
         inverse_problem.inverse_problem,
         **kwargs
     )
-    error = np.sqrt(np.sum((e_opt - e_field) ** 2) / np.sum(e_field ** 2))
+    train_indices = set(range(x.size)) - set(test_indices)
+    train_indices, test_indices = list(sorted(train_indices)), list(sorted(test_indices))
+    error_train = np.sqrt(np.sum((e_opt[:, train_indices, ...] - e_field[:, train_indices, ...]) ** 2)
+                          / np.sum(e_field[:, train_indices, ...] ** 2))
+    error_test = np.sqrt(np.sum((e_opt[:, test_indices, ...] - e_field[:, test_indices, ...]) ** 2)
+                          / np.sum(e_field[:, test_indices, ...] ** 2))
+
     if plot_recall:
-        print(max_order, seed, n_points, error*100)
+        print(f"{max_order=}, {seed=}, {n_points=}, train={error_train*100:.1f}, test={error_test*100:.1f}")
 
         # if error**.5*100 > 31:
         #     raise ValueError()
@@ -212,17 +227,20 @@ def lightning_inverse_problem(**kwargs):
             arg_max = np.argmax(np.abs(h))
             h_max = h[arg_max]
 
+        path = "../../lightning_inverse/figs"
+
         plt.figure()
         heidler_scaled = heidler(t, h_max/.85, tau1=1.8e-6, tau2=95e-6, n=2)
         plt.plot(t - t[np.argmax(np.abs(heidler_scaled))] + t[arg_max], heidler_scaled, "r--", label="Heidler")
         if len(h.shape) > 1 and h.shape[0] > 1:
             for f_ind in range(h.shape[0]):
                 plt.plot(t, h[f_ind, :], color=plt.get_cmap("jet")(f_ind/(h.shape[0]-1)), label=f"{f_ind}")
-            plt.legend()
         else:
-            plt.plot(t, h.T, "k")
+            plt.plot(t, h.T, "k", label="h")
+        plt.legend()
         plt.xlabel("Normalized time")
         plt.ylabel("Excitation function (1)")
+        plt.savefig(f"{path}/opt_h.pdf")
 
         plt.figure(figsize=(15, 10))
         omin, omax = np.min(e_field), np.max(e_field)
@@ -237,10 +255,12 @@ def lightning_inverse_problem(**kwargs):
                 plt.xlabel("Normalized time")
             # plt.ylim(1.1*omin, 1.1*omax)
         plt.tight_layout()
+        plt.savefig(f"{path}/opt_fields.pdf")
 
         print(f"{center=}")
         current_moment[-1, 0, 0, :] *= order_scale**np.linspace(0, max_order + 2, max_order + 3)
         inverse_problem.plot_moment_2d(current_moment)
+        plt.savefig(f"{path}/opt_moments.pdf")
         # plt.figure()
         # max_h = np.max(np.abs(h))
         # if max_h > 0:
@@ -250,7 +270,7 @@ def lightning_inverse_problem(**kwargs):
         # plt.title("Current vs time")
         plt.show(block=True)
 
-    return current_moment, h, center, e_opt, error
+    return current_moment, h, center, e_opt, error_train, error_test
 
 
 def from_command_line():
@@ -294,8 +314,8 @@ def sweep_results():
                     seed=seed
                 )
                 try:
-                    current_moment, h, center, e_opt, error = lightning_inverse_problem(**kwargs)
-                    errors[seed] = error
+                    current_moment, h, center, e_opt, train_error, test_error = lightning_inverse_problem(**kwargs)
+                    errors[seed] = test_error
                 except ValueError:
                     print("Not available")
                     continue
@@ -303,7 +323,7 @@ def sweep_results():
             seed = int(np.argmin(errors))
             kwargs["seed"] = seed
             kwargs["plot_recall"] = True
-            current_moment, h, center, e_opt, error = lightning_inverse_problem(**kwargs)
+            current_moment, h, center, e_opt, train_error, test_error = lightning_inverse_problem(**kwargs)
 
 
 if __name__ == "__main__":
