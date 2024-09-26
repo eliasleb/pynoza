@@ -1,7 +1,7 @@
 function_cache/
 *~
 .DS_Store
-data/
+
 funknoza/data
 funknoza/.jobs
 tests/.jobs

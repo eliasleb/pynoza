@@ -1,0 +1,14 @@
+[H[2J[H[2J[H[2J[H[2J[H[2Jkwargs={'down_sample_time': '1', 'x1': ['.4', '.5', '.45', '.45'], 'x2': ['0', '0', '.2', '0'], 'x3': ['0', '0', '0', '.2'], 'order': '0', 'n_points': '50', 'n_tail': '25', 'verbose_every': '10', 'plot': 'False', 'scale': '1e-12', 'find_center': 'True', 'center_x': '-.5', 'filename': '../../../git_ignore/ti-hira/ti_hira_v1.txt', 'dt': '8e-12', 'before': 0.6}
+Successfully read file
+-0.5
+ex.shape=(4, 1301)
+[((0, 0, 0), set())]
+kwargs={'tol': 1e-06, 'n_points': 50, 'error_tol': 1e-06, 'coeff_derivative': 0, 'verbose_every': 10, 'plot': False, 'scale': 1e-12, 'h_num': <function inverse_problem_hira.<locals>.get_h_num at 0x15766b9c0>, 'find_center': True, 'max_global_tries': 1, 'compute_grid': False, 'estimate': None, 'p': 2}
+There are 53 degrees of freedom.
+Try 0
+##################################################1.000, n_calls=10, component_wise_error/total_energy=array([0.11842745, 0.03815428, 0.84341827])##################################################1.000, n_calls=20, component_wise_error/total_energy=array([0.11842745, 0.03815428, 0.84341827])##################################################1.000, n_calls=30, component_wise_error/total_energy=array([0.11842745, 0.03815428, 0.84341827])##################################################1.000, n_calls=40, component_wise_error/total_energy=array([0.11842745, 0.03815428, 0.84341827])##################################################1.000, n_calls=50, component_wise_error/total_energy=array([0.11842745, 0.03815428, 0.84341827])Optimization terminated successfully.
+         Current function value: 1.000000
+         Iterations: 0
+         Function evaluations: 54
+         Gradient evaluations: 1
+Saved as '../../../git_ignore/GLOBALEM/opt-result-Tue Feb 21 17:09:54 2023.csv'.
