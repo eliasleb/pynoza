@@ -58,4 +58,11 @@ setuptools.setup(
     cmdclass={
         'build_ext': BuildExt,
     },
+    include_package_data=True,  # This ensures that package data is included
+    package_data={
+        # If you want to include all files in the `data` folder
+        "pynoza": ["data/*"],
+    },
+    zip_safe=False,  # If you're including non-Python files, it's safer to set this to False
+
 )

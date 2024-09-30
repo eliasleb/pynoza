@@ -277,9 +277,10 @@ class Solution:
         self.magnetic_moment = self.current_moment.copy()
 
         for ind, _ in np.ndenumerate(zeros(self._shape)):
-            self.current_moment[:, ind[0], ind[1], ind[2]] = current_moment(*ind)
-            if charge_moment is not None:
-                self.charge_moment[:, ind[0], ind[1], ind[2]] = charge_moment(*ind)
+            if np.sum(ind) <= self.max_order:
+                self.current_moment[:, ind[0], ind[1], ind[2]] = current_moment(*ind)
+                if charge_moment is not None:
+                    self.charge_moment[:, ind[0], ind[1], ind[2]] = charge_moment(*ind)
         if charge_moment is None:
             self.charge_moment, _rho_to_j_mapping = pynoza.helpers.get_charge_moment(
                 self.current_moment, return_mapping=True)

@@ -3,7 +3,7 @@ import numpy as np
 from scipy.io import loadmat
 import matplotlib.pyplot as plt
 from itertools import product
-from pynoza.inverse_problem import inverse_problem
+from pynoza.inverse_problem import inverse_problem, plot_moment_2d
 from scipy.interpolate import interp1d
 from pynoza.helpers import cache_function_call
 from pynoza.from_mathematica import SPHERICAL_TO_CARTESIAN
@@ -11,7 +11,8 @@ global moments_shape, max_order, order_scale, n_tail, dim_moment, n_points
 
 
 def heidler(t, max_current, tau1, tau2, n):
-    i = max_current * (t/tau1)**n / (1 + (t/tau1)**n) * np.exp(-t/tau2)
+    i = max_current / np.exp(-(tau1 / tau2)**n * np.sqrt(n * tau2 / tau1)) * (t / tau1) ** n / (
+            1 + (t / tau1)**n) * np.exp(-t / tau2)
     i[t < 0.] = 0.
     return i
 
@@ -22,7 +23,7 @@ def read_data(filename):
     return t.squeeze(), e_r.squeeze(), e_z.squeeze(), h_phi.squeeze()
 
 
-def read_all_data(window_us=1000):
+def read_all_data(window_us=1000, case="MTLL"):
     # r <> x, y <> not used, z <> z
     r_km = np.array((1., 5., 10.))
     z_km = np.array((0., 2., 4.))
@@ -35,7 +36,7 @@ def read_all_data(window_us=1000):
     for r in r_km:
         for zi in z_km:
             _t, e_r, e_z, h_phi = read_data(
-                f"data/20240730/EMF_T={window_us}_r={int(r)}_z={int(zi)}.mat"
+                f"data/{case}/EMF_T={window_us}_r={int(r)}_z={int(zi)}.mat"
             )
             if e_field is None:
                 e_field = np.zeros((3, r_km.size * z_km.size, _t.size))
@@ -67,8 +68,8 @@ def get_current_moment_spherical(moment):
     ind = 0
     for l in range(0, max_order + 1, 2):
         sph_to_cart = SPHERICAL_TO_CARTESIAN[(l, 0)]
-        for alpha in sph_to_cart:
-            _current_moment[2, alpha[0], alpha[1], alpha[2]] += moment[ind] * re_or_im(sph_to_cart[alpha]) \
+        for alpha, coefficient in sph_to_cart.items():
+            _current_moment[2, alpha[0], alpha[1], alpha[2]] += moment[ind] * coefficient \
                                                                 / order_scale**np.sum(alpha)
         ind += 1
 
@@ -142,12 +143,13 @@ def lightning_inverse_problem(**kwargs):
     plot_recall = kwargs.pop("plot_recall", plot)
     rescale_at_points = kwargs.pop("rescale_at_points", False)
     noise_level = kwargs.pop("noise_level", 0.)
+    case = kwargs.pop("case")
 
     if plot or plot_recall:
         import matplotlib
         matplotlib.use("TkAgg")
 
-    x, y, z, t, e_field, h_field = read_all_data()
+    x, y, z, t, e_field, h_field = read_all_data(case=case)
 
     n = 200
     dt = t[1] - t[0]
@@ -187,7 +189,7 @@ def lightning_inverse_problem(**kwargs):
         x3=z,
         t=t,
         _t_sym=None,
-        current_moment_callable=get_current_moment,
+        current_moment_callable=get_current_moment_spherical,
         dim_moment=dim_moment,
         h_num=get_h_num,
         plot=plot,
@@ -227,7 +229,7 @@ def lightning_inverse_problem(**kwargs):
             arg_max = np.argmax(np.abs(h))
             h_max = h[arg_max]
 
-        path = "../../lightning_inverse/figs"
+        path = "../../../lightning_inverse/figs"
 
         plt.figure()
         heidler_scaled = heidler(t, h_max/.85, tau1=1.8e-6, tau2=95e-6, n=2)
@@ -259,7 +261,7 @@ def lightning_inverse_problem(**kwargs):
 
         print(f"{center=}")
         current_moment[-1, 0, 0, :] *= order_scale**np.linspace(0, max_order + 2, max_order + 3)
-        inverse_problem.plot_moment_2d(current_moment)
+        plot_moment_2d(current_moment)
         plt.savefig(f"{path}/opt_moments.pdf")
         # plt.figure()
         # max_h = np.max(np.abs(h))
@@ -291,6 +293,7 @@ def from_command_line():
     parser.add_argument("--plot_recall", type=bool, default=False)
     parser.add_argument("--rescale_at_points", type=bool, default=False)
     parser.add_argument("--noise_level", type=float, default=0.)
+    parser.add_argument("--case", type=str, default="MTLL")
 
     parsed = parser.parse_args()
     lightning_inverse_problem(**vars(parsed))

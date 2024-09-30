@@ -1,0 +1,253 @@
+(* Content-type: application/vnd.wolfram.mathematica *)
+
+(*** Wolfram Notebook File ***)
+(* http://www.wolfram.com/nb *)
+
+(* CreatedBy='Mathematica 13.3' *)
+
+(*CacheID: 234*)
+(* Internal cache information:
+NotebookFileLineBreakTest
+NotebookFileLineBreakTest
+NotebookDataPosition[       158,          7]
+NotebookDataLength[      8805,        245]
+NotebookOptionsPosition[      8364,        230]
+NotebookOutlinePosition[      8755,        246]
+CellTagsIndexPosition[      8712,        243]
+WindowFrame->Normal*)
+
+(* Beginning of Notebook Content *)
+Notebook[{
+Cell[BoxData[{
+ RowBox[{
+  RowBox[{"maxOrder", "=", "16"}], ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"RealSphericalHarmonicY", "[", 
+   RowBox[{"l_", ",", "m_", ",", "\[Theta]_", ",", "\[Phi]_"}], "]"}], ":=", 
+  RowBox[{"If", "[", 
+   RowBox[{
+    RowBox[{"m", "<", "0"}], ",", "\[IndentingNewLine]", 
+    RowBox[{
+     RowBox[{"\[ImaginaryJ]", "/", 
+      RowBox[{"Sqrt", "[", "2", "]"}]}], 
+     RowBox[{"(", 
+      RowBox[{
+       RowBox[{"SphericalHarmonicY", "[", 
+        RowBox[{"l", ",", "m", ",", "\[Theta]", ",", "\[Phi]"}], "]"}], "-", 
+       RowBox[{
+        RowBox[{
+         RowBox[{"(", 
+          RowBox[{"-", "1"}], ")"}], "^", "m"}], " ", 
+        RowBox[{"SphericalHarmonicY", "[", 
+         RowBox[{"l", ",", 
+          RowBox[{"-", "m"}], ",", "\[Theta]", ",", "\[Phi]"}], "]"}]}]}], 
+      ")"}]}], ",", "\[IndentingNewLine]", 
+    RowBox[{"If", "[", 
+     RowBox[{
+      RowBox[{"m", "==", "0"}], ",", "\[IndentingNewLine]", 
+      RowBox[{"SphericalHarmonicY", "[", 
+       RowBox[{"l", ",", "m", ",", "\[Theta]", ",", "\[Phi]"}], "]"}], ",", 
+      "\[IndentingNewLine]", 
+      RowBox[{
+       RowBox[{"1", "/", 
+        RowBox[{"Sqrt", "[", "2", "]"}]}], 
+       RowBox[{"(", 
+        RowBox[{
+         RowBox[{"SphericalHarmonicY", "[", 
+          RowBox[{"l", ",", "m", ",", "\[Theta]", ",", "\[Phi]"}], "]"}], "+", 
+         RowBox[{
+          RowBox[{
+           RowBox[{"(", 
+            RowBox[{"-", "1"}], ")"}], "^", "m"}], " ", 
+          RowBox[{"SphericalHarmonicY", "[", 
+           RowBox[{"l", ",", 
+            RowBox[{"-", "m"}], ",", "\[Theta]", ",", "\[Phi]"}], "]"}]}]}], 
+        ")"}]}]}], "\[IndentingNewLine]", "]"}]}], "\[IndentingNewLine]", 
+   "]"}]}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"ToMultiIndex", "[", 
+   RowBox[{"coefficient_", ",", "powers_"}], "]"}], ":=", 
+  RowBox[{"If", "[", 
+   RowBox[{
+    RowBox[{"powers", "==", 
+     RowBox[{"{", "}"}]}], ",", "\[IndentingNewLine]", 
+    RowBox[{"{", "}"}], ",", "\[IndentingNewLine]", 
+    RowBox[{
+     RowBox[{"Total", "@", 
+      RowBox[{"(", 
+       RowBox[{
+        RowBox[{
+         RowBox[{"UnitVector", "[", 
+          RowBox[{"3", ",", "#"}], "]"}], "&"}], "/@", "powers"}], ")"}]}], "->",
+      "coefficient"}]}], "]"}]}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{
+   RowBox[{"CoefficientArraysToMultiIndex", "[", "array_", "]"}], ":=", 
+   RowBox[{"If", "[", 
+    RowBox[{
+     RowBox[{
+      RowBox[{"Length", "@", "array"}], "==", "1"}], ",", 
+     "\[IndentingNewLine]", 
+     RowBox[{"<|", 
+      RowBox[{
+       RowBox[{"{", 
+        RowBox[{"0", ",", "0", ",", "0"}], "}"}], "->", 
+       RowBox[{"array", "[", 
+        RowBox[{"[", "1", "]"}], "]"}]}], "|>"}], ",", "\[IndentingNewLine]", 
+     
+     RowBox[{"Association", "@", 
+      RowBox[{"Select", "[", 
+       RowBox[{
+        RowBox[{
+         RowBox[{"Flatten", "@", 
+          RowBox[{"Select", "[", 
+           RowBox[{
+            RowBox[{
+             RowBox[{
+              RowBox[{"MapIndexed", "[", 
+               RowBox[{"ToMultiIndex", ",", "#", ",", 
+                RowBox[{"{", 
+                 RowBox[{"Length", "@", 
+                  RowBox[{"Dimensions", "@", "#"}]}], "}"}]}], "]"}], "&"}], "/@",
+              "array"}], ",", 
+            RowBox[{
+             RowBox[{
+              RowBox[{"Length", "@", "#"}], ">", "0"}], "&"}]}], "]"}]}], "/.", 
+         RowBox[{
+          RowBox[{"(", 
+           RowBox[{"index_", "->", "0"}], ")"}], "\[RuleDelayed]", 
+          RowBox[{"{", "}"}]}]}], ",", 
+        RowBox[{
+         RowBox[{
+          RowBox[{"Length", "@", "#"}], ">", "0"}], "&"}]}], "]"}]}]}], 
+    "]"}]}], ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"dr", "=", 
+   RowBox[{
+    RowBox[{"dx", " ", 
+     RowBox[{"Sin", "[", "\[Theta]", "]"}], 
+     RowBox[{"Cos", "[", "\[Phi]", "]"}]}], "+", 
+    RowBox[{"dy", " ", 
+     RowBox[{"Sin", "[", "\[Theta]", "]"}], 
+     RowBox[{"Sin", "[", "\[Phi]", "]"}]}], "+", 
+    RowBox[{"dz", " ", 
+     RowBox[{"Cos", "[", "\[Theta]", "]"}]}]}]}], 
+  ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"sphericalToCartesian", "=", 
+   RowBox[{
+    RowBox[{"Table", "[", 
+     RowBox[{
+      RowBox[{
+       RowBox[{"{", 
+        RowBox[{"l", ",", "m"}], "}"}], "->", 
+       RowBox[{"4", "\[Pi]", 
+        RowBox[{
+         RowBox[{
+          RowBox[{"(", 
+           RowBox[{"-", "1"}], ")"}], "^", "l"}], "/", 
+         RowBox[{"1", "^", 
+          RowBox[{"(", 
+           RowBox[{"l", "+", "1"}], ")"}]}]}], "\[IndentingNewLine]", 
+        RowBox[{"CoefficientArraysToMultiIndex", "[", 
+         RowBox[{"CoefficientArrays", "[", 
+          RowBox[{
+           RowBox[{
+            RowBox[{
+             RowBox[{"(", 
+              RowBox[{
+               RowBox[{"dx", "^", "2"}], "+", 
+               RowBox[{"dy", "^", "2"}], "+", 
+               RowBox[{"dz", "^", "2"}]}], ")"}], "^", 
+             RowBox[{"(", 
+              RowBox[{"l", "/", "2"}], ")"}]}], 
+            RowBox[{"Simplify", "@", 
+             RowBox[{"TrigExpand", "@", 
+              RowBox[{"ExpToTrig", "@", 
+               RowBox[{"TransformedField", "[", "\[IndentingNewLine]", 
+                RowBox[{
+                 RowBox[{"\"\<Spherical\>\"", "->", "\"\<Cartesian\>\""}], 
+                 ",", "\[IndentingNewLine]", 
+                 RowBox[{"RealSphericalHarmonicY", "[", 
+                  RowBox[{"l", ",", "m", ",", "\[Theta]", ",", "\[Phi]"}], 
+                  "]"}], ",", "\[IndentingNewLine]", 
+                 RowBox[{
+                  RowBox[{"{", 
+                   RowBox[{"\[Rho]", ",", "\[Theta]", ",", "\[Phi]"}], "}"}], 
+                  "->", 
+                  RowBox[{"{", 
+                   RowBox[{"dx", ",", "dy", ",", "dz"}], "}"}]}]}], 
+                "\[IndentingNewLine]", "]"}]}]}]}]}], ",", 
+           RowBox[{"{", 
+            RowBox[{"dx", ",", "dy", ",", "dz"}], "}"}]}], "]"}], "]"}]}]}], 
+      ",", "\[IndentingNewLine]", 
+      RowBox[{"{", 
+       RowBox[{"l", ",", "0", ",", "maxOrder"}], "}"}], ",", 
+      RowBox[{"{", 
+       RowBox[{"m", ",", 
+        RowBox[{"-", "l"}], ",", "l"}], "}"}]}], "]"}], "//", 
+    "Association"}]}], ";"}]}], "Input",
+ CellChangeTimes->{{3.93645378498884*^9, 3.936453871284985*^9}, {
+   3.936454794918313*^9, 3.936454795928718*^9}, {3.9364552010763693`*^9, 
+   3.936455201200365*^9}, 3.936455261423987*^9},
+ CellLabel->"In[59]:=",ExpressionUUID->"2ae87404-3c7c-4ed6-9b43-7eda2298275f"],
+
+Cell[BoxData[{
+ RowBox[{
+  RowBox[{"toExport", "=", 
+   RowBox[{"Association", "@", 
+    RowBox[{"KeyValueMap", "[", 
+     RowBox[{
+      RowBox[{
+       RowBox[{"{", 
+        RowBox[{"key", ",", "value"}], "}"}], "|->", 
+       RowBox[{
+        RowBox[{"ToString", "[", "key", "]"}], "->", 
+        RowBox[{"Association", "@", 
+         RowBox[{"KeyValueMap", "[", "\[IndentingNewLine]", 
+          RowBox[{
+           RowBox[{
+            RowBox[{"{", 
+             RowBox[{"k", ",", "v"}], "}"}], "|->", 
+            RowBox[{
+             RowBox[{"ToString", "@", "k"}], "->", 
+             RowBox[{"ToString", "[", 
+              RowBox[{"v", ",", "CForm"}], "]"}]}]}], ",", "value"}], 
+          "\[IndentingNewLine]", "]"}]}]}]}], ",", "sphericalToCartesian"}], 
+     "]"}]}]}], ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"Export", "[", 
+   RowBox[{
+    RowBox[{
+     RowBox[{"NotebookDirectory", "[", "]"}], "<>", "\"\<data/map.json\>\""}],
+     ",", "\[IndentingNewLine]", "toExport", ",", "\"\<JSON\>\""}], "]"}], 
+  ";"}]}], "Input",
+ CellChangeTimes->{{3.936453854285933*^9, 3.936453857607766*^9}, {
+   3.936454288167901*^9, 3.9364543128260803`*^9}, {3.936454484856657*^9, 
+   3.936454737596457*^9}, {3.936454773401939*^9, 3.9364547837905083`*^9}, 
+   3.9364559601485233`*^9},ExpressionUUID->"6b9bdf66-e91e-4724-801e-\
+dfd8faafe602"]
+},
+WindowSize->{808, 887},
+WindowMargins->{{4, Automatic}, {Automatic, 4}},
+FrontEndVersion->"13.3 for Mac OS X ARM (64-bit) (July 24, 2023)",
+StyleDefinitions->"Default.nb",
+ExpressionUUID->"83095b7a-0d82-42f2-81ba-4941d0eb635c"
+]
+(* End of Notebook Content *)
+
+(* Internal cache information *)
+(*CellTagsOutline
+CellTagsIndex->{}
+*)
+(*CellTagsIndex
+CellTagsIndex->{}
+*)
+(*NotebookFileOutline
+Notebook[{
+Cell[558, 20, 6447, 172, 844, "Input",ExpressionUUID->"2ae87404-3c7c-4ed6-9b43-7eda2298275f"],
+Cell[7008, 194, 1352, 34, 220, "Input",ExpressionUUID->"6b9bdf66-e91e-4724-801e-dfd8faafe602"]
+}
+]
+*)
+
