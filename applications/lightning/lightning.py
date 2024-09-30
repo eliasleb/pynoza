@@ -203,7 +203,8 @@ def lightning_inverse_problem(**kwargs):
         find_center_ignore_axes=("x", "y"),
         center_scale=center_scale,
         seed=seed,
-        test_indices=test_indices
+        test_indices=test_indices,
+        fit_on_derivative=True
     )
     current_moment, h, center, e_opt = cache_function_call(
         inverse_problem,
@@ -260,7 +261,7 @@ def lightning_inverse_problem(**kwargs):
         plt.savefig(f"{path}/opt_fields.pdf")
 
         print(f"{center=}")
-        current_moment[-1, 0, 0, :] *= order_scale**np.linspace(0, max_order + 2, max_order + 3)
+        current_moment[-1, 0, 0, :] *= np.power(order_scale, np.linspace(0, max_order + 2, max_order + 3))
         plot_moment_2d(current_moment)
         plt.savefig(f"{path}/opt_moments.pdf")
         # plt.figure()
@@ -270,6 +271,18 @@ def lightning_inverse_problem(**kwargs):
         # plt.xlabel("Time (relative)")
         # plt.ylabel("Amplitude (normalized)")
         # plt.title("Current vs time")
+
+        z = np.linspace(0, 4e3, 100) / c0
+        distribution = 0 * z.copy()
+        center = 0. if center is None else center[0]
+        for az in range(0, max_order + 1, 2):
+            distribution += current_moment[-1, 0, 0, az] * (z - center)**az
+
+        plt.figure()
+        m = np.max(np.abs(distribution))
+        plt.plot(z, distribution)
+        plt.ylim(-1.1 * m, 1.1 * m)
+
         plt.show(block=True)
 
     return current_moment, h, center, e_opt, error_train, error_test

@@ -98,7 +98,9 @@ def get_fields(sol, _sol_rust, find_center, t, x1, x2, x3, current_moment, h_sym
     return sol.compute_b_field(*args, **kwargs)
 
 
-def field_energy(x: np.ndarray, log=False) -> np.ndarray:
+def field_energy(x: np.ndarray, log=False, fit_on_derivative=False) -> np.ndarray:
+    if fit_on_derivative:
+        x = np.diff(x, axis=-1)
     if not log:
         return np.sum(x**2)
     e = x**2
@@ -135,6 +137,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
     if fit_on_magnetic_field:
         scale /= 3e8
     rescale_at_points = kwargs.pop("rescale_at_points", False)
+    fit_on_derivative = kwargs.pop("fit_on_derivative", False)
 
     find_center_ignore_axes = kwargs.pop(
         "find_center_ignore_axes",
@@ -147,8 +150,10 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
     train_indices, test_indices = list(sorted(train_indices)), list(sorted(test_indices))
 
     field_true = np.array(e_true if not fit_on_magnetic_field else b_true)
-    true_energy_train = field_energy(field_true[:, train_indices, ...], log=rescale_at_points)
-    true_energy_test = field_energy(field_true[:, test_indices, ...], log=rescale_at_points)
+    true_energy_train = field_energy(field_true[:, train_indices, ...], log=rescale_at_points,
+                                     fit_on_derivative=fit_on_derivative)
+    true_energy_test = field_energy(field_true[:, test_indices, ...], log=rescale_at_points,
+                                    fit_on_derivative=fit_on_derivative)
     if kwargs:
         raise ValueError(f"Unknown keyword arguments: {kwargs}")
 
@@ -205,10 +210,10 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
         assert field_opt.shape == field_true.shape
 
         train_error = field_energy(field_true[:, train_indices, :] - field_opt[:, train_indices, :] * scale,
-                                   log=rescale_at_points) / true_energy_train
+                                   log=rescale_at_points, fit_on_derivative=fit_on_derivative) / true_energy_train
         if true_energy_test > 1e-18:
             test_error = field_energy(field_true[:, test_indices, :] - field_opt[:, test_indices, :] * scale,
-                                       log=rescale_at_points) / true_energy_test
+                                       log=rescale_at_points, fit_on_derivative=fit_on_derivative) / true_energy_test
         else:
             test_error = 1
         if n_calls % verbose_every == 0:
