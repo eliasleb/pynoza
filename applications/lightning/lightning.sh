@@ -9,6 +9,6 @@ do
   do
     python lightning.py --max_order "$order" --n_points $n_points --n_tail $n_tail --seed "$seed" --find_center True \
     --noise_level $noise_level --case $data_case \
-    > ../../../git_ignore/lightning_inverse/opt_results/max_order_"${order}"_n_points_"${n_points}"_n_tail_"${n_tail}"_seed_"${seed}"_noise_level_"${noise_level}"_case_$data_case.txt &
+    > ../../../git_ignore/lightning_inverse/opt_results/de_max_order_"${order}"_n_points_"${n_points}"_n_tail_"${n_tail}"_seed_"${seed}"_noise_level_"${noise_level}"_case_$data_case.txt &
   done
 done
