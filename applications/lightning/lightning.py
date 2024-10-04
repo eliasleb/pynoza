@@ -1,3 +1,4 @@
+import scipy.optimize
 from numpy.random import normal
 import numpy as np
 from scipy.io import loadmat
@@ -93,7 +94,7 @@ def get_current_moment(moment):
 def get_h_num(h_, t_):
     h_dict = dict()
     delta_t0 = (np.max(t_) - np.min(t_)) / (h_.size - 1)
-    sigma = delta_t0 / 2
+    sigma = delta_t0 / 1
     t_max = h_.size / (n_tail + h_.size) * (np.max(t_) - np.min(t_)) + np.min(t_)
     ind = 0
     # for az in range(max_order + 1):
@@ -157,8 +158,9 @@ def lightning_inverse_problem(**kwargs):
     e_field = np.concatenate((np.zeros((3, e_field.shape[1], n)), e_field), axis=-1)
     n_d = 1
     n_t = t.size
-    t = t[:n_t//2:n_d]
-    e_field = e_field[:, :, :n_t//2:n_d]
+    n_less = 2
+    t = t[:n_t//n_less:n_d]
+    e_field = e_field[:, :, :n_t//n_less:n_d]
 
     # Add noise
     if noise_level > 0.:
@@ -204,7 +206,6 @@ def lightning_inverse_problem(**kwargs):
         center_scale=center_scale,
         seed=seed,
         test_indices=test_indices,
-        fit_on_derivative=True
     )
     current_moment, h, center, e_opt = cache_function_call(
         inverse_problem,
@@ -264,25 +265,73 @@ def lightning_inverse_problem(**kwargs):
         current_moment[-1, 0, 0, :] *= np.power(order_scale, np.linspace(0, max_order + 2, max_order + 3))
         plot_moment_2d(current_moment)
         plt.savefig(f"{path}/opt_moments.pdf")
-        # plt.figure()
-        # max_h = np.max(np.abs(h))
-        # if max_h > 0:
-        #     plt.plot(t, h / max_h)
-        # plt.xlabel("Time (relative)")
-        # plt.ylabel("Amplitude (normalized)")
-        # plt.title("Current vs time")
-
-        z = np.linspace(0, 4e3, 100) / c0
-        distribution = 0 * z.copy()
-        center = 0. if center is None else center[0]
-        for az in range(0, max_order + 1, 2):
-            distribution += current_moment[-1, 0, 0, az] * (z - center)**az
-
         plt.figure()
-        m = np.max(np.abs(distribution))
-        plt.plot(z, distribution)
-        plt.ylim(-1.1 * m, 1.1 * m)
+        max_h = np.max(np.abs(h))
+        if max_h > 0:
+            plt.plot(t, h / max_h)
+        plt.xlabel("Time (relative)")
+        plt.ylabel("Amplitude (normalized)")
+        plt.title("Current vs time")
+        print(f"{current_moment[-1, 0, 0, :]=}")
 
+        # z = np.linspace(-4e3, 4e3, 100) / c0
+        # distribution = 0 * z.copy()
+        # center = 0. if center is None else center[0]
+        # for az in range(0, max_order + 1, 2):
+        #     distribution += current_moment[-1, 0, 0, az] * (z - center)**az * factorial(az) * (-1)**az  # TODO check
+        # n_samples = 300
+        # z = np.linspace(0, 4e3/3e8, n_samples)
+        # dz = z[1] - z[0]
+        # distribution_0 = (np.random.random(z.shape) - .5)
+#
+        # plt.close("all")
+        # plt.figure()
+        # ind = 0
+#
+        # def get_error(distribution_samples):
+        #     nonlocal ind
+        #     moment_error = 0.
+        #     for order in range(0, 8, 2):
+        #         try:
+        #             mi = current_moment[2, 0, 0, order]
+        #         except IndexError:
+        #             mi = 0.
+        #         opt_mi = np.sum(z**order * distribution_samples)
+        #         moment_error += np.abs(mi - opt_mi)**2
+        #     # moment_error += np.sum((np.diff(distribution_samples)**2))
+        #     if ind % 1000 == 0:
+        #         plt.clf()
+        #         plt.plot(z, distribution_samples)
+        #         plt.title(f"{ind=}, {moment_error:.4f}")
+        #         plt.show(block=False)
+        #         plt.pause(1e-6)
+#
+        #     ind += 1
+#
+        #     return moment_error + np.sum(distribution_samples**2)/10000
+#
+        # from scipy.optimize import minimize
+#
+        # res = scipy.optimize.minimize(
+        #     get_error, distribution_0,
+        #     # niter=1_000_000,
+        #     # T=10
+        #     method="nelder-mead",
+        #     options=dict(
+        #         maxiter=1_000_000_000,
+        #         disp=True,
+        #         gtol=1e-20,
+        #         atol=1e-10
+        #     )
+        # )
+        # print(res)
+        # # distribution = res.x
+        # # m = np.max(np.abs(distribution))
+        # #
+        # # plt.figure()
+        # # plt.plot(z, distribution)
+        # # plt.ylim(-1.1 * m, 1.1 * m)
+#
         plt.show(block=True)
 
     return current_moment, h, center, e_opt, error_train, error_test
