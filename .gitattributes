@@ -1,2 +1,3 @@
 *.ipynb linguist-vendored
 *.nb linguist-vendored
+*.job linguist-vendored
