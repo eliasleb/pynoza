@@ -8,6 +8,8 @@ import hashlib
 import re
 from matplotlib.collections import PatchCollection
 from matplotlib.patches import Rectangle
+from numpy.linalg import lstsq
+from scipy.optimize import minimize, basinhopping
 
 
 class PlotAndWait:
@@ -246,6 +248,55 @@ def get_poynting(e, h):
     p[1, ...] = e[2, ...] * h[0, ...] - e[0, ...] * h[2, ...]
     p[2, ...] = e[0, ...] * h[1, ...] - e[1, ...] * h[0, ...]
     return p
+
+
+def lstsq_moment_problem_solution(z, moments, n_steps=10, rcond=-1):
+    if not isinstance(moments, np.ndarray) or len(moments.shape) != 1:
+        raise ValueError(":moments: must be a 1d numpy array")
+    if not isinstance(z, np.ndarray) or len(z.shape) != 1:
+        raise ValueError(":z: must be a 1d numpy array")
+
+    max_order = moments.size - 1
+
+    matrix = np.zeros((max_order + 1, n_steps))
+    for ind_l, l in enumerate(range(0, max_order + 1)):
+        for ind_fun, fun in enumerate(range(1, n_steps + 1)):
+            matrix[ind_l, ind_fun] = (10 ** (-1 - l) * (1 + (-1) ** l) * (11 - fun) ** (1 + l)) / (1 + l)
+
+    sol, residual, _, _ = lstsq(matrix, moments, rcond=rcond)
+    fit = 0.
+    heaviside_pi = lambda y: np.abs(y) < .5
+    for fun_number, sol_i in zip(range(1, n_steps + 1), reversed(sol)):
+        fit = fit + heaviside_pi(z / 2 * n_steps / fun_number) * sol_i
+    return fit, residual
+
+
+def optimization_moment_problem_solution(z, moments, poly_order=2, **opt_kwargs):
+    if not isinstance(moments, np.ndarray) or len(moments.shape) != 1:
+        raise ValueError(":moments: must be a 1d numpy array")
+    if not isinstance(z, np.ndarray) or len(z.shape) != 1:
+        raise ValueError(":z: must be a 1d numpy array")
+
+    dz = z[1] - z[0]
+
+    def get_poly(param):
+        poly = 0.
+        for p_order, coeff in zip(range(0, poly_order + 1), param):
+            poly = poly + coeff * z ** p_order
+        poly[z < 0] = poly[z > 0][:np.sum(z < 0)][::-1]
+        return poly
+
+    def get_error(param):
+        result = 0.
+        poly = get_poly(param)
+        for ind, moment_i in enumerate(moments):
+            opt_moment_i = dz * np.sum(z**ind * poly)
+            result += (opt_moment_i - moment_i) ** 2
+        return result
+
+    sol = minimize(get_error, np.zeros((poly_order + 1, )), **opt_kwargs)
+    y = get_poly(sol.x)
+    return y, sol.fun
 
 
 if __name__ == "__main__":

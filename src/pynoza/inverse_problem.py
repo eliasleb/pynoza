@@ -241,9 +241,9 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
                         plt.plot(t, h_plot.T)
                     if find_center:
                         plt.subplot(2, 3, 2)
-                        plt.title(f"""center = ({complete_center[0]/center_scale:+.03f}, """
-                                  f"""{complete_center[1]/center_scale:+.03f}, """
-                                  f"""{complete_center[2]/center_scale:+.03f})""")
+                        plt.title(f"""center = ({complete_center[0]:+.03f}, """
+                                  f"""{complete_center[1]:+.03f}, """
+                                  f"""{complete_center[2]:+.03f})""")
             if plot:
                 os.system("clear")
                 end = "\r"
@@ -281,6 +281,8 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
     #     accept_test=lambda f_new=None, **_: f_new < 0.3,
     # )
     current_moment, h, center = unravel_params(res.x)
+    if find_center:
+        center *= center_scale
 
     if return_residual_error:
         return current_moment_callable(current_moment), get_h_num(h, t), center, field_opt.squeeze() * scale, res.fun
