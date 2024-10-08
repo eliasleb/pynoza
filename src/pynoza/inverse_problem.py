@@ -138,7 +138,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
         scale /= 3e8
     rescale_at_points = kwargs.pop("rescale_at_points", False)
     fit_on_derivative = kwargs.pop("fit_on_derivative", False)
-
+    return_raw_moment = kwargs.pop("return_raw_moment", False)
     find_center_ignore_axes = kwargs.pop(
         "find_center_ignore_axes",
         ()
@@ -284,6 +284,11 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
     if find_center:
         center *= center_scale
 
+    return_value = (current_moment_callable(current_moment), get_h_num(h, t), center, field_opt.squeeze() * scale, )
+
     if return_residual_error:
-        return current_moment_callable(current_moment), get_h_num(h, t), center, field_opt.squeeze() * scale, res.fun
-    return current_moment_callable(current_moment), get_h_num(h, t), center, field_opt.squeeze() * scale
+        return_value += (res.fun, )
+    if return_raw_moment:
+        return_value += (current_moment, )
+
+    return return_value

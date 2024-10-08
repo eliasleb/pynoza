@@ -1,13 +1,11 @@
-import scipy.optimize
 from numpy.random import normal
 import numpy as np
 from scipy.io import loadmat
 import matplotlib.pyplot as plt
-from itertools import product
 from pynoza.inverse_problem import inverse_problem, plot_moment_2d
-from scipy.interpolate import interp1d
 from pynoza.helpers import cache_function_call
 from pynoza.from_mathematica import SPHERICAL_TO_CARTESIAN
+
 global moments_shape, max_order, order_scale, n_tail, dim_moment, n_points
 
 
@@ -75,6 +73,23 @@ def get_current_moment_spherical(moment):
         ind += 1
 
     assert ind == moment.size
+    return _current_moment
+
+
+def get_poly(z, poly):
+    fun = 0. * z
+    for order, coeff in enumerate(poly):
+        fun += coeff * z ** order
+    return fun
+
+
+def get_current_moment_from_polynomial(poly):
+    _current_moment = np.zeros(moments_shape)
+    z = np.linspace(0, 4e3/3e8, 100)
+    dz = z[1] - z[0]
+    fun = get_poly(z, poly)
+    for az in range(0, max_order + 1, 2):
+        _current_moment[2, 0, 0, az] = 2 * dz * np.sum(z ** az * fun)  # / order_scale**az
     return _current_moment
 
 
@@ -179,8 +194,9 @@ def lightning_inverse_problem(**kwargs):
     z = z / c0
 
     moments_shape = (3, ) + (max_order + 3, ) * 3
-    dim_moment = sum(1 for az in range(max_order + 1) if az % 2 == 0)
+    # dim_moment = sum(1 for az in range(max_order + 1) if az % 2 == 0)
     # dim_moment = max_order // 2 + 1
+    dim_moment = 3
     test_indices = (1, 5,)
 
     kwargs = dict(
@@ -191,7 +207,7 @@ def lightning_inverse_problem(**kwargs):
         x3=z,
         t=t,
         _t_sym=None,
-        current_moment_callable=get_current_moment_spherical,
+        current_moment_callable=get_current_moment_from_polynomial,
         dim_moment=dim_moment,
         h_num=get_h_num,
         plot=plot,
@@ -206,8 +222,9 @@ def lightning_inverse_problem(**kwargs):
         center_scale=center_scale,
         seed=seed,
         test_indices=test_indices,
+        return_raw_moment=True
     )
-    current_moment, h, center, e_opt = cache_function_call(
+    current_moment, h, center, e_opt, poly = cache_function_call(
         inverse_problem,
         **kwargs
     )
@@ -242,9 +259,9 @@ def lightning_inverse_problem(**kwargs):
         else:
             plt.plot(t, h.T, "k", label="h")
         plt.legend()
-        plt.xlabel("Normalized time")
+        plt.xlabel("Time (s)")
         plt.ylabel("Excitation function (1)")
-        plt.savefig(f"{path}/opt_h.pdf")
+        plt.savefig(f"{path}/{case}_opt_h.pdf")
 
         plt.figure(figsize=(15, 10))
         omin, omax = np.min(e_field), np.max(e_field)
@@ -256,82 +273,36 @@ def lightning_inverse_problem(**kwargs):
             if i % 2 == 0:
                 plt.ylabel("Electric field (V/m)")
             if i > 3:
-                plt.xlabel("Normalized time")
+                plt.xlabel("Time (s)")
             # plt.ylim(1.1*omin, 1.1*omax)
         plt.tight_layout()
-        plt.savefig(f"{path}/opt_fields.pdf")
+        plt.savefig(f"{path}/{case}_opt_fields.pdf")
 
         print(f"{center=}")
         current_moment[-1, 0, 0, :] *= np.power(order_scale, np.linspace(0, max_order + 2, max_order + 3))
         plot_moment_2d(current_moment)
-        plt.savefig(f"{path}/opt_moments.pdf")
-        plt.figure()
-        max_h = np.max(np.abs(h))
-        if max_h > 0:
-            plt.plot(t, h / max_h)
-        plt.xlabel("Time (relative)")
-        plt.ylabel("Amplitude (normalized)")
-        plt.title("Current vs time")
+        plt.savefig(f"{path}/{case}_opt_moments.pdf")
+
         print(f"{current_moment[-1, 0, 0, :]=}")
 
-        # z = np.linspace(-4e3, 4e3, 100) / c0
-        # distribution = 0 * z.copy()
-        # center = 0. if center is None else center[0]
-        # for az in range(0, max_order + 1, 2):
-        #     distribution += current_moment[-1, 0, 0, az] * (z - center)**az * factorial(az) * (-1)**az  # TODO check
-        # n_samples = 300
-        # z = np.linspace(0, 4e3/3e8, n_samples)
-        # dz = z[1] - z[0]
-        # distribution_0 = (np.random.random(z.shape) - .5)
+        z = np.linspace(0, 1, 1000)
+
+        # moment = current_moment[2, 0, 0, :]
 #
-        # plt.close("all")
-        # plt.figure()
-        # ind = 0
-#
-        # def get_error(distribution_samples):
-        #     nonlocal ind
-        #     moment_error = 0.
-        #     for order in range(0, 8, 2):
-        #         try:
-        #             mi = current_moment[2, 0, 0, order]
-        #         except IndexError:
-        #             mi = 0.
-        #         opt_mi = np.sum(z**order * distribution_samples)
-        #         moment_error += np.abs(mi - opt_mi)**2
-        #     # moment_error += np.sum((np.diff(distribution_samples)**2))
-        #     if ind % 1000 == 0:
-        #         plt.clf()
-        #         plt.plot(z, distribution_samples)
-        #         plt.title(f"{ind=}, {moment_error:.4f}")
-        #         plt.show(block=False)
-        #         plt.pause(1e-6)
-#
-        #     ind += 1
-#
-        #     return moment_error + np.sum(distribution_samples**2)/10000
-#
-        # from scipy.optimize import minimize
-#
-        # res = scipy.optimize.minimize(
-        #     get_error, distribution_0,
-        #     # niter=1_000_000,
-        #     # T=10
-        #     method="nelder-mead",
-        #     options=dict(
-        #         maxiter=1_000_000_000,
-        #         disp=True,
-        #         gtol=1e-20,
-        #         atol=1e-10
-        #     )
+        # f, _ = optimization_moment_problem_solution(
+        #     z, moment, poly_order=2,
+        #     tol=1e-18,
+        #     method="BFGS"
         # )
-        # print(res)
-        # # distribution = res.x
-        # # m = np.max(np.abs(distribution))
-        # #
-        # # plt.figure()
-        # # plt.plot(z, distribution)
-        # # plt.ylim(-1.1 * m, 1.1 * m)
-#
+
+        plt.figure()
+        # f = -f if np.max(f) < -np.min(f) else f
+        plt.plot(get_poly(z, poly), z, "k-")
+        plt.ylim(0, 1)
+        plt.ylabel("Normalized altitude")
+        plt.xlabel("Attenuation function")
+        plt.title(f"{case}")
+        plt.savefig(f"{path}/{case}_attenuation.pdf")
         plt.show(block=True)
 
     return current_moment, h, center, e_opt, error_train, error_test
@@ -344,7 +315,7 @@ def from_command_line():
 
     parser.add_argument("--max_order", type=int, required=True)
     parser.add_argument("--verbose_every", type=int, default=100)
-
+    parser.add_argument("--scale", type=float, default=1.)
     parser.add_argument("--plot", type=bool, default=False)
     parser.add_argument("--n_tail", type=int, default=20)
     parser.add_argument("--n_points", type=int, default=20)
