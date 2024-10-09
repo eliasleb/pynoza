@@ -5,6 +5,7 @@ import scipy.interpolate
 import matplotlib.pyplot as plt
 import os
 from matplotlib import cm
+from scipy.optimize import basinhopping
 
 
 def complement(*args):
@@ -259,7 +260,8 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
 
     options = {'maxiter': 1_000_000_000,
                "disp": True,
-               "gtol": tol
+               "gtol": tol,
+               "eps": 1e-14
                }
 
     np.random.seed(seed)

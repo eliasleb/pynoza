@@ -3,7 +3,7 @@ import numpy as np
 from scipy.io import loadmat
 import matplotlib.pyplot as plt
 from pynoza.inverse_problem import inverse_problem, plot_moment_2d
-from pynoza.helpers import cache_function_call
+from pynoza.helpers import cache_function_call, optimization_moment_problem_solution
 from pynoza.from_mathematica import SPHERICAL_TO_CARTESIAN
 
 global moments_shape, max_order, order_scale, n_tail, dim_moment, n_points
@@ -24,7 +24,7 @@ def read_data(filename):
 
 def read_all_data(window_us=1000, case="MTLL"):
     # r <> x, y <> not used, z <> z
-    r_km = np.array((1., 5., 10.))
+    # r_km = np.array((1., 5., 10.))
     z_km = np.array((0., 2., 4.))
     r_km = np.array((5., 10., ))
     # z_km = np.array((0., ))
@@ -77,9 +77,13 @@ def get_current_moment_spherical(moment):
 
 
 def get_poly(z, poly):
-    fun = 0. * z
-    for order, coeff in enumerate(poly):
-        fun += coeff * z ** order
+    # fun = 0. * z
+    # for order, coeff in enumerate(poly):
+    #     fun += coeff * z ** order
+    fun = poly[0] * (np.max(z) - z)
+    # plt.clf()
+    # plt.plot(z, fun)
+    # plt.waitforbuttonpress()
     return fun
 
 
@@ -107,7 +111,9 @@ def get_current_moment(moment):
 
 
 def get_h_num(h_, t_):
-    h_dict = dict()
+    # return heidler(t_, 1/.85, tau1=15e-6, tau2=95e-6, n=1
+    #                ) # * (erf(1.5 * t_ / 10e-6 - 2.) + 1.) / 2.
+    # h_dict = dict()
     delta_t0 = (np.max(t_) - np.min(t_)) / (h_.size - 1)
     sigma = delta_t0 / 1
     t_max = h_.size / (n_tail + h_.size) * (np.max(t_) - np.min(t_)) + np.min(t_)
@@ -167,7 +173,7 @@ def lightning_inverse_problem(**kwargs):
 
     x, y, z, t, e_field, h_field = read_all_data(case=case)
 
-    n = 200
+    n = 500
     dt = t[1] - t[0]
     t = np.concatenate((np.linspace(-n * dt, -dt, n) + t[0], t))
     e_field = np.concatenate((np.zeros((3, e_field.shape[1], n)), e_field), axis=-1)
@@ -176,6 +182,10 @@ def lightning_inverse_problem(**kwargs):
     n_less = 2
     t = t[:n_t//n_less:n_d]
     e_field = e_field[:, :, :n_t//n_less:n_d]
+    # n_up = 4
+    # t_new = np.linspace(np.min(t), np.max(t), n_up * t.size)
+    # e_field = interp1d(t, e_field, axis=-1)(t_new)
+    # t = t_new
 
     # Add noise
     if noise_level > 0.:
@@ -194,9 +204,9 @@ def lightning_inverse_problem(**kwargs):
     z = z / c0
 
     moments_shape = (3, ) + (max_order + 3, ) * 3
-    # dim_moment = sum(1 for az in range(max_order + 1) if az % 2 == 0)
+    dim_moment = sum(1 for az in range(max_order + 1) if az % 2 == 0)
     # dim_moment = max_order // 2 + 1
-    dim_moment = 3
+    # dim_moment = 1
     test_indices = (1, 5,)
 
     kwargs = dict(
@@ -207,7 +217,7 @@ def lightning_inverse_problem(**kwargs):
         x3=z,
         t=t,
         _t_sym=None,
-        current_moment_callable=get_current_moment_from_polynomial,
+        current_moment_callable=get_current_moment,
         dim_moment=dim_moment,
         h_num=get_h_num,
         plot=plot,
@@ -222,9 +232,9 @@ def lightning_inverse_problem(**kwargs):
         center_scale=center_scale,
         seed=seed,
         test_indices=test_indices,
-        return_raw_moment=True
+        # return_raw_moment=True
     )
-    current_moment, h, center, e_opt, poly = cache_function_call(
+    current_moment, h, center, e_opt = cache_function_call(
         inverse_problem,
         **kwargs
     )
@@ -232,12 +242,14 @@ def lightning_inverse_problem(**kwargs):
     train_indices, test_indices = list(sorted(train_indices)), list(sorted(test_indices))
     error_train = np.sqrt(np.sum((e_opt[:, train_indices, ...] - e_field[:, train_indices, ...]) ** 2)
                           / np.sum(e_field[:, train_indices, ...] ** 2))
-    error_test = np.sqrt(np.sum((e_opt[:, test_indices, ...] - e_field[:, test_indices, ...]) ** 2)
-                          / np.sum(e_field[:, test_indices, ...] ** 2))
-
+    try:
+        error_test = np.sqrt(np.sum((e_opt[:, test_indices, ...] - e_field[:, test_indices, ...]) ** 2)
+                              / np.sum(e_field[:, test_indices, ...] ** 2))
+    except FloatingPointError:
+        error_test = 1.
     if plot_recall:
         print(f"{max_order=}, {seed=}, {n_points=}, train={error_train*100:.1f}, test={error_test*100:.1f}")
-
+        # print(f"{poly=}")
         # if error**.5*100 > 31:
         #     raise ValueError()
         if isinstance(h, dict):
@@ -264,7 +276,7 @@ def lightning_inverse_problem(**kwargs):
         plt.savefig(f"{path}/{case}_opt_h.pdf")
 
         plt.figure(figsize=(15, 10))
-        omin, omax = np.min(e_field), np.max(e_field)
+        # omin, omax = np.min(e_field), np.max(e_field)
         for i, (xi, yi, zi) in enumerate(zip(x, y, z)):
             plt.subplot(3, 2, i+1)
             plt.plot(t, e_field[:, i, :].T, "r--")
@@ -287,19 +299,24 @@ def lightning_inverse_problem(**kwargs):
 
         z = np.linspace(0, 1, 1000)
 
-        # moment = current_moment[2, 0, 0, :]
-#
-        # f, _ = optimization_moment_problem_solution(
-        #     z, moment, poly_order=2,
-        #     tol=1e-18,
-        #     method="BFGS"
-        # )
+        moment = current_moment[2, 0, 0, :]
+        f, _ = optimization_moment_problem_solution(
+            z, moment, poly_order=2,
+            tol=1e-18,
+            method="BFGS"
+        )
 
         plt.figure()
-        # f = -f if np.max(f) < -np.min(f) else f
-        plt.plot(get_poly(z, poly), z, "k-")
-        plt.ylim(0, 1)
-        plt.ylabel("Normalized altitude")
+        f = -f if np.max(f) < -np.min(f) else f
+        # f = get_poly(z, poly)
+        plt.plot(f, z*4, "k-")
+        # m = np.max(np.abs(f))
+        # if np.abs(np.min(f)) < m:
+        #     plt.xlim(0, 1.1 * m)
+        # else:
+        #     plt.xlim(-1.1 * m, 0)
+        # # plt.ylim(0, 1)
+        plt.ylabel("Altitude (km)")
         plt.xlabel("Attenuation function")
         plt.title(f"{case}")
         plt.savefig(f"{path}/{case}_attenuation.pdf")
@@ -333,33 +350,35 @@ def from_command_line():
 
 
 def sweep_results():
-    for order in range(2, 10, 2):
-        for n_points in range(40, 150, 10):
-            errors = np.ones((10, )) * np.nan
-            for seed in range(10):
-                kwargs = dict(
-                    max_order=order,
-                    verbose_every=100,
-                    plot=False,
-                    plot_recall=False,
-                    n_tail=n_points // 10,
-                    n_points=n_points,
-                    order_scale=1e6,
-                    center_scale=2e3/3e8,
-                    find_center=True,
-                    seed=seed
-                )
-                try:
-                    current_moment, h, center, e_opt, train_error, test_error = lightning_inverse_problem(**kwargs)
-                    errors[seed] = test_error
-                except ValueError:
-                    print("Not available")
-                    continue
-            errors = np.array(errors)
-            seed = int(np.argmin(errors))
-            kwargs["seed"] = seed
-            kwargs["plot_recall"] = True
-            current_moment, h, center, e_opt, train_error, test_error = lightning_inverse_problem(**kwargs)
+    for case in ("TL", "MTLL", "MTLE", "QUAD"):
+        for order in range(2, 4, 2):
+            for _n_points in (40, ):
+                errors = np.ones((10, )) * np.nan
+                for seed in range(10):
+                    kwargs = dict(
+                        max_order=order,
+                        verbose_every=100,
+                        plot=False,
+                        plot_recall=False,
+                        n_tail=_n_points // 10,
+                        n_points=_n_points,
+                        order_scale=1e6,
+                        center_scale=2e3/3e8,
+                        find_center=True,
+                        seed=seed,
+                        case=case
+                    )
+                    try:
+                        current_moment, h, center, e_opt, train_error, test_error = lightning_inverse_problem(**kwargs)
+                        errors[seed] = test_error
+                    except ValueError:
+                        print("Not available")
+                        continue
+                errors = np.array(errors)
+                seed = int(np.argmin(errors))
+                kwargs["seed"] = seed
+                kwargs["plot_recall"] = True
+                current_moment, h, center, e_opt, train_error, test_error = lightning_inverse_problem(**kwargs)
 
 
 if __name__ == "__main__":
