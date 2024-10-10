@@ -260,8 +260,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
 
     options = {'maxiter': 1_000_000_000,
                "disp": True,
-               "gtol": tol,
-               "eps": 1e-14
+               "gtol": tol
                }
 
     np.random.seed(seed)
