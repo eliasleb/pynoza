@@ -173,13 +173,13 @@ def lightning_inverse_problem(**kwargs):
 
     x, y, z, t, e_field, h_field = read_all_data(case=case)
 
-    n = 500
+    n = 200
     dt = t[1] - t[0]
     t = np.concatenate((np.linspace(-n * dt, -dt, n) + t[0], t))
     e_field = np.concatenate((np.zeros((3, e_field.shape[1], n)), e_field), axis=-1)
     n_d = 1
     n_t = t.size
-    n_less = 2
+    n_less = 10
     t = t[:n_t//n_less:n_d]
     e_field = e_field[:, :, :n_t//n_less:n_d]
     # n_up = 4
@@ -351,8 +351,8 @@ def from_command_line():
 
 def sweep_results():
     for case in ("TL", "MTLL", "MTLE", "QUAD"):
-        for order in range(2, 4, 2):
-            for _n_points in (40, ):
+        for order in (8, ):
+            for _n_points in (50, 60, 70 ):
                 errors = np.ones((10, )) * np.nan
                 for seed in range(10):
                     kwargs = dict(
