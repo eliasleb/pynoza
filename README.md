@@ -1,4 +1,5 @@
 # pynoza
+[![PyPI version](https://badge.fury.io/py/pynoza.svg)](https://badge.fury.io/py/pynoza)
 ![Python package badge](https://github.com/eliasleb/pynoza/actions/workflows/master.yml/badge.svg)
 ![doc badge](https://readthedocs.org/projects/pynoza/badge/?version=latest)
 [![DOI](https://zenodo.org/badge/560843340.svg)](https://zenodo.org/doi/10.5281/zenodo.10497354)
