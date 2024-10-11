@@ -121,7 +121,6 @@ def test_em_j_reconstruction(fun_type, plot=False, max_l2_error=1e-2):
     print(f"Reconstructed: {reconstructed_moment}")
 
     order = 10
-    n_steps = 30
     if order > true_moment.size:
         x1 = np.concatenate((true_moment, np.zeros((order - true_moment.size))))
         x2 = np.concatenate((reconstructed_moment, np.zeros((order - reconstructed_moment.size))))
@@ -175,7 +174,7 @@ def get_function_reconstruction(z, fun, max_order=10, plot=False, l2_max=np.inf)
     assert l2 < l2_max
     print(f"{l2=}")
     if plot:
-        plt.clf()
+        plt.figure()
         plt.plot(z, fun)
         plt.plot(z, y)
         plt.title(f"{max_order=}, {residual=}")
@@ -192,18 +191,17 @@ def test_function_reconstruction(plot=False):
     ]
     for fun in functions:
         get_function_reconstruction(z, fun, max_order=10, plot=plot, l2_max=2.6e-2)
-        if plot:
-            plt.waitforbuttonpress()
 
 
 if __name__ == "__main__":
     import matplotlib
     matplotlib.use("TkAgg")
 
-    test_function_reconstruction(plot=False)
-    test_em_j_reconstruction(plot=True, fun_type="TL", max_l2_error=1e-2)
-    test_em_j_reconstruction(plot=True, fun_type="MTLL", max_l2_error=1e-2)
-    test_em_j_reconstruction(plot=True, fun_type="MTLE", max_l2_error=1e-2)
-    test_em_j_reconstruction(plot=True, fun_type="QUAD", max_l2_error=1e-2)
+    test_function_reconstruction(plot=True)
+    l2_max = 1e-2
+    test_em_j_reconstruction(plot=True, fun_type="TL", max_l2_error=l2_max)
+    test_em_j_reconstruction(plot=True, fun_type="MTLL", max_l2_error=l2_max)
+    test_em_j_reconstruction(plot=True, fun_type="MTLE", max_l2_error=l2_max)
+    test_em_j_reconstruction(plot=True, fun_type="QUAD", max_l2_error=l2_max)
 
     plt.show(block=True)

@@ -222,15 +222,10 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
                 plt.clf()
                 max_true = np.max(np.abs(field_true))
                 with pynoza.PlotAndWait(wait_for_enter_keypress=False):
-                    for i in range(3):
+                    for i, color in enumerate(("r", "g", "b")):
                         plt.subplot(2, 3, i + 1)
-                        plt.plot(t, field_true[i].reshape(-1, t.size).T, f"b--")
-                        plt.plot(t, field_true[i].reshape(-1, t.size).T, f"b--")
-                        plt.plot(t, field_true[i].reshape(-1, t.size).T, f"b--")
-
-                        plt.plot(t, field_opt[i].reshape(-1, t.size).T*scale, f"k-")
-                        plt.plot(t, field_opt[i].reshape(-1, t.size).T*scale, f"k-")
-                        plt.plot(t, field_opt[i].reshape(-1, t.size).T*scale, f"k-")
+                        plt.plot(t, field_true[i].reshape(-1, t.size).T, f"{color}--")
+                        plt.plot(t, field_opt[i].reshape(-1, t.size).T*scale, f"{color}-")
                         plt.ylim((-1.1 * max_true, 1.1 * max_true))
                     if isinstance(h_, dict):
                         h_plot = np.array(list(h_.values()))

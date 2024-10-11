@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 from pynoza.inverse_problem import inverse_problem, plot_moment_2d
 from pynoza.helpers import cache_function_call, optimization_moment_problem_solution
 from pynoza.from_mathematica import SPHERICAL_TO_CARTESIAN
+from scipy.signal import sosfilt, butter
+from scipy.interpolate import interp1d
 
 global moments_shape, max_order, order_scale, n_tail, dim_moment, n_points
 
@@ -115,7 +117,7 @@ def get_h_num(h_, t_):
     #                ) # * (erf(1.5 * t_ / 10e-6 - 2.) + 1.) / 2.
     # h_dict = dict()
     delta_t0 = (np.max(t_) - np.min(t_)) / (h_.size - 1)
-    sigma = delta_t0 / 1
+    sigma = delta_t0 * .6
     t_max = h_.size / (n_tail + h_.size) * (np.max(t_) - np.min(t_)) + np.min(t_)
     ind = 0
     # for az in range(max_order + 1):
@@ -167,37 +169,46 @@ def lightning_inverse_problem(**kwargs):
     noise_level = kwargs.pop("noise_level", 0.)
     case = kwargs.pop("case")
 
+    fit_on_magnetic_field = True
+
     if plot or plot_recall:
         import matplotlib
         matplotlib.use("TkAgg")
 
     x, y, z, t, e_field, h_field = read_all_data(case=case)
+    if fit_on_magnetic_field:
+        field = h_field * 4 * np.pi * 1e-7
+    else:
+        field = e_field
 
     n = 200
     dt = t[1] - t[0]
     t = np.concatenate((np.linspace(-n * dt, -dt, n) + t[0], t))
-    e_field = np.concatenate((np.zeros((3, e_field.shape[1], n)), e_field), axis=-1)
+    field = np.concatenate((np.zeros((3, field.shape[1], n)), field), axis=-1)
     n_d = 1
     n_t = t.size
-    n_less = 10
+    n_less = 12
     t = t[:n_t//n_less:n_d]
-    e_field = e_field[:, :, :n_t//n_less:n_d]
-    # n_up = 4
-    # t_new = np.linspace(np.min(t), np.max(t), n_up * t.size)
-    # e_field = interp1d(t, e_field, axis=-1)(t_new)
-    # t = t_new
+    field = field[:, :, :n_t//n_less:n_d]
+    n_up = 4
+    t_new = np.linspace(np.min(t), np.max(t), n_up * t.size)
+    field = interp1d(t, field, axis=-1)(t_new)
+    t = t_new
+    fs = 1 / (t[1] - t[0])
+    highpass = butter(8, 200e3, btype="high", fs=fs, output="sos")
+    field = sosfilt(highpass, field, axis=-1)
+    # field = field[..., ::n_up]
+    # t = t[::n_up]
 
-    # Add noise
+    # Add noise_e
     if noise_level > 0.:
         np.random.seed(seed)
-        noise = normal(size=e_field.shape)
-        noise = noise / np.sqrt(np.sum(noise**2)) * np.sqrt(np.sum(e_field**2)) * noise_level
-        plt.hist(noise[0, 0, :])
-        e_field = e_field + noise
+        noise = normal(size=field.shape)
+        noise = noise / np.sqrt(np.sum(noise ** 2)) * np.sqrt(np.sum(field ** 2)) * noise_level
+        # plt.hist(noise_e[0, 0, :])
+        field = field + noise
 
-    # e_field /= 1e2
     c0 = 3e8
-    # t *= c0
     print(x, y, z)
     x = x / c0
     y = y / c0
@@ -211,7 +222,7 @@ def lightning_inverse_problem(**kwargs):
 
     kwargs = dict(
         order=max_order + 2,
-        e_true=e_field,
+        e_true=field,
         x1=x,
         x2=y,
         x3=z,
@@ -232,19 +243,21 @@ def lightning_inverse_problem(**kwargs):
         center_scale=center_scale,
         seed=seed,
         test_indices=test_indices,
+        fit_on_magnetic_field=fit_on_magnetic_field,
+        b_true=field
         # return_raw_moment=True
     )
-    current_moment, h, center, e_opt = cache_function_call(
+    current_moment, h, center, field_opt = cache_function_call(
         inverse_problem,
         **kwargs
     )
     train_indices = set(range(x.size)) - set(test_indices)
     train_indices, test_indices = list(sorted(train_indices)), list(sorted(test_indices))
-    error_train = np.sqrt(np.sum((e_opt[:, train_indices, ...] - e_field[:, train_indices, ...]) ** 2)
-                          / np.sum(e_field[:, train_indices, ...] ** 2))
+    error_train = np.sqrt(np.sum((field_opt[:, train_indices, ...] - field[:, train_indices, ...]) ** 2)
+                          / np.sum(field[:, train_indices, ...] ** 2))
     try:
-        error_test = np.sqrt(np.sum((e_opt[:, test_indices, ...] - e_field[:, test_indices, ...]) ** 2)
-                              / np.sum(e_field[:, test_indices, ...] ** 2))
+        error_test = np.sqrt(np.sum((field_opt[:, test_indices, ...] - field[:, test_indices, ...]) ** 2)
+                              / np.sum(field[:, test_indices, ...] ** 2))
     except FloatingPointError:
         error_test = 1.
     if plot_recall:
@@ -279,8 +292,8 @@ def lightning_inverse_problem(**kwargs):
         # omin, omax = np.min(e_field), np.max(e_field)
         for i, (xi, yi, zi) in enumerate(zip(x, y, z)):
             plt.subplot(3, 2, i+1)
-            plt.plot(t, e_field[:, i, :].T, "r--")
-            plt.plot(t, e_opt[:, i, :].T, "k-")
+            plt.plot(t, field[:, i, :].T, "r--")
+            plt.plot(t, field_opt[:, i, :].T, "k-")
             plt.title(f"x = {xi*c0/1e3:.1f} km, z = {zi*c0/1e3:.1f} km")
             if i % 2 == 0:
                 plt.ylabel("Electric field (V/m)")
@@ -297,9 +310,9 @@ def lightning_inverse_problem(**kwargs):
 
         print(f"{current_moment[-1, 0, 0, :]=}")
 
-        z = np.linspace(0, 1, 1000)
+        z = np.linspace(-1, 1, 1000)
 
-        moment = current_moment[2, 0, 0, :]
+        moment = current_moment[2, 0, 0, :2]
         f, _ = optimization_moment_problem_solution(
             z, moment, poly_order=2,
             tol=1e-18,
@@ -322,7 +335,7 @@ def lightning_inverse_problem(**kwargs):
         plt.savefig(f"{path}/{case}_attenuation.pdf")
         plt.show(block=True)
 
-    return current_moment, h, center, e_opt, error_train, error_test
+    return current_moment, h, center, field_opt, error_train, error_test
 
 
 def from_command_line():
@@ -352,7 +365,7 @@ def from_command_line():
 def sweep_results():
     for case in ("TL", "MTLL", "MTLE", "QUAD"):
         for order in (8, ):
-            for _n_points in (50, 60, 70 ):
+            for _n_points in (30, 40, 50, ):
                 errors = np.ones((10, )) * np.nan
                 for seed in range(10):
                     kwargs = dict(
@@ -360,7 +373,7 @@ def sweep_results():
                         verbose_every=100,
                         plot=False,
                         plot_recall=False,
-                        n_tail=_n_points // 10,
+                        n_tail=0,
                         n_points=_n_points,
                         order_scale=1e6,
                         center_scale=2e3/3e8,
