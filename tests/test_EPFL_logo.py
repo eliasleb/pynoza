@@ -174,7 +174,6 @@ def test_solution(test_case, order, method, plot=False, cname="xyz"):
 
     for ind, _ in np.ndenumerate(np.zeros((order + 1, ) * 3)):
         current_moment_arr[:, ind[0], ind[1], ind[2]] = current_moment(*ind)
-    charge_moment = pynoza.helpers.get_charge_moment(current_moment_arr)
     for ind, _ in np.ndenumerate(np.zeros((order + 1, ) * 3)):
         if np.sum(ind) > order - 2:
             charge_moment_arr[:, ind[0], ind[1], ind[2]] = 0.

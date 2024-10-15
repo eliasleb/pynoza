@@ -19,7 +19,7 @@ import cython
 from itertools import product as itertools_product
 
 
-@cython.cfunc
+@cython.ccall
 def levi_civita(i: int, j: int, k: int, start_at_0=True):
     if start_at_0:
         i, j, k = i + 1, j + 1, k + 1
@@ -31,7 +31,7 @@ def levi_civita(i: int, j: int, k: int, start_at_0=True):
     return 0
 
 
-@cython.cfunc
+@cython.ccall
 def get_charge_moment(current_moment: ndarray, return_mapping=False):
     """
     Compute a charge moment that is compatible with the conservation of charge
@@ -73,7 +73,7 @@ def get_charge_moment(current_moment: ndarray, return_mapping=False):
     return charge_moment
 
 
-@cython.cfunc
+@cython.ccall
 def get_magnetic_moment(current_moment: ndarray, return_mapping=False):
     """
     Compute the magnetic moment corresponding to the curl of the current density from the current moments.
@@ -144,7 +144,7 @@ def check_fun_type(fun):
                      "a SymPy expression")
 
 
-@cython.cfunc
+@cython.ccall
 def _process_moment_mapping(mapping, h0_dict):
     h_tfm_dict = dict()
     for dim_and_multi_index, current_mapping in mapping.items():
@@ -812,7 +812,7 @@ def set_extremities(x: np.ndarray, ratio: float, dim: int = 0, val: float = 0) -
     return x
 
 
-@cython.cfunc
+@cython.ccall
 def _to_ndarray_safer(a: list):
     shape = None
     for i, ai in enumerate(a):

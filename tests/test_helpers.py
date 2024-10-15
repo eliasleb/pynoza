@@ -14,7 +14,7 @@
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 
-from pynoza.helpers import levi_civita, get_magnetic_moment
+from pynoza import levi_civita, get_magnetic_moment
 import itertools
 import numpy as np
 

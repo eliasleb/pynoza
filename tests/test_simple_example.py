@@ -135,7 +135,7 @@ def test_charge_inversion():
         if np.sum(ind) <= max_order:
             current_moment_array[:, ind[0], ind[1], ind[2]] = toy_current_density(ind[0], ind[1], ind[2])
 
-    _, mapping = pynoza.helpers.get_charge_moment(current_moment_array, return_mapping=True)
+    _, mapping = pynoza.get_charge_moment(current_moment_array, return_mapping=True)
 
 
 if __name__ == "__main__":

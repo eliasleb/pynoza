@@ -150,7 +150,7 @@ def get_h_num(h_, t_):
     #         continue
     y = np.zeros(t_.shape)
     # plt.figure()
-    for t0 in np.linspace(-.2, 4, n_points):
+    for t0 in np.linspace(-.6, 4.6, n_points):
         y = y + h_[ind] * np.exp(-1 / 2 * (t_ - t0) ** 2 / sigma ** 2)
         # plt.plot(t_, np.exp(-1 / 2 * (t_ - t0) ** 2 / sigma ** 2), "k--")
         ind += 1
@@ -336,7 +336,7 @@ def lightning_inverse_problem(**kwargs):
         # plt.plot(t - t[np.argmax(np.abs(heidler_scaled))] + t[arg_max], heidler_scaled, "r--", label="Heidler")
         if len(h.shape) > 1 and h.shape[0] > 1:
             for f_ind in range(h.shape[0]):
-                plt.plot(t, h[f_ind, :], color=plt.get_cmap("jet")(f_ind/(h.shape[0]-1)), label=f"{f_ind}")
+                plt.plot(t, h[f_ind, ...].T, color=plt.get_cmap("jet")(f_ind/(h.shape[0]-1)), label=f"{f_ind}")
         else:
             plt.plot(t, h[:, 2, :].T, "k", label="h")
         plt.legend()
