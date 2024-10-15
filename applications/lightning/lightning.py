@@ -226,7 +226,7 @@ def lightning_inverse_problem(**kwargs):
     dt = t[1] - t[0]
     t = np.concatenate((np.linspace(-n * dt, -dt, n) + t[0], t))
     field = np.concatenate((np.zeros((3, field.shape[1], n)), field), axis=-1)
-    n_d = 10
+    n_d = 1
     n_t = t.size
     n_less = 12
     t = t[:n_t//n_less:n_d]
