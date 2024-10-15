@@ -339,6 +339,8 @@ def plot_lse_logo():
 
 
 if __name__ == "__main__":
+    import matplotlib
+    matplotlib.use("TkAgg")
     import argparse
 
     plt.rcParams.update({

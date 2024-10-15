@@ -47,7 +47,7 @@ def test_inputs():
         s.compute_e_field(x, x, x, x, {-1: None}, t_sym)
     t_sym = sympy.Symbol("t")
     h_sym = t_sym
-    s.compute_e_field(x, x, x, x, h_sym, t_sym)
+    s.compute_e_field(x, x, x, np.linspace(0, 1), h_sym, t_sym)
 
 
 def test_multi_time_dependent_moments():
@@ -60,8 +60,11 @@ def test_multi_time_dependent_moments():
     x1 = np.array([1., ])
     x2, x3 = x1.copy(), x1.copy()
     h = {(0, 0, 0): np.exp(-t), (1, 0, 0): -2 * np.exp(-t)}
-    _e = s.compute_e_field(x1, x2, x3, t, h, None)
+    with pytest.raises(ValueError):
+        _e = s.compute_e_field(x1, x2, x3, t, h, None)
     h = {(0, 0, 0): [np.exp(-t), 0, 0], (1, 0, 0): [-2 * np.exp(-t), 0, 0]}
+    s = pynoza.Solution()
+    s.recurse()
     _e = s.compute_e_field(x1, x2, x3, t, h, None)
 
 

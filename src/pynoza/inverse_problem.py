@@ -85,9 +85,10 @@ def plot_moment(moment):
 
 
 def get_fields(sol, _sol_rust, find_center, t, x1, x2, x3, current_moment, h_sym, t_sym, center,
-               shift=0, magnetic=False):
+               shift=0, magnetic=False, assuming_separability=True):
     c_mom = lambda a1, a2, a3: list(current_moment[:, a1, a2, a3])
-    sol.set_moments(c_mom)
+    if assuming_separability:
+        sol.set_moments(c_mom)
     kwargs = dict(compute_grid=False, shift=shift)
 
     if find_center:
@@ -170,6 +171,9 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
     current_moment = np.zeros((dim_moment, ))
     h = np.zeros((n_points, ))
 
+    _test = get_h_num(h, t)
+    assuming_separability = isinstance(_test, np.ndarray)
+
     if find_center:
         def ravel_params(current_moments, h_, center_):
             return np.concatenate((np.ravel(current_moments), np.ravel(h_), np.ravel(center_)))
@@ -207,7 +211,8 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
         h_ = get_h_num(h_, t)
         current_moment_ = current_moment_callable(current_moment_)
         field_opt = get_fields(sol_python, None, find_center, t, x1, x2, x3, current_moment_, h_, None,
-                               complete_center, shift=shift, magnetic=fit_on_magnetic_field)
+                               complete_center, shift=shift, magnetic=fit_on_magnetic_field,
+                               assuming_separability=assuming_separability)
         assert field_opt.shape == field_true.shape
 
         train_error = field_energy(field_true[:, train_indices, :] - field_opt[:, train_indices, :] * scale,
@@ -222,10 +227,10 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
                 plt.clf()
                 max_true = np.max(np.abs(field_true))
                 with pynoza.PlotAndWait(wait_for_enter_keypress=False):
-                    for i, color in enumerate(("r", "g", "b")):
+                    for i, _color in enumerate(("r", "g", "b")):
                         plt.subplot(2, 3, i + 1)
-                        plt.plot(t, field_true[i].reshape(-1, t.size).T, f"{color}--")
-                        plt.plot(t, field_opt[i].reshape(-1, t.size).T*scale, f"{color}-")
+                        plt.plot(t, field_true[i].reshape(-1, t.size).T, f"r--")
+                        plt.plot(t, field_opt[i].reshape(-1, t.size).T*scale, f"k-")
                         plt.ylim((-1.1 * max_true, 1.1 * max_true))
                     if isinstance(h_, dict):
                         h_plot = np.array(list(h_.values()))
@@ -234,7 +239,9 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
                     max_h = np.max(np.abs(h_plot))
                     plt.subplot(2, 3, 5)
                     if max_h > 0:
-                        plt.plot(t, h_plot.T)
+                        plt.plot(t, h_plot[:, 0, :].T, "r")
+                        plt.plot(t, h_plot[:, 1, :].T, "g")
+                        plt.plot(t, h_plot[:, 2, :].T, "b")
                     if find_center:
                         plt.subplot(2, 3, 2)
                         plt.title(f"""center = ({complete_center[0]:+.03f}, """

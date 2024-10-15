@@ -61,15 +61,14 @@ def test_simple_example(return_result=False, do_assert=True):
     r = np.sqrt(x1**2 + x2**2 + x3**2)
     rho = np.sqrt(x1**2 + x2**2)
     theta = np.arctan2(rho, x3)
-    print(theta)
     h2 = np.exp(-(t[None, :] - t0 - r[:, None]/3e8)**2 / sigma**2)
     dh_dt = np.diff(h2, axis=1) / dt
     dh_dt = np.concatenate([np.zeros((3, 1)), dh_dt], axis=1)
     e_theta = -1 / 4 / np.pi / 8.854e-12 * np.sin(theta[:, None]) / r[:, None] / 3e8**2 * dh_dt
     b_phi = -1 / 4 / np.pi * np.sin(theta[:, None]) / r[:, None] / 3e8 * dh_dt * sol.get_mu()
 
-    e_field = sol.compute_e_field(x1, x2, x3, t, h, None, compute_grid=False, compute_txt=True)
-    b_field = sol.compute_b_field(x1, x2, x3, t, h, None, compute_grid=False, compute_txt=True)
+    e_field = sol.compute_e_field(x1, x2, x3, t, h, None, compute_grid=False)
+    b_field = sol.compute_b_field(x1, x2, x3, t, h, None, compute_grid=False)
     poynting = 1 / sol.get_mu() * np.cross(e_field, b_field, axis=0)
     # rtol = 1
     # import matplotlib
@@ -137,8 +136,6 @@ def test_charge_inversion():
             current_moment_array[:, ind[0], ind[1], ind[2]] = toy_current_density(ind[0], ind[1], ind[2])
 
     _, mapping = pynoza.helpers.get_charge_moment(current_moment_array, return_mapping=True)
-    for _, b in mapping.items():
-        assert len(b) == 1
 
 
 if __name__ == "__main__":

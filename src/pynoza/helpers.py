@@ -1,7 +1,5 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from numpy import ndarray
-import itertools
 import os
 import pickle
 import hashlib
@@ -9,7 +7,7 @@ import re
 from matplotlib.collections import PatchCollection
 from matplotlib.patches import Rectangle
 from numpy.linalg import lstsq
-from scipy.optimize import minimize, basinhopping
+from scipy.optimize import minimize
 
 
 class PlotAndWait:
@@ -28,72 +26,6 @@ class PlotAndWait:
         plt.show()
         if self.wait_for_enter_keypress:
             input("[Enter] to continue...")
-
-
-def get_charge_moment(current_moment: ndarray, return_mapping=False) -> ndarray:
-    """
-    Compute a charge moment that is compatible with the conservation of charge
-
-    :param current_moment: an array with the current moments
-    :param return_mapping: return a dict to keep a track of which charge moments correspond to which current moments
-    :return: the corresponding charge moment (+ eventually the charge-current mapping)
-
-    The moment at index `(i, a1, a2, a3)` is the moment of the `i`-th coordinate corresponding to the multi-index
-    `(a1, a2, a3)`
-    """
-    charge_moment = np.zeros(current_moment.shape)
-    mapping = {}
-    for ind, _ in np.ndenumerate(charge_moment):
-        i, a1, a2, a3 = ind
-        a = (a1, a2, a3)
-        for j in range(3):
-            b = list(a)
-            if i == j:
-                if a[j] >= 2:
-                    b[j] = a[j] - 2
-                    charge_moment[i, a1, a2, a3] += a[j] * (a[j] - 1) \
-                        * current_moment[j, b[0], b[1], b[2]]
-                    if a not in mapping:
-                        mapping[tuple(ind)] = set()
-                    mapping[tuple(ind)].add((j, ) + tuple(b))
-            else:
-                b[i] -= 1
-                b[j] -= 1
-                if a[j] >= 1 and a[i] >= 1:
-                    charge_moment[i, a1, a2, a3] += a[j] * a[i] \
-                        * current_moment[j, b[0], b[1], b[2]]
-                    if a not in mapping:
-                        mapping[tuple(ind)] = set()
-                    mapping[tuple(ind)].add((j, ) + tuple(b))
-    charge_moment = -charge_moment
-    if return_mapping:
-        return charge_moment, mapping
-    return charge_moment
-
-
-def get_magnetic_moment(current_moment: ndarray) -> ndarray:
-    """
-    Compute the magnetic moment corresponding to the curl of the current density from the current moments.
-
-    :param current_moment: an array with the current moments
-    :return: the corresponding magnetic moment
-    :rtype: ndarray
-
-    The moment at index `(i, a1, a2, a3)` is the moment of the `i`-th coordinate corresponding to the multi-index
-    `(a1, a2, a3)`
-    """
-    magnetic_moment = np.zeros(current_moment.shape)
-    for ind, _ in np.ndenumerate(magnetic_moment):
-        i, a1, a2, a3 = ind
-        a = [a1, a2, a3]
-        for j, k in itertools.product(range(3), repeat=2):
-            lc = levi_civita(i, j, k)
-            if a[j] > 0 and lc != 0:
-                a_copy = [a1, a2, a3]
-                a_copy[j] -= 1
-                magnetic_moment[i, a1, a2, a3] += a[j] * lc * current_moment[k, a_copy[0], a_copy[1], a_copy[2]]
-
-    return -magnetic_moment
 
 
 def int_j(x0, sig, m):
@@ -159,18 +91,6 @@ def c_r(a1, a2, _a3, x1, x2, w, h):
     return int_r(x1, w, a1) * int_j(x2, h, a2)
 
 
-def levi_civita(i: int, j: int, k: int, start_at_0=True):
-    if start_at_0:
-        i, j, k = i + 1, j + 1, k + 1
-    match (i, j, k):
-        case (1, 2, 3) | (2, 3, 1) | (3, 1, 2):
-            return 1
-        case (3, 2, 1) | (1, 3, 2) | (2, 1, 3):
-            return -1
-        case _:
-            return 0
-
-
 def cache_function_call(func, *args, cache_dir="function_cache", **kwargs):
     """
     Caches the result of a function call and retrieves it from the cache if the same call is made again.
@@ -231,8 +151,8 @@ def plot_current_density(xs: list[float, ...], ys: list[float, ...], ws: list[fl
     :param ax: optional axis to use
     """
 
-    rectangles = [Rectangle((x / length_logo * length - d1, y / length_logo * length - d2),
-                            w / length_logo * length, h / length_logo * length) for x, y, w, h in zip(xs, ys, ws, hs)]
+    rectangles = [Rectangle((_x / length_logo * length - d1, y / length_logo * length - d2),
+                            w / length_logo * length, h / length_logo * length) for _x, y, w, h in zip(xs, ys, ws, hs)]
     pc = PatchCollection(rectangles, facecolor="r", **kwargs)
     if ax is None:
         ax = plt.gca()
@@ -300,24 +220,28 @@ def optimization_moment_problem_solution(z, moments, poly_order=2, **opt_kwargs)
 
 
 if __name__ == "__main__":
-    import matplotlib
-    matplotlib.use("TkAgg")
-    with PlotAndWait(new_figure=True) as paw:
-        paw.fig.add_subplot(1, 2, 1)
-        plt.plot(1, 1, "x")
-        paw.fig.add_subplot(1, 2, 2)
-        plt.plot(1, 1, "o")
 
-    import time
+    def small_test():
+        import matplotlib
+        matplotlib.use("TkAgg")
+        with PlotAndWait(new_figure=True) as paw:
+            paw.fig.add_subplot(1, 2, 1)
+            plt.plot(1, 1, "x")
+            paw.fig.add_subplot(1, 2, 2)
+            plt.plot(1, 1, "o")
 
-    def f(_x):
-        time.sleep(2)
-        return _x**2
+        import time
 
-    x = 2
+        def f(_x):
+            time.sleep(2)
+            return _x**2
 
-    def call():
-        return cache_function_call(f, x)
+        x = 2
 
-    print(call())
-    print(call())
+        def call():
+            return cache_function_call(f, x)
+
+        print(call())
+        print(call())
+
+    small_test()

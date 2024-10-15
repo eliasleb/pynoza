@@ -1,5 +1,5 @@
 #!/bin/sh
-for n_points in 100
+for n_points in 90 110
 do
   n_tail=$n_points
   noise_level=0.
