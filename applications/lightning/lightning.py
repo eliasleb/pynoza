@@ -9,8 +9,9 @@ from pynoza import Solution
 from scipy.signal import sosfilt, butter
 from scipy.interpolate import interp1d
 from scipy.special import erf
+from scipy.ndimage import gaussian_filter
 
-global moments_shape, max_order, order_scale, n_tail, dim_moment, n_points
+global moments_shape, max_order, order_scale, n_tail, dim_moment, n_points, h_lower_order, n_calls
 
 
 def heidler(t, max_current, tau1, tau2, n):
@@ -130,64 +131,29 @@ def get_current_moment(moment):
 
 
 def get_h_num(h_, t_):
-    # t_ -= 1e-6
-    # y = heidler(t_, 1/.85, tau1=h_[0]*1e-6, tau2=95e-6, n=1)
-    # # plt.plot(t_, y)
-    # smoothing = np.exp(-.5 * (t_ / .1e-6)**2)
-    # # plt.plot(t_, smoothing)
-    # y1 = np.convolve(smoothing, y)[t_.size//4:t_.size//4 + t_.size]
-    # # plt.plot(t_, y/np.max(y))
-    # # plt.plot(t_, y1/np.max(y1))
-    # # plt.show()
-    # return y1
-    # h_dict = dict()
-    delta_t0 = (np.max(t_) - np.min(t_)) / (h_.size - 1)
-    sigma = delta_t0 * .6
-    t_max = h_.size / (n_tail + h_.size) * (np.max(t_) - np.min(t_)) + np.min(t_)
-    ind = 0
-    # for az in range(max_order + 1):
-    #     if az % 2 == 1:
-    #         continue
-    y = np.zeros(t_.shape)
-    # plt.figure()
-    for t0 in np.linspace(-.6, 4.6, n_points):
-        y = y + h_[ind] * np.exp(-1 / 2 * (t_ - t0) ** 2 / sigma ** 2)
-        # plt.plot(t_, np.exp(-1 / 2 * (t_ - t0) ** 2 / sigma ** 2), "k--")
-        ind += 1
-    #     # h_dict[(0, 0, az)] = y - y[0]
-    # # plt.xlabel("Normalized time")
-    # # plt.title("Current basis functions")
-    # # plt.tight_layout()
-    # # plt.show()
-    h = y - y[0]
-    #
-    # n_head = 4
-    # if n_tail > 0:
-    #     h_interpolated = interp1d(
-    #         np.linspace(np.min(t_), np.max(t_), n_head + h_.size + n_tail),
-    #         np.concatenate((np.zeros((n_head, )), h_.ravel(), np.zeros((n_tail, )))),
-    #         kind="cubic"
-    #     )(t_)
-    # else:
-    #     h_interpolated = interp1d(
-    #         np.linspace(np.min(t_), np.max(t_), n_head + h_.size),
-    #         np.concatenate((np.zeros((n_head, )), h_.ravel())),
-    #         kind="cubic"
-    #     )(t_)
-    # return h_interpolated
+    n_points_segment = h_.size // (max_order // 2 + 1)
     h_dict = dict()
-    z = np.linspace(-1, 1, 1000)
-    dz = z[1] - z[0]
-    attenuation = 1 - np.abs(z)
-    attenuation, h_interpolated, z = attenuation[None, :], h[:, None], z[None, :]
     for az in range(0, max_order + 1, 2):
+        t_min, t_max = -.3, 5.5
+        steps = np.logspace(np.log10(t_min - t_min + 1), np.log10(t_max - t_min + 1), n_points_segment) + t_min - 1
+        h = interp1d(
+            steps,
+            h_.ravel()[(az // 2) * n_points_segment:(az // 2 + 1) * n_points_segment],
+            kind="cubic",
+            fill_value=0.,
+            bounds_error=False
+        )(t_)
+        dt = t_[1] - t_[0]
+        step = (t_max - t_min) / (n_points_segment + 1)
+        h = gaussian_filter(h, int(step / dt * .5))
         h_dict[(0, 0, az)] = [
             0 * t_,
             0 * t_,
-            dz * np.sum(
-                attenuation * h_interpolated * z ** az,
-                axis=1
-            )
+            h / 3 ** az
+            # dz * np.sum(
+            #     attenuation * h_interpolated * z ** az,
+            #     axis=1
+            # )
         ]
     return h_dict
 
@@ -198,7 +164,7 @@ def lightning_inverse_problem(**kwargs):
     plot = kwargs.pop("plot", False)
     verbose_every = kwargs.pop("verbose_every", 100)
     scale = kwargs.pop("scale", 1e0)
-    tol = kwargs.pop("tol", 1e-8)
+    tol = kwargs.pop("tol", 1e-12)
     n_points = kwargs.pop("n_points", 20)
     find_center = kwargs.pop("find_center", False)
     seed = kwargs.pop("seed", 0)
@@ -226,20 +192,10 @@ def lightning_inverse_problem(**kwargs):
     dt = t[1] - t[0]
     t = np.concatenate((np.linspace(-n * dt, -dt, n) + t[0], t))
     field = np.concatenate((np.zeros((3, field.shape[1], n)), field), axis=-1)
-    n_d = 1
-    n_t = t.size
-    n_less = 12
-    t = t[:n_t//n_less:n_d]
-    field = field[:, :, :n_t//n_less:n_d]
-    # n_up = 4
-    # t_new = np.linspace(np.min(t), np.max(t), n_up * t.size)
-    # field = interp1d(t, field, axis=-1)(t_new)
-    # t = t_new
-    # fs = 1 / (t[1] - t[0])
-    # highpass = butter(8, 200e3, btype="high", fs=fs, output="sos")
-    # field = sosfilt(highpass, field, axis=-1)
-    # field = field[..., ::n_up]
-    # t = t[::n_up]
+    r = np.sqrt(x ** 2 + y ** 2 + z ** 2)
+    for ind_pos, ri in enumerate(r):
+        field[:, ind_pos, ...] = interp1d(t - ri / 3e8, field[:, ind_pos, ...],
+                                          bounds_error=False, fill_value=0.)(t)
 
     # Add noise_e
     if noise_level > 0.:
@@ -249,33 +205,22 @@ def lightning_inverse_problem(**kwargs):
         # plt.hist(noise_e[0, 0, :])
         field = field + noise
 
-    factor = 3e8 / 4e3
     print(x, y, z)
-    x = x / 3e8 * factor
-    y = y / 3e8 * factor
-    z = z / 3e8 * factor
-    t = t * factor
+    factor = 4e3
+    x = x / factor
+    y = y / factor
+    z = z / factor
+    t = t * 3e8 / factor
     moments_shape = (3, ) + (max_order + 3, ) * 3
     dim_moment = sum(1 for az in range(max_order + 1) if az % 2 == 0) - 1
     # dim_moment = max_order // 2 + 1
     dim_moment = 0
     test_indices = (1, 5,)
 
-    # sol = Solution(max_order=max_order + 2, wave_speed=1.)
-    # sol.recurse()
-    # mom = get_current_moment_true([1, ])
-    # sol.set_moments(current_moment=lambda ax, ay, az: list(mom[:, ax, ay, az]))
-    # for tau1 in np.arange(2, 3, 2):
-    #     field_me = sol.compute_e_field(x, y, z, t, get_h_num([tau1, ], t), None, compute_grid=False)
-    #     field_me = field_me / np.max(np.abs(field_me)) * np.max(np.abs(field))
-    #     plt.figure(figsize=(10, 4))
-    #     for dim, name in enumerate(("x", "y", "z")):
-    #         plt.subplot(1, 3, 1 + dim)
-    #         plt.plot(t, field[dim, :, :].T, "--")
-    #         plt.plot(t, field_me[dim, :, :].T)
-    #     plt.title(tau1)
-    #     plt.show()
-    # return
+    keep = (t >= -.5) * (t <= 5)
+    t = t[keep]
+    field = field[..., keep]
+
     kwargs = dict(
         order=max_order + 2,
         e_true=field,
@@ -291,7 +236,7 @@ def lightning_inverse_problem(**kwargs):
         verbose_every=verbose_every,
         scale=scale,  # shift, scale: 0, 14 -- -1 22
         tol=tol,
-        n_points=n_points * 1,
+        n_points=n_points * (max_order // 2 + 1),
         find_center=find_center,
         shift=0,
         rescale_at_points=rescale_at_points,
@@ -300,7 +245,8 @@ def lightning_inverse_problem(**kwargs):
         seed=seed,
         test_indices=test_indices,
         fit_on_magnetic_field=fit_on_magnetic_field,
-        b_true=field
+        b_true=field,
+        delayed=False
         # return_raw_moment=True
     )
     current_moment, h, center, field_opt = cache_function_call(
@@ -336,9 +282,13 @@ def lightning_inverse_problem(**kwargs):
         # plt.plot(t - t[np.argmax(np.abs(heidler_scaled))] + t[arg_max], heidler_scaled, "r--", label="Heidler")
         if len(h.shape) > 1 and h.shape[0] > 1:
             for f_ind in range(h.shape[0]):
-                plt.plot(t, h[f_ind, ...].T, color=plt.get_cmap("jet")(f_ind/(h.shape[0]-1)), label=f"{f_ind}")
+                plt.plot(t, h[f_ind, 2], color=plt.get_cmap("jet")(f_ind/(h.shape[0]-1)), label=f"{f_ind}")
         else:
-            plt.plot(t, h[:, 2, :].T, "k", label="h")
+            if len(h.shape) == 3:
+                plt.plot(t, h[:, 2, :].T, "k", label="h")
+            else:
+                plt.plot(t, h, "k", label="h")
+
         plt.legend()
         plt.xlabel("Time (s)")
         plt.ylabel("Excitation function (1)")
@@ -359,34 +309,26 @@ def lightning_inverse_problem(**kwargs):
         plt.tight_layout()
         plt.savefig(f"{path}/{case}_opt_fields.pdf")
 
-        print(f"{center=}")
-        # current_moment[-1, 0, 0, :] *= np.power(order_scale, np.linspace(0, max_order + 2, max_order + 3))
-        plot_moment_2d(current_moment)
-        plt.savefig(f"{path}/{case}_opt_moments.pdf")
-
-        print(f"{current_moment[-1, 0, 0, :]=}")
-
         z = np.linspace(-1, 1, 1000)
-
-        moment = current_moment[2, 0, 0, :4]
-        f, _ = optimization_moment_problem_solution(
-            z, moment, poly_order=2,
-            tol=1e-8,
-            method="BFGS"
-        )
-
+        function = np.zeros((t.size, z.size))
         plt.figure()
-        f = -f if np.max(f) < -np.min(f) else f
-        # f = get_poly(z, poly)
-        plt.plot(f, z*4, "k-")
-        # m = np.max(np.abs(f))
-        # if np.abs(np.min(f)) < m:
-        #     plt.xlim(0, 1.1 * m)
-        # else:
-        #     plt.xlim(-1.1 * m, 0)
-        # # plt.ylim(0, 1)
+        for ind_t, ti in enumerate(t):
+            moment = np.array([h[0, 2, ind_t], 0, h[1, 2, ind_t], ])
+            f, _ = optimization_moment_problem_solution(
+                z, moment, poly_order=2,
+                tol=1e-8,
+                method="BFGS"
+            )
+            function[ind_t, :] = f
+
+        plt.clf()
+        m = np.max(np.abs(function))
+        plt.contourf(t * factor / 3e8 * 1e6, z * 4, function.T, cmap="RdBu", levels=np.linspace(-m, m, 41))
+        plt.ylim(0, 4)
+        plt.colorbar()
+
         plt.ylabel("Altitude (km)")
-        plt.xlabel("Attenuation function")
+        plt.xlabel("Time (us)")
         plt.title(f"{case}")
         plt.savefig(f"{path}/{case}_attenuation.pdf")
         plt.show(block=True)

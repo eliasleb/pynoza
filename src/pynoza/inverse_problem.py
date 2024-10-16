@@ -85,11 +85,11 @@ def plot_moment(moment):
 
 
 def get_fields(sol, _sol_rust, find_center, t, x1, x2, x3, current_moment, h_sym, t_sym, center,
-               shift=0, magnetic=False, assuming_separability=True):
+               shift=0, magnetic=False, assuming_separability=True, delayed=True):
     c_mom = lambda a1, a2, a3: list(current_moment[:, a1, a2, a3])
     if assuming_separability:
         sol.set_moments(c_mom)
-    kwargs = dict(compute_grid=False, shift=shift)
+    kwargs = dict(compute_grid=False, shift=shift, delayed=delayed)
 
     if find_center:
         args = (x1 - center[0], x2 - center[1], x3 - center[2], t, h_sym, t_sym)
@@ -141,6 +141,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
     rescale_at_points = kwargs.pop("rescale_at_points", False)
     fit_on_derivative = kwargs.pop("fit_on_derivative", False)
     return_raw_moment = kwargs.pop("return_raw_moment", False)
+    delayed = kwargs.pop("delayed", True)
     find_center_ignore_axes = kwargs.pop(
         "find_center_ignore_axes",
         ()
@@ -212,7 +213,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
         current_moment_ = current_moment_callable(current_moment_)
         field_opt = get_fields(sol_python, None, find_center, t, x1, x2, x3, current_moment_, h_, None,
                                complete_center, shift=shift, magnetic=fit_on_magnetic_field,
-                               assuming_separability=assuming_separability)
+                               assuming_separability=assuming_separability, delayed=delayed)
         assert field_opt.shape == field_true.shape
 
         train_error = field_energy(field_true[:, train_indices, :] - field_opt[:, train_indices, :] * scale,
