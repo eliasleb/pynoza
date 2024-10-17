@@ -140,12 +140,13 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
         scale /= 3e8
     rescale_at_points = kwargs.pop("rescale_at_points", False)
     fit_on_derivative = kwargs.pop("fit_on_derivative", False)
-    return_raw_moment = kwargs.pop("return_raw_moment", False)
+    return_x_opt = kwargs.pop("return_x_opt", False)
     delayed = kwargs.pop("delayed", True)
     find_center_ignore_axes = kwargs.pop(
         "find_center_ignore_axes",
         ()
     )
+    ignore_tail = kwargs.pop("ignore_tail", 0.)
     shift = kwargs.pop("shift", 0)
     seed = kwargs.pop("seed", 0)
     test_indices = set(kwargs.pop("test_indices", {}))
@@ -153,9 +154,10 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
     train_indices, test_indices = list(sorted(train_indices)), list(sorted(test_indices))
 
     field_true = np.array(e_true if not fit_on_magnetic_field else b_true)
-    true_energy_train = field_energy(field_true[:, train_indices, ...], log=rescale_at_points,
+    tail = (t <= np.max(t) - ignore_tail)
+    true_energy_train = field_energy(field_true[..., tail][:, train_indices, :], log=rescale_at_points,
                                      fit_on_derivative=fit_on_derivative)
-    true_energy_test = field_energy(field_true[:, test_indices, ...], log=rescale_at_points,
+    true_energy_test = field_energy(field_true[..., tail][:, test_indices, :], log=rescale_at_points,
                                     fit_on_derivative=fit_on_derivative)
     if kwargs:
         raise ValueError(f"Unknown keyword arguments: {kwargs}")
@@ -215,11 +217,12 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
                                complete_center, shift=shift, magnetic=fit_on_magnetic_field,
                                assuming_separability=assuming_separability, delayed=delayed)
         assert field_opt.shape == field_true.shape
-
-        train_error = field_energy(field_true[:, train_indices, :] - field_opt[:, train_indices, :] * scale,
+        train_error = field_energy(field_true[..., tail][:, train_indices, :]
+                                   - field_opt[..., tail][:, train_indices, :] * scale,
                                    log=rescale_at_points, fit_on_derivative=fit_on_derivative) / true_energy_train
         if true_energy_test > 1e-18:
-            test_error = field_energy(field_true[:, test_indices, :] - field_opt[:, test_indices, :] * scale,
+            test_error = field_energy(field_true[..., tail][:, test_indices, :]
+                                      - field_opt[..., tail][:, test_indices, :] * scale,
                                        log=rescale_at_points, fit_on_derivative=fit_on_derivative) / true_energy_test
         else:
             test_error = 1
@@ -292,7 +295,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
 
     if return_residual_error:
         return_value += (res.fun, )
-    if return_raw_moment:
-        return_value += (current_moment, )
+    if return_x_opt:
+        return_value += (res.x, )
 
     return return_value
