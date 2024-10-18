@@ -36,7 +36,7 @@ def launch(s=0, rm_cache=False):
     all_args = get_all_args(
         cases=("TL", "MTLL", "MTLE", "QUAD"),
         orders=(2, 4),
-        n_points=(50, 60, 70),
+        n_points=(20, 30, 40, 50, 60, 70),
         seeds=range(10)
     )
     seed(s)
@@ -73,6 +73,6 @@ def monitor():
 
 
 if __name__ == "__main__":
-    # launch()
+    launch(rm_cache=True)
     monitor()
 

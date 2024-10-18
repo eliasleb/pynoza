@@ -135,15 +135,15 @@ def get_attenuation(h_):
     return z, attenuation
 
 
-def get_h_num(h_, t_):
+def get_h_num_sampled_attenuation(h_, t_):
     global n_z
-    n_points_segment = h_.size - n_z
+    n_points_segment = h_.size  # - n_z
     h_dict = dict()
     t_min, t_max = -.3, 5.5
     c = .5
-    steps = np.logspace(np.log10(t_min - t_min + 1), np.log10(t_max - t_min + 1), n_points_segment) + t_min - 1
+    # steps = np.logspace(np.log10(t_min - t_min + 1), np.log10(t_max - t_min + 1), n_points_segment) + t_min - 1
     h = interp1d(
-        steps,
+        np.linspace(t_min, t_max, n_points_segment),
         h_[n_z:],
         kind="cubic",
         fill_value=0.,
@@ -170,6 +170,30 @@ def get_h_num(h_, t_):
     return h_dict
 
 
+def get_h_num_full(h_, t_):
+    n_points_segment = h_.size // (max_order // 2 + 1)
+    h_dict = dict()
+    t_min, t_max = -.3, 5.5
+    steps = np.logspace(np.log10(t_min - t_min + 1), np.log10(t_max - t_min + 1), n_points_segment) + t_min - 1
+    for az in range(0, max_order + 1, 2):
+        h = interp1d(
+            steps,
+            h_[az // 2  * n_points_segment:(az // 2 + 1) * n_points_segment],
+            kind="cubic",
+            fill_value=0.,
+            bounds_error=False
+        )(t_)
+        dt = t_[1] - t_[0]
+        step = (t_max - t_min) / (n_points_segment + 1)
+        h = gaussian_filter(h, int(step / dt * .5))
+        h_dict[(0, 0, az)] = [
+            0 * t_,
+            0 * t_,
+            h
+        ]
+    return h_dict
+
+
 def lightning_inverse_problem(**kwargs):
     global max_order, order_scale, moments_shape, n_points, n_z
     max_order = kwargs.pop("max_order", 0)
@@ -180,7 +204,6 @@ def lightning_inverse_problem(**kwargs):
     n_points = kwargs.pop("n_points", 20)
     find_center = kwargs.pop("find_center", False)
     seed = kwargs.pop("seed", 0)
-    n_tail = kwargs.pop("n_tail", 10)
     order_scale = kwargs.pop("order_scale", 1.)
     center_scale = kwargs.pop("center_scale", 2e3/3e8)
     plot_recall = kwargs.pop("plot_recall", plot)
@@ -245,12 +268,12 @@ def lightning_inverse_problem(**kwargs):
         _t_sym=None,
         current_moment_callable=lambda *args: [0., 0., 0.],
         dim_moment=dim_moment,
-        h_num=get_h_num,
+        h_num=get_h_num_full,
         plot=plot,
         verbose_every=verbose_every,
         scale=scale,  # shift, scale: 0, 14 -- -1 22
         tol=tol,
-        n_points=n_points + n_z,
+        n_points=n_points * (max_order // 2 + 1),
         find_center=find_center,
         shift=0,
         rescale_at_points=rescale_at_points,
@@ -282,9 +305,8 @@ def lightning_inverse_problem(**kwargs):
         error_test = 1.
     if plot_recall:
         print(f"{max_order=}, {seed=}, {n_points=}, train={error_train*100:.1f}, test={error_test*100:.1f}")
-        # print(f"{poly=}")
-        # if error**.5*100 > 31:
-        #     raise ValueError()
+        print(f"{center*4e3=}")
+
         if isinstance(h, dict):
             h = np.array(list(h.values()))
             arg_max = np.argmax(np.abs(h), axis=-1)
@@ -329,7 +351,10 @@ def lightning_inverse_problem(**kwargs):
 
         z, attenuation = get_attenuation(x_opt)
         plt.figure()
-        plt.plot(z, attenuation)
+        plt.plot(z * 4, attenuation)
+        plt.xlabel("Altitude (km)")
+        plt.ylabel("Attenuation")
+        plt.ylim(-.1, 1.1)
         # z = np.linspace(-1, 1, 1000)
         # function = np.zeros((t.size, z.size))
         # plt.figure()
@@ -384,8 +409,8 @@ def from_command_line():
 
 
 def sweep_results():
-    all_orders = (2, 4)
-    all_n_points = (20, 30, 40, 50, )
+    all_orders = (2, )
+    all_n_points = (50, 60,  )
     for case in ("TL", "MTLL", "MTLE", "QUAD"):
         errors = np.ones((len(all_orders), len(all_n_points), 10,)) * np.nan
         for ind_order, order in enumerate(all_orders):
@@ -393,7 +418,6 @@ def sweep_results():
                 for seed in range(10):
                     kwargs = dict(
                         max_order=order,
-                        verbose_every=100,
                         plot=False,
                         plot_recall=False,
                         n_tail=0,
