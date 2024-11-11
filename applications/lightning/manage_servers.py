@@ -57,8 +57,8 @@ cd applications/lightning
             commands += """rm function_cache/* || echo "Cache already empty"\n"""
         for case, order, n_point, s in sublist_args:
             noise_level = 0
-            commands += f"""python lightning.py --max_order {order} --n_points {n_point} --seed {s} """ \
-                f"""--noise_level {noise_level} --case {case} --scale 1e9 --order_scale 2 & """
+            commands += f"""nohup python lightning.py --max_order {order} --n_points {n_point} --seed {s} """ \
+                f"""--noise_level {noise_level} --case {case} --scale 1e9 --order_scale 2 & > /dev/null 2>&1 """
             # f"""> ../../../git_ignore/lightning_inverse/opt_results/v{version}_max_order_{order}""" \
             # f"""_n_points_{n_point}_seed_{s}_noise_level_{noise_level}_case_{case}.txt > /dev/null 2>&1 &\n"""
         # commands += "exit\n"
