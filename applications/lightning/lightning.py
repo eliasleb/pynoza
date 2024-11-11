@@ -294,7 +294,8 @@ def lightning_inverse_problem(**kwargs):
         b_true=field,
         delayed=False,
         ignore_tail=ignore_tail,
-        return_x_opt=True
+        return_x_opt=True,
+        random_start=False
     )
     current_moment, h, center, field_opt, x_opt = cache_function_call(
         inverse_problem,
@@ -332,15 +333,15 @@ def lightning_inverse_problem(**kwargs):
         # plt.plot(t - t[np.argmax(np.abs(heidler_scaled))] + t[arg_max], heidler_scaled, "r--", label="Heidler")
         if len(h.shape) > 1 and h.shape[0] > 1:
             for f_ind in range(h.shape[0]):
-                plt.plot(t, h[f_ind, 2], color=plt.get_cmap("jet")(f_ind/(h.shape[0]-1)), label=f"{f_ind}")
+                plt.plot(t / 3e8 * factor * 1e6, h[f_ind, 2], color=plt.get_cmap("jet")(f_ind/(h.shape[0]-1)), label=f"{f_ind}")
         else:
             if len(h.shape) == 3:
-                plt.plot(t, h[:, 2, :].T, "k", label="h")
+                plt.plot(t / 3e8 * factor * 1e6, h[:, 2, :].T, "k", label="h")
             else:
-                plt.plot(t, h, "k", label="h")
+                plt.plot(t / 3e8 * factor * 1e6, h, "k", label="h")
 
         plt.legend()
-        plt.xlabel("Time (...)")
+        plt.xlabel("Time (us)")
         plt.savefig(f"{path}/{case}_opt_h.pdf")
 
         plt.figure(figsize=(15, 10))
@@ -362,7 +363,7 @@ def lightning_inverse_problem(**kwargs):
         function = np.zeros((t.size, z.size))
         plt.figure()
         for ind_t, ti in enumerate(t):
-            moment = np.array([h[0, 2, ind_t], 0, h[1, 2, ind_t], 0.])  # , h[2, 2, ind_t], 0.])
+            moment = np.array([h[o_i // 2, 2, ind_t] if o_i % 2 == 0 else 0. for o_i in range(4)])
             f, _ = optimization_moment_problem_solution(
                 z, moment, poly_order=2,
                 tol=1e-8,
@@ -377,7 +378,32 @@ def lightning_inverse_problem(**kwargs):
         plt.ylabel("Altitude (km)")
         plt.xlabel("Time (us)")
         plt.title(f"{case}")
+        plt.tight_layout()
         plt.savefig(f"{path}/{case}_attenuation.pdf")
+
+        plt.figure()
+        t_slice_us = 30
+        ind_t = np.where(t / 3e8 * factor * 1e6 >= t_slice_us)[0][0]
+        current_max = np.max(np.abs(function[ind_t, :]))
+        plt.plot(z * factor, function[ind_t, :], "k")
+        plt.ylim(-1.1 * current_max, .1)
+        plt.xlim(0, factor)
+        plt.xlabel("Altitude (m)")
+        plt.title(f"Reconstructed current at {t_slice_us} us")
+        plt.tight_layout()
+        plt.savefig(f"{path}/{case}_attenuation_slice.pdf")
+
+        plt.figure()
+        i1 = z.size // 2
+        i2 = z.size // 2 + z.size * 3 // 8
+        f1 = function[:, i1] / np.max(np.abs(function[:, i1]))
+        f2 = function[:, i2] / np.max(np.abs(function[:, i2]))
+        t1 = t[np.argmax(np.abs(f1))]
+        t2 = t[np.argmax(np.abs(f2))]
+        print(f"speed = {3e3/(t2 - t1) * 3e8 / factor / 3e8 * 100:.2f} % c0")
+        plt.plot(t / 3e8 * factor, f1, )
+        plt.plot(t / 3e8 * factor, f2, )
+        plt.vlines(np.array((t1, t2)) / 3e8 * factor, -1, 0)
 
         # plt.figure()
         # n_calls = 0
@@ -463,9 +489,9 @@ def from_command_line():
 
 
 def sweep_results():
-    all_orders = (2, 4, 6, 8, )
+    all_orders = (2, 4, 6, )
     all_n_points = (20, 30, 40, 50, 60, 70, )
-    for case in ("TL", "MTLL", "MTLE", "QUAD", ):
+    for case in ("MTLL", "MTLE", "QUAD", "TL", ):
         errors = np.ones((len(all_orders), len(all_n_points), 10,)) * np.nan
         for ind_order, order in enumerate(all_orders):
             for ind_n_points, _n_points in enumerate(all_n_points):
@@ -484,10 +510,10 @@ def sweep_results():
                     errors[ind_order, ind_n_points, seed] = test_error
         ind_order, ind_n_points, seed = np.unravel_index(np.argmin(errors), errors.shape)
         plt.contourf(
-            all_orders, all_n_points, np.log10(np.min(errors, axis=-1)).T, cmap="jet"
+            all_orders, all_n_points, np.log10(np.min(errors, axis=-1)).T, cmap="jet", levels=31
         )
         plt.colorbar()
-        plt.show()
+
         kwargs["seed"] = seed
         kwargs["max_order"] = all_orders[ind_order]
         kwargs["n_points"] = all_n_points[ind_n_points]

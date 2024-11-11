@@ -5,7 +5,7 @@ import scipy.interpolate
 import matplotlib.pyplot as plt
 import os
 from matplotlib import cm
-from scipy.optimize import basinhopping
+from scipy.optimize import dual_annealing
 
 
 def complement(*args):
@@ -141,6 +141,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
     rescale_at_points = kwargs.pop("rescale_at_points", False)
     fit_on_derivative = kwargs.pop("fit_on_derivative", False)
     return_x_opt = kwargs.pop("return_x_opt", False)
+    random_start = kwargs.pop("random_start", True)
     delayed = kwargs.pop("delayed", True)
     find_center_ignore_axes = kwargs.pop(
         "find_center_ignore_axes",
@@ -272,9 +273,10 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
     np.random.seed(seed)
     print(f"There are {x0.size} degrees of freedom.")
 
-    x0 = np.random.random(x0.shape) * 2 - 1
-    x0[-n_center_coordinates:] = np.zeros((n_center_coordinates, ))
     n_calls = 0
+    if random_start:
+        x0 = np.random.random(x0.shape) * 2 - 1
+        x0[-n_center_coordinates:] = np.zeros((n_center_coordinates, ))
 
     res = scipy.optimize.minimize(get_error, x0,
                                   method="BFGS",

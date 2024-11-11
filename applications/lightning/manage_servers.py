@@ -20,11 +20,11 @@ def get_ips():
     return ips
 
 
-def run_remote_command(ip, command, verbose=True):
+def run_remote_command(ip, command, verbose=True, ret=False):
     if verbose:
         print(f"@{ip}: Running command {command}...")
-    ssh_command = f"ssh -i ~/.ssh/id_rsa ubuntu@{ip} '{command}'"
-    return run(ssh_command, shell=True, capture_output=not verbose)
+    ssh_command = f"ssh {'-f' if not ret else ''} -i ~/.ssh/id_rsa ubuntu@{ip} '{command}'"
+    return run(ssh_command, shell=True, capture_output=ret)
 
 
 def split_list(lst, n):
@@ -57,8 +57,8 @@ cd applications/lightning
             commands += """rm function_cache/* || echo "Cache already empty"\n"""
         for case, order, n_point, s in sublist_args:
             noise_level = 0
-            commands += f"""nohup python lightning.py --max_order {order} --n_points {n_point} --seed {s} """ \
-                f"""--noise_level {noise_level} --case {case} --scale 1e9 --order_scale 2 & > /dev/null 2>&1 """
+            commands += f"""python lightning.py --max_order {order} --n_points {n_point} --seed {s} """ \
+                f"""--noise_level {noise_level} --case {case} --scale 1e9 --order_scale 2 &\n"""
             # f"""> ../../../git_ignore/lightning_inverse/opt_results/v{version}_max_order_{order}""" \
             # f"""_n_points_{n_point}_seed_{s}_noise_level_{noise_level}_case_{case}.txt > /dev/null 2>&1 &\n"""
         # commands += "exit\n"
@@ -67,12 +67,12 @@ cd applications/lightning
 
 def monitor():
     for ip in get_ips():
-        ret = run_remote_command(ip, "pgrep python | wc -l", verbose=False)
+        ret = run_remote_command(ip, "pgrep python | wc -l", verbose=False, ret=True)
         n = int(ret.stdout)
         print(f"{ip:16} {n}")
 
 
 if __name__ == "__main__":
-    launch(rm_cache=False)
+    # launch(rm_cache=False)
     monitor()
 
