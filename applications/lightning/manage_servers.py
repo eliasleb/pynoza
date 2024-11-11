@@ -35,7 +35,7 @@ def split_list(lst, n):
 def launch(s=0, rm_cache=False):
     all_args = get_all_args(
         cases=("TL", "MTLL", "MTLE", "QUAD"),
-        orders=(2, 4),
+        orders=(6, 8, ),
         n_points=(20, 30, 40, 50, 60, 70),
         seeds=range(10)
     )
@@ -58,7 +58,7 @@ cd applications/lightning
         for case, order, n_point, s in sublist_args:
             noise_level = 0
             commands += f"""nohup python lightning.py --max_order {order} --n_points {n_point} --seed {s} """ \
-                f"""--noise_level {noise_level} --case {case} --scale 1e9 > /dev/null 2>&1 &"""
+                f"""--noise_level {noise_level} --case {case} --scale 1e9 --order_scale 2 > /dev/null 2>&1 &"""
             # f"""> ../../../git_ignore/lightning_inverse/opt_results/v{version}_max_order_{order}""" \
             # f"""_n_points_{n_point}_seed_{s}_noise_level_{noise_level}_case_{case}.txt > /dev/null 2>&1 &\n"""
         # commands += "exit\n"
@@ -73,6 +73,6 @@ def monitor():
 
 
 if __name__ == "__main__":
-    launch(rm_cache=True)
+    # launch(rm_cache=False)
     monitor()
 
