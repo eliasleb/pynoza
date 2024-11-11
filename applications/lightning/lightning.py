@@ -497,6 +497,9 @@ def sweep_results():
 
 if __name__ == "__main__":
     import matplotlib
-    matplotlib.use("TkAgg")
+    try:
+        matplotlib.use("TkAgg")
+    except ModuleNotFoundError:
+        pass
     from_command_line()
     # sweep_results()
