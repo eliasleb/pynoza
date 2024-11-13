@@ -323,11 +323,12 @@ def lightning_inverse_problem(**kwargs):
             bounds=[(-np.inf, 0), ] * (n_points * (max_order // 2 + 1)),
         ),
         minimize_options=dict(
-            ftol=1e-9,
-            gtol=1e-9,
+            ftol=1e-15,
+            gtol=1e-15,
             disp=True,
             maxfun=1_000_000,
-            maxiter=1_000_000
+            maxiter=1_000_000,
+            maxls=(n_points * (max_order // 2 + 1)) * 5
         )
     )
     current_moment, h, center, field_opt, x_opt = cache_function_call(
