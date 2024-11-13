@@ -147,6 +147,14 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
         "find_center_ignore_axes",
         ()
     )
+    minimize_kwargs = kwargs.pop("minimize_kwargs", {
+        "method": "BFGS"
+    })
+    minimize_options = kwargs.pop("minimize_options", {
+        'maxiter': 1_000_000_000,
+        "disp": True,
+        "gtol": tol
+    })
     ignore_tail = kwargs.pop("ignore_tail", 0.)
     shift = kwargs.pop("shift", 0)
     seed = kwargs.pop("seed", 0)
@@ -265,11 +273,6 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
 
         return train_error
 
-    options = {'maxiter': 1_000_000_000,
-               "disp": True,
-               "gtol": tol
-               }
-
     np.random.seed(seed)
     print(f"There are {x0.size} degrees of freedom.")
 
@@ -278,9 +281,11 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
         x0 = np.random.random(x0.shape) * 2 - 1
         x0[-n_center_coordinates:] = np.zeros((n_center_coordinates, ))
 
-    res = scipy.optimize.minimize(get_error, x0,
-                                  method="BFGS",
-                                  options=options)
+    res = scipy.optimize.minimize(
+        get_error, x0,
+        options=minimize_options,
+        **minimize_kwargs,
+    )
     # res = scipy.optimize.basinhopping(
     #     get_error,
     #     x0,

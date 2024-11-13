@@ -197,6 +197,10 @@ def optimization_moment_problem_solution(z, moments, poly_order=2, **opt_kwargs)
     if not isinstance(z, np.ndarray) or len(z.shape) != 1:
         raise ValueError(":z: must be a 1d numpy array")
 
+    should_be_negative = opt_kwargs.pop("should_be_negative", False)
+    should_be_positive = opt_kwargs.pop("should_be_positive", False)
+    weight_l2 = opt_kwargs.pop("weight_l2", 0.)
+
     dz = z[1] - z[0]
 
     def get_poly(param):
@@ -212,6 +216,11 @@ def optimization_moment_problem_solution(z, moments, poly_order=2, **opt_kwargs)
         for ind, moment_i in enumerate(moments):
             opt_moment_i = dz * np.sum(z**ind * poly)
             result += (opt_moment_i - moment_i) ** 2
+        result += weight_l2 * dz * np.sum(poly**2)
+        if should_be_negative:
+            return result + np.sum(poly[poly > 0])
+        if should_be_positive:
+            return result - np.sum(poly[poly < 0])
         return result
 
     sol = minimize(get_error, np.zeros((poly_order + 1, )), **opt_kwargs)

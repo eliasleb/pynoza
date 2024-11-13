@@ -53,7 +53,7 @@ setuptools.setup(
     package_dir={"": "src"},
     packages=setuptools.find_packages(where="src"),
     python_requires=">=3.10, <4",
-    ext_modules=cythonize("src/pynoza/solution.py",
+    ext_modules=cythonize("src/pynoza/solution.py", "src/pynoza/helpers.py",
                           compiler_directives={'language_level': "3"}),
     cmdclass={
         'build_ext': BuildExt,
