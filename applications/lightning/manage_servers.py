@@ -38,8 +38,8 @@ def launch(s=0, rm_cache=False):
     all_args = get_all_args(
         cases=("TL", "MTLL", "MTLE", "QUAD"),
         orders=(2, 4, 6, ),
-        n_points=range(20, 61),
-        seeds=(0, )
+        n_points=range(20, 51),
+        seeds=(10, )
         # cases=("TL", ),
         # orders=(2, 4, 6, ),
         # n_points=(20, ),
@@ -70,14 +70,14 @@ cd applications/lightning
 """
         for case, order, n_point, s in sublist_args:
             noise_level = 0
+            order_scale = 2
             commands += f"""python lightning.py --max_order {order} --n_points {n_point} --seed {s} """ \
-                f"""--noise_level {noise_level} --case {case} --scale 1e9 --order_scale {1} & """ \
-                f"""> /dev/null 2>&1 &\n """  # \
-            # f"""> ../../../git_ignore/lightning_inverse/opt_results/v100_max_order_{order}""" \
-            # f"""_n_points_{n_point}_seed_{s}_noise_level_{noise_level}_case_{case}.txt &\n"""
+                f"""--noise_level {noise_level} --case {case} --scale 1e9 --order_scale {order_scale} """ \
+                f"""> ../../../git_ignore/lightning_inverse/opt_results/v101_max_order_{order}""" \
+                f"""_n_points_{n_point}_seed_{s}_noise_level_{noise_level}_case_{case}"""\
+                f"""_order_scale_{order_scale}.txt &\n"""
         # commands += "exit\n"
         run_remote_command(ip, commands)
-        time.sleep(3)
 
 
 def monitor(killall=False):

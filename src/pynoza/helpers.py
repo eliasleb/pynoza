@@ -91,15 +91,17 @@ def c_r(a1, a2, _a3, x1, x2, w, h):
     return int_r(x1, w, a1) * int_j(x2, h, a2)
 
 
-def cache_function_call(func, *args, cache_dir="function_cache", **kwargs):
+def cache_function_call(func, *args, cache_dir="function_cache", raise_error_if_not_cached=False, **kwargs):
     """
     Caches the result of a function call and retrieves it from the cache if the same call is made again.
 
     Args:
-    :func (function): The function to call.
-    :*args: Positional arguments of the function.
-    :cache_dir: Directory used to cache function calls
-    :**kwargs: Keyword arguments of the function.
+    :param func: The function to call.
+    :param args: Positional arguments of the function.
+    :param cache_dir: Directory used to cache function calls
+    :param raise_error_if_not_cached: If true, raises FileNotFoundError if the call is not cached instead of calling
+        :func:
+    :param kwargs: Keyword arguments of the function.
 
     Returns:
     The result of the function call.
@@ -126,6 +128,8 @@ def cache_function_call(func, *args, cache_dir="function_cache", **kwargs):
             result = pickle.load(f)
         print("Retrieved from cache.")
         return result
+    elif raise_error_if_not_cached:
+        raise FileNotFoundError(f"Hash {hash_key} not found. Set :raise_error_if_not_cached: to False to disable")
 
     # Compute the result and cache it
     result = func(*args, **kwargs)
@@ -205,6 +209,15 @@ def optimization_moment_problem_solution(z, moments, poly_order=2, **opt_kwargs)
 
     def get_poly(param):
         poly = 0.
+
+        if poly_order == 2:
+            # params are samples at 0, 1/2, 1
+            param = [
+                param[0],
+                -3 * param[0] + 4 * param[1] - param[2],
+                2 * (param[0] - 2 * param[1] + param[2])
+            ]
+
         for p_order, coeff in zip(range(0, poly_order + 1), param):
             poly = poly + coeff * z ** p_order
         poly[z < 0] = poly[z > 0][:np.sum(z < 0)][::-1]

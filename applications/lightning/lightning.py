@@ -234,6 +234,7 @@ def lightning_inverse_problem(**kwargs):
     rescale_at_points = kwargs.pop("rescale_at_points", False)
     noise_level = kwargs.pop("noise_level", 0.)
     case = kwargs.pop("case")
+    raise_error_if_not_cached = kwargs.pop("raise_error_if_not_cached", False)
 
     fit_on_magnetic_field = True
 
@@ -288,6 +289,7 @@ def lightning_inverse_problem(**kwargs):
     t = t[keep]
     field = field[..., keep]
     ignore_tail = .5
+    t_max = np.max(t) - ignore_tail
     n_z = 2
 
     kwargs = dict(
@@ -326,18 +328,19 @@ def lightning_inverse_problem(**kwargs):
             ftol=1e-15,
             gtol=1e-15,
             disp=True,
-            maxfun=1_000_000,
-            maxiter=1_000_000,
+            maxfun=1_000_000_000_000,
+            maxiter=1_000_000_000_000,
             maxls=(n_points * (max_order // 2 + 1)) * 5
         )
     )
     current_moment, h, center, field_opt, x_opt = cache_function_call(
         inverse_problem,
+        raise_error_if_not_cached=raise_error_if_not_cached,
         **kwargs
     )
-
-    plt.figure()
-    plt.plot(x_opt)
+    if plot_recall:
+        plt.figure()
+        plt.plot(x_opt)
 
     train_indices = set(range(x.size)) - set(test_indices)
     keep = (t <= np.max(t) - ignore_tail)
@@ -353,6 +356,8 @@ def lightning_inverse_problem(**kwargs):
         error_test = 1.
     if plot_recall:
         t = t * factor / 3e8 * 1e6
+        t_min = np.min(t)
+        t_max *= factor / 3e8 * 1e6
         print(f"{max_order=}, {seed=}, {n_points=}, train={error_train*100:.1f}, test={error_test*100:.1f}")
         if isinstance(center, float):
             print(f"{center*4e3=}")
@@ -381,7 +386,8 @@ def lightning_inverse_problem(**kwargs):
 
         plt.legend()
         plt.xlabel("Time (us)")
-        plt.savefig(f"{path}/{case}_opt_h.pdf")
+        plt.tight_layout()
+        plt.savefig(f"{path}/opt_h_{case}.pdf")
 
         plt.figure(figsize=(15, 10))
         # omin, omax = np.min(e_field), np.max(e_field)
@@ -395,8 +401,9 @@ def lightning_inverse_problem(**kwargs):
             if i > 3:
                 plt.xlabel("Time (us)")
             # plt.ylim(1.1*omin, 1.1*omax)
+            plt.xlim(t_min, t_max)
         plt.tight_layout()
-        plt.savefig(f"{path}/{case}_opt_fields.pdf")
+        plt.savefig(f"{path}/opt_fields_{case}.pdf")
 
         z = np.linspace(-1, 1, 100)
         function = np.zeros((t.size, z.size))
@@ -408,10 +415,10 @@ def lightning_inverse_problem(**kwargs):
             f, _ = optimization_moment_problem_solution(
                 z, moment, poly_order=2,
                 tol=1e-8,
-                method="BFGS",
+                # method="BFGS",
                 # should_be_negative=True,
-                weight_l2=.1
-                # bounds=((-np.inf, 0), (0, np.inf), (0, np.inf), )
+                weight_l2=.03,
+                bounds=[(-np.inf, 0), ] * 3
             )
             function[ind_t, :] = f
         function *= factor * 2 / 1e3
@@ -426,14 +433,16 @@ def lightning_inverse_problem(**kwargs):
         ind_z_pos = z >= 0
         x_mg, y_mg = np.meshgrid(t, z[ind_z_pos] * 4)
         ax = fig.add_subplot(111, projection='3d')
-        ax.plot_surface(x_mg, y_mg, function[:, ind_z_pos].T, cmap="jet",)
+        surf = ax.plot_surface(x_mg, y_mg, function[:, ind_z_pos].T, cmap="jet",)
+        fig.colorbar(surf, ax=ax, shrink=0.5, aspect=10)
 
         plt.ylim(0, 4)
         plt.ylabel("Altitude (km)")
         plt.xlabel("Time (us)")
+        plt.xlim(t_min, t_max)
         plt.title(f"{case}, current (kA)")
         plt.tight_layout()
-        plt.savefig(f"{path}/{case}_attenuation.pdf")
+        plt.savefig(f"{path}/attenuation_{case}.pdf")
 
         plt.figure()
         t_slice_us = 30
@@ -446,19 +455,24 @@ def lightning_inverse_problem(**kwargs):
         plt.ylabel("kA")
         plt.title(f"Reconstructed current at {t_slice_us} us")
         plt.tight_layout()
-        plt.savefig(f"{path}/{case}_attenuation_slice.pdf")
+        plt.savefig(f"{path}/attenuation_slice_{case}.pdf")
 
         plt.figure()
         i1 = z.size // 2
         i2 = z.size // 2 + z.size * 3 // 8
-        f1 = function[:, i1] / np.max(np.abs(function[:, i1]))
-        f2 = function[:, i2] / np.max(np.abs(function[:, i2]))
-        t1 = t[np.argmax(np.abs(f1))]
-        t2 = t[np.argmax(np.abs(f2))]
-        print(f"speed = {3e3/(t2 - t1) * 1e6 / 3e8 * 100:.2f} % c0")
-        plt.plot(t / 3e8 * factor, f1, )
-        plt.plot(t / 3e8 * factor, f2, )
-        plt.vlines(np.array((t1, t2)) / 3e8 * factor, -1, 0)
+        f1 = function[:, i1]  # / np.max(np.abs(function[:, i1]))
+        f2 = function[:, i2]  # / np.max(np.abs(function[:, i2]))
+        # t1 = t[np.argmax(np.abs(f1))]
+        # t2 = t[np.argmax(np.abs(f2))]
+        # print(f"speed = {3e3/(t2 - t1) * 1e6 / 3e8 * 100:.2f} % c0")
+        plt.plot(t, f1, label="z = 0 km")
+        plt.plot(t, f2, label="z = 3 km")
+        plt.xlabel("Time (us)")
+        plt.ylabel("Current (kA)")
+        plt.legend()
+        # plt.vlines(np.array((t1, t2)) / 3e8 * factor, -1, 0)
+        plt.tight_layout()
+        plt.savefig(f"{path}/time_slices_{case}.pdf")
 
         # plt.figure()
         # n_calls = 0
@@ -544,8 +558,8 @@ def from_command_line():
 
 
 def sweep_results():
-    all_orders = (2, 4, )
-    all_n_points = range(21, 61, 1)
+    all_orders = (2, 4, 6, )
+    all_n_points = range(20, 61, 1)
     for case in ("MTLL", "MTLE", "QUAD", "TL", ):
         errors = np.ones((len(all_orders), len(all_n_points), 1,)) * np.nan
         for ind_order, order in enumerate(all_orders):
@@ -560,11 +574,16 @@ def sweep_results():
                         n_points=_n_points,
                         seed=seed,
                         case=case,
+                        order_scale=2,
+                        raise_error_if_not_cached=True
                     )
                     print(f"{case=}, {order=}, {_n_points=}")
-                    current_moment, h, center, e_opt, train_error, test_error = lightning_inverse_problem(**kwargs)
-                    errors[ind_order, ind_n_points, seed] = test_error
-        ind_order, ind_n_points, seed = np.unravel_index(np.argmin(errors), errors.shape)
+                    try:
+                        current_moment, h, center, e_opt, train_error, test_error = lightning_inverse_problem(**kwargs)
+                        errors[ind_order, ind_n_points, seed] = test_error
+                    except FileNotFoundError:
+                        print("Not found, ignoring")
+        ind_order, ind_n_points, seed = np.unravel_index(np.nanargmin(errors), errors.shape)
         if len(all_orders) > 1:
             plt.figure()
             plt.contourf(
