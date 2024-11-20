@@ -17,10 +17,10 @@ def _read_mathematica_export():
     mapping = dict()
     with open(data_path, "r") as fd:
         data = json.load(fd)
-        for spherical_key, map in data.items():
+        for spherical_key, map1 in data.items():
             spherical_key = _from_mathematica_tuple(spherical_key)
             mapping[spherical_key] = dict()
-            for cartesian_key, expression in map.items():
+            for cartesian_key, expression in map1.items():
                 cartesian_key = _from_mathematica_tuple(cartesian_key)
                 mapping[spherical_key][cartesian_key] = _from_mathematica(expression)
     return mapping

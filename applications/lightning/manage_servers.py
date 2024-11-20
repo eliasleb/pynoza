@@ -39,7 +39,7 @@ def launch(s=0, rm_cache=False):
         cases=("TL", "MTLL", "MTLE", "QUAD"),
         orders=(2, 4, 6, ),
         n_points=range(20, 51),
-        seeds=(10, )
+        seeds=(11, )
         # cases=("TL", ),
         # orders=(2, 4, 6, ),
         # n_points=(20, ),
