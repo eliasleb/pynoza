@@ -252,9 +252,12 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
                     max_h = np.max(np.abs(h_plot))
                     plt.subplot(2, 3, 5)
                     if max_h > 0:
-                        plt.plot(t, h_plot[:, 0, :].T, "r")
-                        plt.plot(t, h_plot[:, 1, :].T, "g")
-                        plt.plot(t, h_plot[:, 2, :].T, "b")
+                        if len(h_plot.shape) == 3:
+                            plt.plot(t, h_plot[:, 0, :].T, "r")
+                            plt.plot(t, h_plot[:, 1, :].T, "g")
+                            plt.plot(t, h_plot[:, 2, :].T, "b")
+                        else:
+                            plt.plot(t, h_plot)
                     if find_center:
                         plt.subplot(2, 3, 2)
                         plt.title(f"""center = ({complete_center[0]:+.03f}, """

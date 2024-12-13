@@ -559,12 +559,13 @@ def from_command_line():
 
 def sweep_results():
     all_orders = (2, 4, 6, )
-    all_n_points = range(20, 61, 1)
+    all_n_points = range(20, 51, 1)
+    seeds = (11, )
     for case in ("MTLL", "MTLE", "QUAD", "TL", ):
-        errors = np.ones((len(all_orders), len(all_n_points), 1,)) * np.nan
+        errors = np.ones((len(all_orders), len(all_n_points), len(seeds),)) * np.nan
         for ind_order, order in enumerate(all_orders):
             for ind_n_points, _n_points in enumerate(all_n_points):
-                for seed in (0, ):
+                for ind_seed, seed in enumerate(seeds):
                     kwargs = dict(
                         max_order=order,
                         plot=False,
@@ -580,10 +581,10 @@ def sweep_results():
                     print(f"{case=}, {order=}, {_n_points=}")
                     try:
                         current_moment, h, center, e_opt, train_error, test_error = lightning_inverse_problem(**kwargs)
-                        errors[ind_order, ind_n_points, seed] = test_error
+                        errors[ind_order, ind_n_points, ind_seed] = test_error
                     except FileNotFoundError:
                         print("Not found, ignoring")
-        ind_order, ind_n_points, seed = np.unravel_index(np.nanargmin(errors), errors.shape)
+        ind_order, ind_n_points, ind_seed = np.unravel_index(np.nanargmin(errors), errors.shape)
         if len(all_orders) > 1:
             plt.figure()
             plt.contourf(
@@ -591,7 +592,7 @@ def sweep_results():
             )
             plt.colorbar()
 
-        kwargs["seed"] = seed
+        kwargs["seed"] = seeds[ind_seed]
         kwargs["max_order"] = all_orders[ind_order]
         kwargs["n_points"] = all_n_points[ind_n_points]
         kwargs["plot_recall"] = True

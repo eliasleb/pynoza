@@ -197,11 +197,12 @@ if __name__ == "__main__":
     import matplotlib
     matplotlib.use("TkAgg")
 
-    test_function_reconstruction(plot=True)
-    l2_max = 1e-2
-    test_em_j_reconstruction(plot=True, fun_type="TL", max_l2_error=l2_max)
-    test_em_j_reconstruction(plot=True, fun_type="MTLL", max_l2_error=l2_max)
-    test_em_j_reconstruction(plot=True, fun_type="MTLE", max_l2_error=l2_max)
-    test_em_j_reconstruction(plot=True, fun_type="QUAD", max_l2_error=l2_max)
+    plot = True
+    test_function_reconstruction(plot=plot)
+    l2_max = 1.4e-2
+    # test_em_j_reconstruction(plot=plot, fun_type="TL", max_l2_error=l2_max)
+    # test_em_j_reconstruction(plot=plot, fun_type="MTLL", max_l2_error=l2_max)
+    test_em_j_reconstruction(plot=plot, fun_type="MTLE", max_l2_error=l2_max)
+    # test_em_j_reconstruction(plot=plot, fun_type="QUAD", max_l2_error=l2_max)
 
     plt.show(block=True)

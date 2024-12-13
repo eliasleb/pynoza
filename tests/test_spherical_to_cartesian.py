@@ -138,19 +138,20 @@ def spherical_integral(theta, x):
     return np.sum(x * np.sin(theta))
 
 
-def test(plot=False):
+def test_spherical_to_cartesian(plot=False, do_assert=True):
     evaluate_radiation_pattern([0, ], [0, ], pol=[1, ], plot=plot, coefficients=[1., ],
-                               formula=lambda t, p: 1 - np.sin(p) ** 2 * np.sin(t) ** 2, do_assert=True)  # 1 -1
+                               formula=lambda t, p: 1 - np.sin(p) ** 2 * np.sin(t) ** 2, do_assert=do_assert)  # 1 -1
+    plt.show()
     evaluate_radiation_pattern([0, ], [0, ], pol=[2, ], plot=plot, coefficients=[1., ],
-                               formula=lambda t, p: np.sin(t)**2)  # 1 0
+                               formula=lambda t, p: np.sin(t)**2, do_assert=do_assert)  # 1 0
     evaluate_radiation_pattern([0, ], [0, ], pol=[0, ], plot=plot, coefficients=[1., ],
-                               formula=lambda t, p: 1 - np.cos(p) ** 2 * np.sin(t) ** 2, do_assert=True)  # 1 1
+                               formula=lambda t, p: 1 - np.cos(p) ** 2 * np.sin(t) ** 2, do_assert=do_assert)  # 1 1
 
     evaluate_radiation_pattern(
         [1, 1], [1, -1], pol=[1, 0], plot=plot, coefficients=[1., -1.],
         formula=lambda t, p: np.sqrt(
             (np.cos(2 * p) ** 2 * np.sin(t) ** 2 + .25 * np.sin(2 * t) ** 2 * np.sin(2 * p) ** 2) ** 2),
-        do_assert=True)  # 2 -2
+        do_assert=do_assert)  # 2 -2
     evaluate_radiation_pattern(
         [1, 1], [-1, 0], pol=[2, 1], plot=plot, coefficients=[1, 1], formula=lambda theta, phi:
         np.sqrt(np.maximum(
@@ -162,10 +163,10 @@ def test(plot=False):
                 -5.69932 * np.sin(theta) ** 6 * np.sin(phi) ** 4 + 0.712415 * np.sin(theta) ** 4 * np.sin(
                     2 * phi) ** 2),
             0.)),
-        do_assert=True
+        do_assert=do_assert
     )  # 2 -1
     evaluate_radiation_pattern([1, 1, 1], [-1, 0, 1], pol=[1, 2, 0], plot=plot, coefficients=[-1, 2, 1],
-                               formula=lambda t, _: np.sin(2 * t) ** 2)  # 2 0
+                               formula=lambda t, _: np.sin(2 * t) ** 2, do_assert=do_assert)  # 2 0
     evaluate_radiation_pattern(
         [1, 1], [0, 1], pol=[0, 2], plot=plot, coefficients=[1, -1], formula=lambda theta, phi:
         np.sqrt(np.maximum(
@@ -176,20 +177,20 @@ def test(plot=False):
                         8.54897 * np.cos(phi) ** 4 * np.sin(theta) ** 4 + 1.42483 * np.sin(phi) ** 4 - 1.42483 * np.sin(
                             theta) ** 2 * np.sin(2 * phi) ** 2) + np.cos(theta) ** 2 * (
                         -5.69932 * np.cos(phi) ** 4 * np.sin(theta) ** 6 + 0.712415 * np.sin(theta) ** 4 * np.sin(
-                            2 * phi) ** 2), 0))
+                            2 * phi) ** 2), 0)), do_assert=do_assert
     )  # 2 1
     evaluate_radiation_pattern(
         [1, 1], [-1, 1], pol=[1, 0], plot=plot, coefficients=[1., 1.], formula=lambda theta, phi:
         np.sin(theta) ** 2 * np.sqrt(np.maximum(
             1.42483 * np.cos(theta) ** 4 * np.cos(2. * phi) ** 4 + 2.84966 * np.cos(theta) ** 2 * np.cos(
-                2. * phi) ** 2 * np.sin(2. * phi) ** 2 + 1.42483 * np.sin(2. * phi) ** 4, 0))
+                2. * phi) ** 2 * np.sin(2. * phi) ** 2 + 1.42483 * np.sin(2. * phi) ** 4, 0)), do_assert=do_assert
     )  # 2, 2
 
     evaluate_radiation_pattern(
         [2, 2], [-2, 2], pol=[0, 1], plot=plot, coefficients=[1., 1.], formula=lambda theta, phi:
         np.sin(theta) ** 4 * np.sqrt(np.maximum(
             9.81796 * np.cos(3. * phi) ** 4 + 19.6359 * np.cos(theta) ** 2 * np.cos(3. * phi) ** 2 * np.sin(
-                3. * phi) ** 2 + 9.81796 * np.cos(theta) ** 4 * np.sin(3. * phi) ** 4, 0))
+                3. * phi) ** 2 + 9.81796 * np.cos(theta) ** 4 * np.sin(3. * phi) ** 4, 0)), do_assert=do_assert
     )  # 3, -3
     evaluate_radiation_pattern(
         [2, 2, 2], [-2, -1, 1], pol=[2, 0, 1, ],
@@ -203,7 +204,7 @@ def test(plot=False):
                 8 * theta) -
              0.0937479 / np.sin(6 * theta) * np.sin(12 * theta) - 0.0511352 / np.sin(8 * theta) * np.sin(16 * theta) +
              0.0767028 / np.sin(10 * theta) * np.sin(20 * theta)) * np.sin(4. * phi) ** 2,
-            0))
+            0)), do_assert=do_assert
     )  # 3, -2
     evaluate_radiation_pattern(
         [2, 2, 2, 2], [-2, -1, 0, 2],
@@ -214,14 +215,15 @@ def test(plot=False):
             0.385609 * np.cos(2 * theta - 2 * phi) + 0.129151 * np.cos(4 * theta - 2 * phi) -
             0.415129 * np.cos(6 * theta - 2 * phi) - 0.199262 * np.cos(2 * phi) +
             0.385609 * np.cos(2 * (theta + phi)) + 0.129151 * np.cos(4 * theta + 2 * phi) -
-            0.415129 * np.cos(6 * theta + 2 * phi))
+            0.415129 * np.cos(6 * theta + 2 * phi)), do_assert=do_assert
     )  # 3, -1
     evaluate_radiation_pattern(
         [2, 2, 2, ], [-1, 0, 1, ],
         pol=[1, 2, 0, ], plot=plot,
         coefficients=[-0.409878, 0.70993, 0.409878, ], formula=lambda theta, phi:
         15 * np.abs(0.2 - np.cos(theta) ** 2) * np.sin(theta) * np.sqrt(np.maximum(
-            (0.174542 + 4.36354 * np.cos(theta) ** 4) * np.sin(theta) ** 2 - 0.436354 * np.sin(2 * theta) ** 2, 0))
+            (0.174542 + 4.36354 * np.cos(theta) ** 4) * np.sin(theta) ** 2 - 0.436354 * np.sin(2 * theta) ** 2, 0)),
+        do_assert=do_assert
     )  # 3, 0
     evaluate_radiation_pattern(
         [2, 2, 2, 2, ], [-2, 0, 1, 2],
@@ -232,7 +234,7 @@ def test(plot=False):
             0.385609 * np.cos(2 * theta - 2 * phi) - 0.129151 * np.cos(4 * theta - 2 * phi) +
             0.415129 * np.cos(6 * theta - 2 * phi) + 0.199262 * np.cos(2 * phi) -
             0.385609 * np.cos(2 * (theta + phi)) - 0.129151 * np.cos(4 * theta + 2 * phi) +
-            0.415129 * np.cos(6 * theta + 2 * phi))
+            0.415129 * np.cos(6 * theta + 2 * phi)), do_assert=do_assert
     )  # 3, 1
     evaluate_radiation_pattern(
         [2, 2, 2, ], [-1, 1, 2, ],
@@ -242,7 +244,7 @@ def test(plot=False):
                 np.cos(theta) ** 4 * np.cos(2. * phi) ** 2 +
                 0.25 * np.cos(2. * phi) ** 2 * np.sin(theta) ** 4 +
                 np.cos(theta) ** 2 * (-np.cos(2. * phi) ** 2 * np.sin(theta) ** 2 + np.sin(2. * phi) ** 2)
-        )
+        ), do_assert=do_assert
     )  # 3, 2
     evaluate_radiation_pattern(
         [2, 2, ], [-2, 2, ],
@@ -251,7 +253,7 @@ def test(plot=False):
         np.sin(theta) ** 4 * np.sqrt(np.maximum(
             9.81796 * np.cos(theta) ** 4 * np.cos(3. * phi) ** 4 +
             19.6359 * np.cos(theta) ** 2 * np.cos(3. * phi) ** 2 * np.sin(3. * phi) ** 2 +
-            9.81796 * np.sin(3. * phi) ** 4, 0))
+            9.81796 * np.sin(3. * phi) ** 4, 0)), do_assert=do_assert
     )  # 3, 3
 
     evaluate_radiation_pattern(
@@ -261,12 +263,13 @@ def test(plot=False):
         np.sin(theta) ** 6 * np.sqrt(np.maximum(
             39.2719 * np.cos(theta) ** 4 * np.cos(4. * phi) ** 4 +
             78.5437 * np.cos(theta) ** 2 * np.cos(4. * phi) ** 2 * np.sin(4. * phi) ** 2 +
-            39.2719 * np.sin(4. * phi) ** 4, 0))
+            39.2719 * np.sin(4. * phi) ** 4, 0)), do_assert=do_assert
     )  # 4, 4
 
 
 if __name__ == "__main__":
     import matplotlib
     matplotlib.use("TkAgg")
-    test(plot=True)
+    test_spherical_to_cartesian(plot=True, do_assert=True)
+    # test_cartesian_to_spherical(plot=True)
     plt.show()

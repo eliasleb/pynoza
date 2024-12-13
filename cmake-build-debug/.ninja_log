@@ -1,9 +1,0 @@
-# ninja log v5
-2	120	1707746936307219368	build.ninja	e9cc0f1708b24e9e
-4	60	1707746902772866269	CMakeFiles/integration_comparison.dir/tests/integration_comparison.c.o	318ad51cbb882955
-60	96	1707746902808476491	/Users/elias/Dropbox/Documents/EPFL/Doctorat/etr/papers/pynoza/integration_comparison.so	39cf7297ded17353
-2	125	1707746936307219368	build.ninja	e9cc0f1708b24e9e
-2	51	1707746936361949265	CMakeFiles/integration_comparison.dir/tests/integration_comparison.c.o	318ad51cbb882955
-51	89	1707746936400754190	/Users/elias/Dropbox/Documents/EPFL/Doctorat/etr/papers/pynoza/integration_comparison.so	39cf7297ded17353
-5	66	1707747053929094174	CMakeFiles/integration_comparison.dir/tests/integration_comparison.c.o	318ad51cbb882955
-66	102	1707747053965826380	/Users/elias/Dropbox/Documents/EPFL/Doctorat/etr/papers/pynoza/integration_comparison.so	39cf7297ded17353

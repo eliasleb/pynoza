@@ -53,21 +53,20 @@ def get_charge_moment(current_moment: ndarray, return_mapping=False):
             if i == j:
                 if a[j] >= 2:
                     b[j] = a[j] - 2
-                    charge_moment[i, a1, a2, a3] += a[j] * (a[j] - 1) \
+                    charge_moment[i, a1, a2, a3] += -a[j] * (a[j] - 1) \
                         * current_moment[j, b[0], b[1], b[2]]
                     if tuple(ind) not in mapping:
                         mapping[tuple(ind)] = dict()
-                    mapping[tuple(ind)][(j, ) + tuple(b)] = a[j] * (a[j] - 1)
+                    mapping[tuple(ind)][(j, ) + tuple(b)] = -a[j] * (a[j] - 1)
             else:
                 b[i] -= 1
                 b[j] -= 1
                 if a[j] >= 1 and a[i] >= 1:
-                    charge_moment[i, a1, a2, a3] += a[j] * a[i] \
+                    charge_moment[i, a1, a2, a3] += -a[j] * a[i] \
                         * current_moment[j, b[0], b[1], b[2]]
                     if tuple(ind) not in mapping:
                         mapping[tuple(ind)] = dict()
-                    mapping[tuple(ind)][(j, ) + tuple(b)] = a[j] * a[i]
-    charge_moment = -charge_moment
+                    mapping[tuple(ind)][(j, ) + tuple(b)] = -a[j] * a[i]
     if return_mapping:
         return charge_moment, mapping
     return charge_moment
@@ -515,6 +514,7 @@ class Solution:
                     get_charge_moment(np.zeros((3,) + (self.max_order + 1,) * 3), return_mapping=True)[1],
                     hs_integral
                 )
+                hs_derivative_dict = hs_derivative
 
         hs_0, hs_derivative, hs_integral = hs_0_dict, hs_derivative_dict, hs_integral_dict
 
@@ -522,6 +522,7 @@ class Solution:
             self._all_multi_indices = set(hs_0.keys())
             return x1, x2, x3, t, moment_shape, hs_0
         self._all_multi_indices = set(hs_derivative.keys()).union(set(hs_integral.keys()))
+        self._all_multi_indices = {alpha for alpha in self._all_multi_indices if np_sum(alpha) <= self.max_order}
         return x1, x2, x3, t, moment_shape, hs_derivative, hs_integral
 
     @cython.ccall
@@ -587,22 +588,21 @@ class Solution:
         )
 
         for multi_index in self._all_multi_indices:
-            if np_sum(multi_index) <= self.max_order:
-                if multi_index in hs_integral:
-                    self.e_field += self._single_term_multipole(multi_index,
-                                                                -self.mu * self.c ** 2 * hs_integral[multi_index],
-                                                                x1, x2, x3, self._r)
-                    if compute_txt:
-                        self.e_field_text += self._single_term_multipole_txt(
-                            multi_index, "rho", "int_h")
+            if multi_index in hs_integral:
+                self.e_field += self._single_term_multipole(multi_index,
+                                                            -self.mu * self.c ** 2 * hs_integral[multi_index],
+                                                            x1, x2, x3, self._r)
+                if compute_txt:
+                    self.e_field_text += self._single_term_multipole_txt(
+                        multi_index, "rho", "int_h")
 
-                if multi_index in hs_derivative:
-                    self.e_field += self._single_term_multipole(multi_index,
-                                                                -self.mu * hs_derivative[multi_index],
-                                                                x1, x2, x3, self._r)
-                    if compute_txt:
-                        self.e_field_text += self._single_term_multipole_txt(
-                            multi_index, "J", "dh_dt")
+            if multi_index in hs_derivative:
+                self.e_field += self._single_term_multipole(multi_index,
+                                                            -self.mu * hs_derivative[multi_index],
+                                                            x1, x2, x3, self._r)
+                if compute_txt:
+                    self.e_field_text += self._single_term_multipole_txt(
+                        multi_index, "J", "dh_dt")
 
         return self.e_field
 
@@ -639,14 +639,13 @@ class Solution:
         )
 
         for ind in self._all_multi_indices:
-            if np_sum(ind) <= self.max_order:
-                self.b_field += self._single_term_multipole(ind,
-                                                            self.mu * hs_0[ind],
-                                                            x1, x2, x3, self._r)
-                if compute_txt:
-                    self.b_field_text += self._single_term_multipole_txt(ind,
-                                                                         "nabla_x_j",
-                                                                         "dh_dt")
+            self.b_field += self._single_term_multipole(ind,
+                                                        self.mu * hs_0[ind],
+                                                        x1, x2, x3, self._r)
+            if compute_txt:
+                self.b_field_text += self._single_term_multipole_txt(ind,
+                                                                     "nabla_x_j",
+                                                                     "dh_dt")
         if self.verbose:
             print("Done.")
 
@@ -671,23 +670,26 @@ class Solution:
                     hs[order] = -fun(t + self._r / self.c)
             else:
                 hs[order] = sympy.lambdify(t_sym, hs_sym[order])(t)
-
+            if not isinstance(hs[order], ndarray):
+                hs[order] = np.ones(t.shape) * hs[order]
         return self._repack_hs(hs)
 
     def _repack_hs(self, hs):
-        hs_integral = list()
-        hs_derivative = list()
-        hs_0 = [hs[order] for order in range(0, self.max_order + 3)]
-        for order in range(-1, self.max_order + 3):
-            if order > 0:
-                if order <= self.max_order:
-                    hs_derivative.append(hs[order])
-                    hs_integral.append(hs[order])
-                else:
-                    hs_derivative.append(np.zeros(hs[0].shape))
-                    hs_integral.append(np.zeros(hs[0].shape))
-            else:
-                hs_integral.append(hs[order])
+        # hs_integral = list()
+        # hs_derivative = list()
+        hs_0 = [hs[order].copy() for order in range(0, self.max_order + 3)]
+        hs_derivative = [hs[order].copy() for order in range(1, self.max_order + 3)]
+        hs_integral = [hs[order].copy() for order in range(-1, self.max_order + 3)]
+        # for order in range(-1, self.max_order + 3):
+        #     if order > 0:
+        #         if order <= self.max_order + 2:
+        #             hs_derivative.append(hs[order])
+        #             hs_integral.append(hs[order])
+        #         else:
+        #             hs_derivative.append(np.zeros(hs[0].shape))
+        #             hs_integral.append(np.zeros(hs[0].shape))
+        #     else:
+        #         hs_integral.append(hs[order])
 
         return _to_ndarray_safer(hs_0), _to_ndarray_safer(hs_derivative), _to_ndarray_safer(hs_integral)
 
@@ -724,13 +726,14 @@ class Solution:
 
         h_sym_callable = dict()
         kwargs = {"bounds_error": False, "fill_value": 0.}
+        direction = -1. if self._causal else 1.
         for order in hs:
             if self.delayed:
-                h_sym_callable[order] = interp1d(
+                h_sym_callable[order] = -direction * interp1d(
                     t.squeeze(), hs[order], **kwargs
-                )(t - self._r / self.c)
+                )(t + direction * self._r / self.c)
             else:
-                h_sym_callable[order] = interp1d(t.squeeze(), hs[order], **kwargs)(t)
+                h_sym_callable[order] = -direction * interp1d(t.squeeze(), hs[order], **kwargs)(t)
 
         return self._repack_hs(h_sym_callable)
 

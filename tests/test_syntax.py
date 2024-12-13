@@ -73,3 +73,5 @@ if __name__ == "__main__":
     print(sol)
     sol.recurse()
     print(sol)
+
+    test_inputs()
