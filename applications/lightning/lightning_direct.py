@@ -28,15 +28,16 @@ def channel_base_current(t):
     return peak_current * heidler
 
 
-def get_h(t, max_order=0, unit_time=0., unit_distance=0., channel_height_m=0., attenuation=lambda *args: 0., side=1.):
+def get_h(t, max_order=0, unit_time=0., unit_distance=0., channel_height_m=0., attenuation=lambda *args: 0.):
     v = 0.5 * 3e8 / unit_distance * unit_time
     dt = t[1] - t[0]
-    dz = dt * v * .1
+    dz = dt * v * 10
     z = np.arange(0, channel_height_m / unit_distance, dz)
-    z_moment = z - side * channel_height_m / unit_distance / 2
+    z_moment = z - channel_height_m / unit_distance / 2
     current = (attenuation(z))[None, :] * channel_base_current(
         (t[:, None] - z[None, :] / v) * unit_time
     )
+    # plt.figure()
     # plt.contourf(t, z_moment, current.T, cmap="jet", levels=21)
     # plt.colorbar()
     # plt.show()
@@ -54,11 +55,12 @@ def get_h(t, max_order=0, unit_time=0., unit_distance=0., channel_height_m=0., a
 
 
 def get_scalar_moments(ax, ay, az, unit_distance=0., channel_height_m=0., attenuation=lambda *args: 0.):
-    z_moment = np.linspace(0, channel_height_m / unit_distance, 100)
+    z = np.linspace(0, channel_height_m / unit_distance, 100)
+    z_moment = z - channel_height_m / unit_distance / 2.
     dz = z_moment[1] - z_moment[0]
     if ax == 0 and ay == 0 and az % 2 == 0:
         return [0., 0.,
-                2 * dz * np.trapezoid(z_moment ** az * attenuation(z_moment))
+                2 * dz * np.trapezoid(z_moment ** az * attenuation(z))
                 ]
     return [0., 0., 0.]
 
@@ -69,41 +71,45 @@ def read_matlab():
 
 
 def main():
-    max_order = 3
+    max_order = 0
 
     channel_height_m = 4000.
     attenuation = lambda z_: np.exp(-np.abs(z_) / 2_000 * unit_distance)
 
-    unit_distance = 8000.
+    unit_distance = 4000.
     unit_time = 1 / 3e8 * unit_distance
 
     c0 = 3e8
     c = c0 / unit_distance * unit_time
     print(f"{c=}")
-    r = 1000 / unit_distance
-    z = 10 / unit_distance - channel_height_m / unit_distance / 2
-    t = np.arange(-2, 40, .1) * 1e-6 / unit_time
+    r = 16000 / unit_distance
+    z = 10 / unit_distance
+    t = np.arange(-2, 160, .1) * 1e-6 / unit_time
     print(f"{t.shape=}")
     x1 = np.array([r, ])
     x2 = np.array([0, ])
     x3 = np.array([z, ])
 
     sol = Solution(max_order=max_order + 2, wave_speed=c)
-    sol_tr = Solution(max_order=max_order + 2, wave_speed=c, causal=False)
+    # sol_tr = Solution(max_order=max_order + 2, wave_speed=c, causal=False)
     sol.recurse()
-    sol_tr.recurse()
+    # sol_tr.recurse()
     h = get_h(t, max_order=max_order, unit_time=unit_time, unit_distance=unit_distance,
-              channel_height_m=channel_height_m, attenuation=attenuation, side=1.)
-    h2 = get_h(t, max_order=max_order, unit_time=unit_time, unit_distance=unit_distance,
-               channel_height_m=channel_height_m, attenuation=attenuation, side=-1.)
-    args = (x1, x2, x3, t, h)
-    args2 = (x1, x2, x3, t, h2)
+              channel_height_m=channel_height_m, attenuation=attenuation)
+    # h = channel_base_current(t * unit_time)
+    # sol.set_moments(current_moment=lambda *_args: get_scalar_moments(
+    #     *_args, unit_distance=unit_distance, channel_height_m=channel_height_m,
+    #     attenuation=attenuation))
+    args = (x1, x2, x3 - channel_height_m / unit_distance / 2, t, h)
+    args2 = (x1, x2, x3 + channel_height_m / unit_distance / 2, t, h)
     kwargs = dict(
             delayed=True
     )
     start_time = time.perf_counter()
-    e_field = (sol.compute_e_field(*args, **kwargs) + sol.compute_e_field(*args2, **kwargs)) / unit_time
-    b_field = (sol.compute_b_field(*args, **kwargs) + sol.compute_b_field(*args2, **kwargs)) / unit_distance
+    e_field = sol.compute_e_field(*args, **kwargs) / unit_time
+    e_field_sym = sol.compute_e_field(*args2, **kwargs) / unit_time
+    b_field = sol.compute_b_field(*args, **kwargs) / unit_distance
+    b_field_sym = sol.compute_b_field(*args2, **kwargs) / unit_distance
     # b_field_tr = sol_tr.compute_b_field(*args, **kwargs) / unit_distance
     end_time = time.perf_counter()
 
@@ -116,19 +122,23 @@ def main():
 
     plt.subplot(3, 1, 1)
     plt.plot(t_comp, h_phi * 1e3, "--")
-    plt.plot(t * unit_time * 1e6, -1 * b_field[1, 0, 0, 0, :] / (4 * np.pi * 1e-7))
-    # plt.plot(t * unit_time * 1e6, -b_field_tr[1, 0, 0, 0, :] / (4 * np.pi * 1e-7))
-    # plt.plot(t * unit_time * 1e6, -.5 * (b_field - b_field_tr)[1, 0, 0, 0, :] / (4 * np.pi * 1e-7))
+    plt.plot(t * unit_time * 1e6, -2 * b_field[1, 0, 0, 0, :] / (4 * np.pi * 1e-7))
+    plt.plot(t * unit_time * 1e6, -2 * b_field_sym[1, 0, 0, 0, :] / (4 * np.pi * 1e-7))
+    plt.plot(t * unit_time * 1e6, - (b_field + b_field_sym)[1, 0, 0, 0, :] / (4 * np.pi * 1e-7))
     plt.ylim(-1e-1, 1.1 * np.max(h_phi) * 1e3)
 
     plt.subplot(3, 1, 2)
     plt.plot(t_comp, e_z * 1e3, "--")
     plt.plot(t * unit_time * 1e6, 2 * e_field[2, 0, 0, 0, :])
+    plt.plot(t * unit_time * 1e6, 2 * e_field_sym[2, 0, 0, 0, :])
+    plt.plot(t * unit_time * 1e6, (e_field + e_field_sym)[2, 0, 0, 0, :])
     plt.ylim(1.1 * np.min(e_z) * 1e3, 50)
 
     plt.subplot(3, 1, 3)
     plt.plot(t_comp, e_r * 1e3, "--")
     plt.plot(t * unit_time * 1e6, 2 * e_field[0, 0, 0, 0, :])
+    plt.plot(t * unit_time * 1e6, 2 * e_field_sym[0, 0, 0, 0, :])
+    plt.plot(t * unit_time * 1e6, (e_field + e_field_sym)[0, 0, 0, 0, :])
     plt.ylim(-.1, 1.1 * np.max(e_r) * 1e3)
 
     plt.show()
