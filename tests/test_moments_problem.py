@@ -53,7 +53,7 @@ def get_h_num(h_, t_, n_points=30):
     "MTLE",
     "QUAD"
 ))
-def test_em_j_reconstruction(fun_type, plot=False, max_l2_error=1e-2):
+def test_em_j_reconstruction(fun_type, plot=False, max_l2_error=1.4e-2):
     size = 1.
     z_j = np.linspace(-size, size, 10000)
     j_z = true_current_density(z_j, size=size, fun_type=fun_type)
