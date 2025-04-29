@@ -174,10 +174,9 @@ def get_h_num_sampled_attenuation(h_, t_):
     return h_dict
 
 
-def get_h_num_full(h_, t_):
+def get_h_num_full(h_, t_, t_min=0., t_max=1.):
     n_points_segment = h_.size // (max_order // 2 + 1)
     h_dict = dict()
-    t_min, t_max = -.3, 5.5
     steps = np.logspace(np.log10(t_min - t_min + 1), np.log10(t_max - t_min + 1), n_points_segment) + t_min - 1
     for az in range(0, max_order + 1, 2):
         h = interp1d(
@@ -196,6 +195,24 @@ def get_h_num_full(h_, t_):
             h / order_scale ** az
         ]
     return h_dict
+
+
+def read_all_data_coupling(x_f, y_f, case, z=10, dx=10, dt=1e-8, n_t=2000):
+    filepath = f"../../../lightning_inverse/Campi_Analitici_v2024/Fields_Elias/xF={x_f}_yF={y_f}_P={case}.mat"
+    data = loadmat(filepath)
+    e_r, e_z, h_phi = data["Er"], data["Ez"], data["Hphi"]
+    x = np.arange(0, dx * e_r.shape[0], dx)
+    t = np.arange(0, dt * (e_r.shape[1] + 1), dt)[:e_r.shape[1]]
+    y = np.zeros(x.shape)
+    z = z * np.ones(x.shape)
+    e_field = np.stack((
+        e_r, np.zeros(e_r.shape), e_z
+    ))
+    h_field = np.stack((
+        np.zeros(h_phi.shape), -h_phi, np.zeros(h_phi.shape)
+    ))
+
+    return x, y, z, t, e_field, h_field
 
 
 def extend_moment(moment, extended_order=10):
@@ -235,6 +252,8 @@ def lightning_inverse_problem(**kwargs):
     noise_level = kwargs.pop("noise_level", 0.)
     case = kwargs.pop("case")
     raise_error_if_not_cached = kwargs.pop("raise_error_if_not_cached", False)
+    study = kwargs.pop("study", "FDTD")
+    do_cache = kwargs.pop("do_cache", True)
 
     fit_on_magnetic_field = True
 
@@ -242,7 +261,26 @@ def lightning_inverse_problem(**kwargs):
     #     import matplotlib
     #     matplotlib.use("TkAgg")
 
-    x, y, z, t, e_field, h_field = read_all_data(case=case)
+    if study == "FDTD":
+        x, y, z, t, e_field, h_field = read_all_data(case=case)
+        x0, y0 = 0, 0
+    elif study == "coupling":
+        x0, y0 = 500, 2000
+        x, y, z, t, e_field, h_field = read_all_data_coupling(x0, y0, "MTLE")
+        # for i, ti in enumerate(t):
+        #     plt.clf()
+        #     plt.plot(x, h_field[1, :, i])
+        #     plt.title(f"{ti*1e6:2f}")
+        #     plt.ylim(-1.5e-3, 0)
+        #     plt.pause(1e-3)
+
+        e_field = -e_field
+        h_field = -h_field
+        keep = slice(0, -1, 5)
+        x, y, z, e_field, h_field = x[keep], y[keep], z[keep], e_field[:, keep, :], h_field[:, keep, :]
+    else:
+        raise ValueError(f"Unknown value of --study: {study}")
+
     if fit_on_magnetic_field:
         field = h_field * 4 * np.pi * 1e-7
     else:
@@ -252,7 +290,7 @@ def lightning_inverse_problem(**kwargs):
     dt = t[1] - t[0]
     t = np.concatenate((np.linspace(-n * dt, -dt, n) + t[0], t))
     field = np.concatenate((np.zeros((3, field.shape[1], n)), field), axis=-1)
-    r = np.sqrt(x ** 2 + y ** 2 + z ** 2)
+    r = np.sqrt((x - x0) ** 2 + (y - y0) ** 2 + (z - 0) ** 2)
     for ind_pos, ri in enumerate(r):
         field[:, ind_pos, ...] = interp1d(t - ri / 3e8, field[:, ind_pos, ...],
                                           bounds_error=False, fill_value=0.)(t)
@@ -266,7 +304,7 @@ def lightning_inverse_problem(**kwargs):
         field = field + noise
 
     print(x, y, z)
-    factor = 4e3
+    factor = 1.
     x = x / factor
     y = y / factor
     z = z / factor
@@ -275,7 +313,7 @@ def lightning_inverse_problem(**kwargs):
     # dim_moment = sum(1 for az in range(max_order + 1) if az % 2 == 0) - 1
     # dim_moment = max_order // 2 + 1
     dim_moment = 0
-    test_indices = (1, 5,)
+    test_indices = set(range(0, 20, 2))
 
     # n_up = 10
     # t_new = np.linspace(np.min(t), np.max(t), n_up * t.size)
@@ -285,12 +323,20 @@ def lightning_inverse_problem(**kwargs):
     # field = sosfilt(highpass, field, axis=-1)
     # field = field[..., ::n_up]
 
-    keep = (t >= -.5) * (t <= 5)
-    t = t[keep]
-    field = field[..., keep]
-    ignore_tail = .5
-    t_max = np.max(t) - ignore_tail
-    n_z = 2
+    # keep = (t >= -.5) * (t <= 5)
+    # t = t[keep]
+    # field = field[..., keep]
+    t_min = 0
+    t_max = 5000.
+    ignore_tail = 2500
+    # t_max = np.max(t) - ignore_tail
+    # n_z = 2
+
+    bounds = [(-np.inf, 0), ] * (n_points * (max_order // 2 + 1))
+
+    if find_center:
+        lim = 10
+        bounds += [(-lim, lim), (-lim, lim), (0, np.inf), ]
 
     kwargs = dict(
         order=max_order + 2,
@@ -302,7 +348,7 @@ def lightning_inverse_problem(**kwargs):
         _t_sym=None,
         current_moment_callable=lambda *args: [0., 0., 0.],
         dim_moment=dim_moment,
-        h_num=get_h_num_full,
+        h_num=lambda x1, x2: get_h_num_full(x1, x2, t_min=t_min, t_max=t_max),
         plot=plot,
         verbose_every=verbose_every,
         scale=scale,  # shift, scale: 0, 14 -- -1 22
@@ -311,7 +357,7 @@ def lightning_inverse_problem(**kwargs):
         find_center=find_center,
         shift=0,
         rescale_at_points=rescale_at_points,
-        find_center_ignore_axes=("x", "y"),
+        find_center_ignore_axes=(),
         center_scale=center_scale,
         seed=seed,
         test_indices=test_indices,
@@ -322,7 +368,7 @@ def lightning_inverse_problem(**kwargs):
         return_x_opt=True,
         random_start=False,
         minimize_kwargs=dict(
-            bounds=[(-np.inf, 0), ] * (n_points * (max_order // 2 + 1)),
+            bounds=bounds,
         ),
         minimize_options=dict(
             ftol=1e-15,
@@ -333,14 +379,21 @@ def lightning_inverse_problem(**kwargs):
             maxls=(n_points * (max_order // 2 + 1)) * 5
         )
     )
-    current_moment, h, center, field_opt, x_opt = cache_function_call(
-        inverse_problem,
-        raise_error_if_not_cached=raise_error_if_not_cached,
-        **kwargs
-    )
+    if do_cache:
+        current_moment, h, center, field_opt, x_opt = cache_function_call(
+            inverse_problem,
+            raise_error_if_not_cached=raise_error_if_not_cached,
+            **kwargs
+        )
+    else:
+        current_moment, h, center, field_opt, x_opt = inverse_problem(
+            **kwargs
+        )
+
     if plot_recall:
         plt.figure()
-        plt.plot(x_opt)
+        plt.stairs(x_opt)
+        plt.title("x opt")
 
     train_indices = set(range(x.size)) - set(test_indices)
     keep = (t <= np.max(t) - ignore_tail)
@@ -389,90 +442,90 @@ def lightning_inverse_problem(**kwargs):
         plt.tight_layout()
         plt.savefig(f"{path}/opt_h_{case}.pdf")
 
-        plt.figure(figsize=(15, 10))
-        # omin, omax = np.min(e_field), np.max(e_field)
-        for i, (xi, yi, zi) in enumerate(zip(x, y, z)):
-            plt.subplot(3, 2, i+1)
-            plt.plot(t, field[:, i, :].T, "r--")
-            plt.plot(t, field_opt[:, i, :].T, "k-")
-            plt.title(f"x = {xi*factor/1e3:.1f} km, z = {zi*factor/1e3:.1f} km")
-            if i % 2 == 0:
-                plt.ylabel("Field (...)")
-            if i > 3:
-                plt.xlabel("Time (us)")
-            # plt.ylim(1.1*omin, 1.1*omax)
-            plt.xlim(t_min, t_max)
-        plt.tight_layout()
-        plt.savefig(f"{path}/opt_fields_{case}.pdf")
+        # plt.figure(figsize=(15, 10))
+        # # omin, omax = np.min(e_field), np.max(e_field)
+        # for i, (xi, yi, zi) in enumerate(zip(x, y, z)):
+        #     plt.subplot(3, 2, i+1)
+        #     plt.plot(t, field[:, i, :].T, "r--")
+        #     plt.plot(t, field_opt[:, i, :].T, "k-")
+        #     plt.title(f"x = {xi*factor/1e3:.1f} km, z = {zi*factor/1e3:.1f} km")
+        #     if i % 2 == 0:
+        #         plt.ylabel("Field (...)")
+        #     if i > 3:
+        #         plt.xlabel("Time (us)")
+        #     # plt.ylim(1.1*omin, 1.1*omax)
+        #     plt.xlim(t_min, t_max)
+        # plt.tight_layout()
+        # plt.savefig(f"{path}/opt_fields_{case}.pdf")
 
-        z = np.linspace(-1, 1, 100)
-        function = np.zeros((t.size, z.size))
+        # z = np.linspace(-1, 1, 100)
+        # function = np.zeros((t.size, z.size))
 
-        for ind_t, ti in enumerate(t):
-            moment = np.array([h[o_i // 2, 2, ind_t] if o_i % 2 == 0 else 0. for o_i in range(max_order + 1)])
-            # moment = extend_moment(h[:, 2, ind_t], extended_order=10)
-            # moment = np.array([mi if ai % 2 == 0 else 0. for ai, mi in enumerate(moment)])
-            f, _ = optimization_moment_problem_solution(
-                z, moment, poly_order=2,
-                tol=1e-8,
-                # method="BFGS",
-                # should_be_negative=True,
-                weight_l2=.03,
-                bounds=[(-np.inf, 0), ] * 3
-            )
-            function[ind_t, :] = f
-        function *= factor * 2 / 1e3
+        # for ind_t, ti in enumerate(t):
+        #     moment = np.array([h[o_i // 2, 2, ind_t] if o_i % 2 == 0 else 0. for o_i in range(max_order + 1)])
+        #     # moment = extend_moment(h[:, 2, ind_t], extended_order=10)
+        #     # moment = np.array([mi if ai % 2 == 0 else 0. for ai, mi in enumerate(moment)])
+        #     f, _ = optimization_moment_problem_solution(
+        #         z, moment, poly_order=2,
+        #         tol=1e-8,
+        #         # method="BFGS",
+        #         # should_be_negative=True,
+        #         weight_l2=.03,
+        #         bounds=[(-np.inf, 0), ] * 3
+        #     )
+        #     function[ind_t, :] = f
+        # function *= factor * 2 / 1e3
 
         # sos = butter(6, .1, fs=1/(t[1] - t[0]), output="sos")
         # function = sosfilt(sos, function, axis=0)
 
-        fig = plt.figure()
-        # plt.contourf(t * factor / 3e8 * 1e6, z * 4, function.T, cmap="jet", levels=21)
-        # plt.colorbar()
-        # plt.contour(t * factor / 3e8 * 1e6, z * 4, function.T, levels=(0, ))
-        ind_z_pos = z >= 0
-        x_mg, y_mg = np.meshgrid(t, z[ind_z_pos] * 4)
-        ax = fig.add_subplot(111, projection='3d')
-        surf = ax.plot_surface(x_mg, y_mg, function[:, ind_z_pos].T, cmap="jet",)
-        fig.colorbar(surf, ax=ax, shrink=0.5, aspect=10)
+        # fig = plt.figure()
+        # # plt.contourf(t * factor / 3e8 * 1e6, z * 4, function.T, cmap="jet", levels=21)
+        # # plt.colorbar()
+        # # plt.contour(t * factor / 3e8 * 1e6, z * 4, function.T, levels=(0, ))
+        # ind_z_pos = z >= 0
+        # x_mg, y_mg = np.meshgrid(t, z[ind_z_pos] * 4)
+        # ax = fig.add_subplot(111, projection='3d')
+        # surf = ax.plot_surface(x_mg, y_mg, function[:, ind_z_pos].T, cmap="jet",)
+        # fig.colorbar(surf, ax=ax, shrink=0.5, aspect=10)
+#
+        # plt.ylim(0, 4)
+        # plt.ylabel("Altitude (km)")
+        # plt.xlabel("Time (us)")
+        # plt.xlim(t_min, t_max)
+        # plt.title(f"{case}, current (kA)")
+        # plt.tight_layout()
+        # plt.savefig(f"{path}/attenuation_{case}.pdf")
 
-        plt.ylim(0, 4)
-        plt.ylabel("Altitude (km)")
-        plt.xlabel("Time (us)")
-        plt.xlim(t_min, t_max)
-        plt.title(f"{case}, current (kA)")
-        plt.tight_layout()
-        plt.savefig(f"{path}/attenuation_{case}.pdf")
+        # plt.figure()
+        # t_slice_us = 0
+        # ind_t = np.where(t >= t_slice_us)[0][0]
+        # current_max = np.max(np.abs(function[ind_t, :]))
+        # plt.plot(z * factor, function[ind_t, :], "k")
+        # plt.ylim(-1.1 * current_max, .1)
+        # plt.xlim(0, factor)
+        # plt.xlabel("Altitude (m)")
+        # plt.ylabel("kA")
+        # plt.title(f"Reconstructed current at {t_slice_us} us")
+        # plt.tight_layout()
+        # plt.savefig(f"{path}/attenuation_slice_{case}.pdf")
 
-        plt.figure()
-        t_slice_us = 30
-        ind_t = np.where(t >= t_slice_us)[0][0]
-        current_max = np.max(np.abs(function[ind_t, :]))
-        plt.plot(z * factor, function[ind_t, :], "k")
-        plt.ylim(-1.1 * current_max, .1)
-        plt.xlim(0, factor)
-        plt.xlabel("Altitude (m)")
-        plt.ylabel("kA")
-        plt.title(f"Reconstructed current at {t_slice_us} us")
-        plt.tight_layout()
-        plt.savefig(f"{path}/attenuation_slice_{case}.pdf")
-
-        plt.figure()
-        i1 = z.size // 2
-        i2 = z.size // 2 + z.size * 3 // 8
-        f1 = function[:, i1]  # / np.max(np.abs(function[:, i1]))
-        f2 = function[:, i2]  # / np.max(np.abs(function[:, i2]))
-        # t1 = t[np.argmax(np.abs(f1))]
-        # t2 = t[np.argmax(np.abs(f2))]
-        # print(f"speed = {3e3/(t2 - t1) * 1e6 / 3e8 * 100:.2f} % c0")
-        plt.plot(t, f1, label="z = 0 km")
-        plt.plot(t, f2, label="z = 3 km")
-        plt.xlabel("Time (us)")
-        plt.ylabel("Current (kA)")
-        plt.legend()
-        # plt.vlines(np.array((t1, t2)) / 3e8 * factor, -1, 0)
-        plt.tight_layout()
-        plt.savefig(f"{path}/time_slices_{case}.pdf")
+        # plt.figure()
+        # i1 = z.size // 2
+        # i2 = z.size // 2 + z.size * 3 // 8
+        # f1 = function[:, i1]  # / np.max(np.abs(function[:, i1]))
+        # f2 = function[:, i2]  # / np.max(np.abs(function[:, i2]))
+        # # t1 = t[np.argmax(np.abs(f1))]
+        # # t2 = t[np.argmax(np.abs(f2))]
+        # # print(f"speed = {3e3/(t2 - t1) * 1e6 / 3e8 * 100:.2f} % c0")
+        # plt.plot(t, f1, label="z = 0 km")
+        # plt.plot(t, f2, label="z = 3 km")
+        # plt.xlabel("Time (us)")
+        # plt.ylabel("Current (kA)")
+        # plt.legend()
+        # # plt.vlines(np.array((t1, t2)) / 3e8 * factor, -1, 0)
+        # plt.tight_layout()
+        # plt.savefig(f"{path}/time_slices_{case}.pdf")
 
         # plt.figure()
         # n_calls = 0
@@ -552,6 +605,8 @@ def from_command_line():
     parser.add_argument("--rescale_at_points", type=bool, default=False)
     parser.add_argument("--noise_level", type=float, default=0.)
     parser.add_argument("--case", type=str, default="MTLL")
+    parser.add_argument("--study", type=str, default="FDTD")
+    parser.add_argument("--do_cache", type=int, default=True)
 
     parsed = parser.parse_args()
     lightning_inverse_problem(**vars(parsed))

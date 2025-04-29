@@ -301,7 +301,7 @@ def inverse_problem(order, e_true, x1, x2, x3, t, _t_sym, current_moment_callabl
     if find_center:
         center *= center_scale
 
-    return_value = (current_moment_callable(current_moment), get_h_num(h, t), center, field_opt.squeeze() * scale, )
+    return_value = (current_moment_callable(current_moment), get_h_num(h, t), center, field_opt * scale, )
 
     if return_residual_error:
         return_value += (res.fun, )
