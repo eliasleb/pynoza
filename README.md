@@ -18,7 +18,7 @@ The theory behind the code can be found in E. Le Boudec et al., “The time-doma
 
 ## Tutorial
 
-The Python `>= 3.10` script `tests/test_EPFL_logo.py` shows some examples. A Jupyter notebook is also provided. The general procedure is the following:
+The Python `>= 3.11` script `tests/test_EPFL_logo.py` shows some examples. A Jupyter notebook is also provided. The general procedure is the following:
 
 1. Compute the electric time-domain current moments 
    $C_\mathbf{\alpha}^{J_i}(t)=h^{'}(t)\iiint\mathbf{x}^\alpha j_i(\mathbf{x}) d^3\mathbf{x}$.

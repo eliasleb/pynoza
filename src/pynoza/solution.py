@@ -712,9 +712,13 @@ class Solution:
             h = h_np
 
         def integrate_array(x):
+            if np.isscalar(x) or np.ndim(x) == 0:
+                x = np.full_like(t, x, dtype=float)
             return np.cumsum(x, axis=-1) * dt
 
         def derivative(x):
+            if np.isscalar(x) or np.ndim(x) == 0:
+                x = np.full_like(t, x, dtype=float)
             return np.gradient(x, dt, axis=-1)
 
         hs = {shift: h}
