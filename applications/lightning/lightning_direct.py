@@ -32,7 +32,9 @@ def channel_base_current(t, for_plot=False):
     term1 = x1 / (1 + x1)
     heidler[ind_nonzero] = (i01 * term1 / eta1 * np.exp(-tn0 / tau12))
     heidler = peak_current * heidler
-    # plt.plot(t, heidler)
+    plt.figure()
+    plt.plot(t, heidler)
+    plt.show()
     return heidler
 
 
@@ -103,14 +105,14 @@ def get_h(t, max_order=0, unit_time=0., unit_distance=0., channel_height_m=0., a
     step = 2 if symmetry else 1
     cmap = plt.get_cmap("jet")
     for ind, az in enumerate(range(0, max_order + 1, step)):
-        hi = dz * np.trapezoid(
+        hi = (2. if symmetry else 1.) * dz * np.trapezoid(
             z_moment ** az * current,
             axis=1
         )
         h_dict[(0, 0, az)] = [
             0. * hi, 0. * hi, hi
         ]
-        plt.loglog(t * unit_time * 1e6, hi * unit_distance ** (az + 1),
+        plt.semilogy(t * unit_time * 1e6, hi * unit_distance ** (az + 1),
                      color=cmap(ind/(max_order + 1)), label=f"a_z = {az}")
 
     plt.legend(loc="lower right")
@@ -180,7 +182,8 @@ def plot_heidler_derivatives(max_order=3):
     plt.savefig("../../../lightning_inverse/figs/heidler_derivatives_v2.pdf")
 
 
-def lightning_multipole_expansion(r_m=8000, max_order=2, block_plot=False, t_max_us=None):
+def lightning_multipole_expansion(r_m=8000, max_order=2, block_plot=False, t_max_us=None, max_e_z=None,
+                                  max_e_r=None, n_times=30):
 
     plot_case = f"../../../lightning_inverse/figs/field_r_{int(r_m)}_order_{max_order}"
 
@@ -237,18 +240,28 @@ def lightning_multipole_expansion(r_m=8000, max_order=2, block_plot=False, t_max
     kwargs = dict(
             delayed=True
     )
-    start_time = time.perf_counter()
-    e_field = sol.compute_e_field(*args, **kwargs) / unit_time
-    b_field = sol.compute_b_field(*args, **kwargs) / unit_distance
-    if has_image:
-        e_field_img = sol.compute_e_field(*args_img, **kwargs) / unit_time
-        b_field_img = sol.compute_b_field(*args_img, **kwargs) / unit_distance
-    end_time = time.perf_counter()
+    times = []
+    for ind in range(n_times):
+        print(f"{ind + 1} / {n_times}")
+        start_time = time.perf_counter()
+        e_field = sol.compute_e_field(*args, **kwargs) / unit_time
+        b_field = sol.compute_b_field(*args, **kwargs) / unit_distance
+        if has_image:
+            e_field_img = sol.compute_e_field(*args_img, **kwargs) / unit_time
+            b_field_img = sol.compute_b_field(*args_img, **kwargs) / unit_distance
+        end_time = time.perf_counter()
 
-    # print(f"{np.max(np.abs(b_field[1, ...]))*1e6:.2f}")
+        # print(f"{np.max(np.abs(b_field[1, ...]))*1e6:.2f}")
 
-    elapsed_time = end_time - start_time
-    print(f"Elapsed Time: {elapsed_time:.4f} seconds")
+        elapsed_time = end_time - start_time
+        times.append(elapsed_time)
+    print(f"Median comp. time: {np.median(times):.4f} seconds")
+    b = 10000
+    medians = [np.median(np.random.choice(times, size=len(times), replace=True))
+               for _ in range(b)]
+    lo, hi = np.percentile(medians, [2.5, 97.5])
+    print(f"95 % CI: {lo:.4f} - {hi:.4f} s")
+
     t_comp, h_phi, e_z, e_r = read_matlab(r * unit_distance)
     t_comp *= 1e6
     ts_us = t_early * 1e6, t_sing1 * 1e6, t_sing2 * 1e6
@@ -258,9 +271,9 @@ def lightning_multipole_expansion(r_m=8000, max_order=2, block_plot=False, t_max
     linestyle_me = "r--"
     plt.subplot(3, 1, 1)
     plt.plot(t_comp, h_phi * 1e3, linestyle_ref, label="Ref.")
-    plt.plot(t * unit_time * 1e6, -2 * b_field[1, 0, 0, 0, :] / (4 * np.pi * 1e-7), linestyle_me, label="M.E.")
+    plt.plot(t * unit_time * 1e6, -b_field[1, 0, 0, 0, :] / (4 * np.pi * 1e-7), linestyle_me, label="ME")
     if has_image:
-        plt.plot(t * unit_time * 1e6, -2 * b_field_img[1, 0, 0, 0, :] / (4 * np.pi * 1e-7), label="2")
+        plt.plot(t * unit_time * 1e6, -b_field_img[1, 0, 0, 0, :] / (4 * np.pi * 1e-7), label="2")
         plt.plot(t * unit_time * 1e6, -(b_field + b_field_img)[1, 0, 0, 0, :] / (4 * np.pi * 1e-7), label="both")
     plt.title("H, azimuthal (A/m)")
     y1, y2 = -np.max(np.abs(h_phi)) * 1e3 / 10, np.max(np.abs(h_phi)) * 1e3 * 1.1
@@ -271,27 +284,27 @@ def lightning_multipole_expansion(r_m=8000, max_order=2, block_plot=False, t_max
 
     plt.subplot(3, 1, 2)
     plt.plot(t_comp, e_z * 1e3, linestyle_ref, label="ref")
-    plt.plot(t * unit_time * 1e6, 2 * e_field[2, 0, 0, 0, :], linestyle_me, label="ME")
+    plt.plot(t * unit_time * 1e6, e_field[2, 0, 0, 0, :], linestyle_me, label="ME")
     if has_image:
-        plt.plot(t * unit_time * 1e6, 2 * e_field_img[2, 0, 0, 0, :], label="2")
+        plt.plot(t * unit_time * 1e6, e_field_img[2, 0, 0, 0, :], label="2")
         plt.plot(t * unit_time * 1e6, (e_field + e_field_img)[2, 0, 0, 0, :], label="both")
     plt.title("E, vertical (V/m)")
     y1, y2 = -np.max(np.abs(e_z)) * 1e3 * 1.1, np.max(np.abs(e_z)) * 1e3 * .1
-    plt.ylim(y1, y2)
+    plt.ylim(y1 if max_e_z is None else -max_e_z, y2)
     plt.vlines(ts_us, y1, y2, colors="b", linestyles=":")
     plt.xlim(np.min(t) * unit_time * 1e6, np.max(t) * unit_time * 1e6 if t_max_us is None else t_max_us)
     plt.grid()
 
     plt.subplot(3, 1, 3)
     plt.plot(t_comp, e_r * 1e3, linestyle_ref, label="Ref.")
-    plt.plot(t * unit_time * 1e6, 2 * e_field[0, 0, 0, 0, :], linestyle_me, label="M.E.")
+    plt.plot(t * unit_time * 1e6, e_field[0, 0, 0, 0, :], linestyle_me, label="ME")
     if has_image:
         plt.plot(t * unit_time * 1e6, e_field_img[0, 0, 0, 0, :], label="2")
         plt.plot(t * unit_time * 1e6, (e_field + e_field_img)[0, 0, 0, 0, :], label="both")
     plt.title("E, radial (V/m)")
     y1, y2 = -np.max(np.abs(e_r)) * 1e3 / 10, np.max(np.abs(e_r)) * 1e3 * 1.1
-    plt.ylim(y1, y2)
-    plt.legend()
+    plt.ylim(y1, y2 if max_e_r is None else max_e_r)
+    plt.legend(loc="upper left")
     plt.xlabel("Time (us)")
     plt.xlim(np.min(t) * unit_time * 1e6, np.max(t) * unit_time * 1e6 if t_max_us is None else t_max_us)
     plt.vlines(ts_us, y1, y2, colors="b", linestyles=":")
@@ -301,7 +314,7 @@ def lightning_multipole_expansion(r_m=8000, max_order=2, block_plot=False, t_max
     plt.savefig(f"{plot_case}_fields.pdf")
 
     max_h_phi_ref = np.max(1e3 * h_phi)
-    max_h_phi_com = np.max(-2 * b_field[1, 0, 0, 0, t < t_early / unit_time] / (4 * np.pi * 1e-7))
+    max_h_phi_com = np.max(-b_field[1, 0, 0, 0, t < t_early / unit_time] / (4 * np.pi * 1e-7))
     error = (max_h_phi_com - max_h_phi_ref) / max_h_phi_ref
     print(f"Relative peak error: {error * 100:.2f} %")
 
@@ -311,10 +324,12 @@ def lightning_multipole_expansion(r_m=8000, max_order=2, block_plot=False, t_max
 
 
 def main():
-    lightning_multipole_expansion(r_m=8000, max_order=10, block_plot=True)
-    lightning_multipole_expansion(r_m=3000, max_order=10, block_plot=True, t_max_us=30)
+    lightning_multipole_expansion(r_m=8000, max_order=10, block_plot=True, n_times=1)
+    lightning_multipole_expansion(r_m=3000, max_order=10, block_plot=True, t_max_us=30, max_e_z=500, max_e_r=4,
+                                  n_times=1)
     for max_order in range(0, 10 + 1, 2):
-        lightning_multipole_expansion(r_m=3000, max_order=max_order, block_plot=False, t_max_us=30)
+        lightning_multipole_expansion(r_m=3000, max_order=max_order, block_plot=False, t_max_us=30,
+                                      max_e_z=500, max_e_r=4, n_times=100)
         plt.close("all")
 
 
