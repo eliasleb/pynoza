@@ -12,7 +12,7 @@ import sympy.functions
 from scipy.integrate import quad
 
 
-def channel_base_current(t, for_plot=False):
+def channel_base_current(t, for_plot=False, plot_current=False):
     ind_nonzero = t > 0
     tn0 = t[ind_nonzero]
 
@@ -32,9 +32,10 @@ def channel_base_current(t, for_plot=False):
     term1 = x1 / (1 + x1)
     heidler[ind_nonzero] = (i01 * term1 / eta1 * np.exp(-tn0 / tau12))
     heidler = peak_current * heidler
-    plt.figure()
-    plt.plot(t, heidler)
-    plt.show()
+    if plot_current:
+        plt.figure()
+        plt.plot(t, heidler)
+        plt.show()
     return heidler
 
 
@@ -313,10 +314,20 @@ def lightning_multipole_expansion(r_m=8000, max_order=2, block_plot=False, t_max
     plt.tight_layout()
     plt.savefig(f"{plot_case}_fields.pdf")
 
-    max_h_phi_ref = np.max(1e3 * h_phi)
+    max_h_phi_ref = np.max(1e3 * h_phi[t_comp < t_early * 1e6])
     max_h_phi_com = np.max(-b_field[1, 0, 0, 0, t < t_early / unit_time] / (4 * np.pi * 1e-7))
-    error = (max_h_phi_com - max_h_phi_ref) / max_h_phi_ref
-    print(f"Relative peak error: {error * 100:.2f} %")
+    error_h_phi = (max_h_phi_com - max_h_phi_ref) / max_h_phi_ref
+    print(f"{max_h_phi_ref=:.2f}, {max_h_phi_com=:.2f} --- Relative peak error h_phi: {error_h_phi * 100:.2f} %")
+
+    max_e_z_ref = np.min(e_z[t_comp < t_early * 1e6] * 1e3)
+    max_e_z_com = np.min(e_field[2, 0, 0, 0, t < t_early / unit_time])
+    error_e_z = (max_e_z_com - max_e_z_ref) / max_e_z_ref
+    print(f"{max_e_z_ref=:.2f}, {max_e_z_com=:.2f} --- Relative peak error e_z: {error_e_z * 100:.2f} %")
+
+    max_e_r_ref = np.max(1e3 * e_r[t_comp < t_early * 1e6])
+    max_e_r_com = np.max(e_field[0, 0, 0, 0, t < t_early / unit_time])
+    error_e_r = (max_e_r_com - max_e_r_ref) / max_e_r_ref
+    print(f"{max_e_r_ref=:.2f}, {max_e_r_com=:.2f} --- Relative peak error e_r: {error_e_r * 100:.2f} %")
 
     if block_plot:
         plt.show()
@@ -324,12 +335,13 @@ def lightning_multipole_expansion(r_m=8000, max_order=2, block_plot=False, t_max
 
 
 def main():
-    lightning_multipole_expansion(r_m=8000, max_order=10, block_plot=True, n_times=1)
-    lightning_multipole_expansion(r_m=3000, max_order=10, block_plot=True, t_max_us=30, max_e_z=500, max_e_r=4,
-                                  n_times=1)
+    # lightning_multipole_expansion(r_m=8000, max_order=10, block_plot=True, n_times=1)
+    # lightning_multipole_expansion(r_m=3000, max_order=10, block_plot=True, t_max_us=30, max_e_z=500, max_e_r=4,
+    #                              n_times=1)
     for max_order in range(0, 10 + 1, 2):
         lightning_multipole_expansion(r_m=3000, max_order=max_order, block_plot=False, t_max_us=30,
-                                      max_e_z=500, max_e_r=4, n_times=100)
+                                      max_e_z=500, max_e_r=4, n_times=1)
+        plt.waitforbuttonpress()
         plt.close("all")
 
 
